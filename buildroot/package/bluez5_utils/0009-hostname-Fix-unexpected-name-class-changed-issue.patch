@@ -1,0 +1,37 @@
+From 32f48573a43d011a52bb9fbde5005ea05f1982bf Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Thu, 31 Oct 2019 11:10:28 +0800
+Subject: [PATCH] hostname: Fix unexpected name class changed issue
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ plugins/hostname.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/plugins/hostname.c b/plugins/hostname.c
+index 4f9dfe6..c885714 100644
+--- a/plugins/hostname.c
++++ b/plugins/hostname.c
+@@ -198,8 +198,8 @@ static int hostname_probe(struct btd_adapter *adapter)
+ {
+ 	DBG("");
+ 
+-	update_name(adapter, NULL);
+-	update_class(adapter, NULL);
++	//update_name(adapter, NULL);
++	//update_class(adapter, NULL);
+ 
+ 	return 0;
+ }
+@@ -277,7 +277,7 @@ static int hostname_init(void)
+ 	DBusConnection *conn = btd_get_dbus_connection();
+ 	int err;
+ 
+-	read_dmi_fallback();
++	//read_dmi_fallback();
+ 
+ 	hostname_client = g_dbus_client_new(conn, "org.freedesktop.hostname1",
+ 						"/org/freedesktop/hostname1");
+-- 
+2.7.4
+

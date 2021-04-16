@@ -1,0 +1,35 @@
+From 733b6fc0b1a3cecd307713c12acdee460b4feb0e Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 29 Jan 2021 10:01:57 +0800
+Subject: [PATCH 2/2] Add missing include of math.h
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ include/mynteyed/filter/spatial_filter.h | 1 +
+ src/mynteyed/internal/location.cc        | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/include/mynteyed/filter/spatial_filter.h b/include/mynteyed/filter/spatial_filter.h
+index f050c7c..f4abf8e 100644
+--- a/include/mynteyed/filter/spatial_filter.h
++++ b/include/mynteyed/filter/spatial_filter.h
+@@ -17,6 +17,7 @@
+ #include <vector>
+ #include <memory>
+ #include "mynteyed/filter/base_filter.h"
++#include <math.h>
+ 
+ MYNTEYE_BEGIN_NAMESPACE
+ 
+diff --git a/src/mynteyed/internal/location.cc b/src/mynteyed/internal/location.cc
+index 5ea1c28..ae14873 100644
+--- a/src/mynteyed/internal/location.cc
++++ b/src/mynteyed/internal/location.cc
+@@ -1,3 +1,4 @@
++#include <math.h>
+ #include "mynteyed/util/log.h"
+ #include "mynteyed/internal/location.h"
+ 
+-- 
+2.20.1
+

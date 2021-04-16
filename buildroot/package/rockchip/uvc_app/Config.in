@@ -1,0 +1,14 @@
+config BR2_PACKAGE_UVC_APP
+    bool "uvc app"
+    select BR2_PACKAGE_LIBDRM
+    select BR2_PACKAGE_MPP
+    select BR2_PACKAGE_LIBV4L
+
+if BR2_PACKAGE_UVC_APP
+config BR2_PACKAGE_UVC_APP_MINILOGGER
+	bool "enable uvc_app miniloger print"
+	select BR2_PACKAGE_MINILOGGER
+	default y
+	help
+	  Enable uvc_app miniloger print.
+endif

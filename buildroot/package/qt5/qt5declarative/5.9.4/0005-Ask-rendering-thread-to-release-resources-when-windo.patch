@@ -1,0 +1,47 @@
+From 0feb322730d684aee38ba7e74339bafbdb6bfed8 Mon Sep 17 00:00:00 2001
+From: Damien Caliste <dcaliste@free.fr>
+Date: Fri, 1 Feb 2019 14:35:21 +0100
+Subject: [PATCH 5/5] Ask rendering thread to release resources when window is
+ closed
+
+If the close event is accepted, the close handler in QWindow will
+destroy the underlying platform window without notifying the
+QSGRenderer attribute windowManager. This may cause a race
+condition if the renderer is a QSGThreadedRenderLoop because
+the platform window may be deleted while the thread is using it.
+
+Correct this issue by notifying the QSGRenderer on a close event
+using the hide() method (which is supposed to release the
+resources according to documentation).
+
+Task-number: QTBUG-73929
+Change-Id: Ia48366b3f6638d5d714ceb17a2f8c7848eb20465
+Reviewed-by: Shawn Rutledge <shawn.rutledge@qt.io>
+Reviewed-by: Laszlo Agocs <laszlo.agocs@qt.io>
+(cherry picked from commit ca66d4fc23706a0f4ecfc4031f37cdd19facd836)
+---
+ src/quick/items/qquickwindow.cpp | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/quick/items/qquickwindow.cpp b/src/quick/items/qquickwindow.cpp
+index 15ade6767c..530db53eac 100644
+--- a/src/quick/items/qquickwindow.cpp
++++ b/src/quick/items/qquickwindow.cpp
+@@ -1575,6 +1575,14 @@ bool QQuickWindow::event(QEvent *e)
+         emit closing(&qev);
+         e->setAccepted(qev.isAccepted());
+         } break;
++    case QEvent::PlatformSurface:
++        if ((static_cast<QPlatformSurfaceEvent *>(e))->surfaceEventType() == QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed) {
++            // Ensure that the rendering thread is notified before
++            // the QPlatformWindow is destroyed.
++            if (d->windowManager)
++                d->windowManager->hide(this);
++        }
++        break;
+     case QEvent::FocusAboutToChange:
+ #if QT_CONFIG(im)
+         if (d->activeFocusItem)
+-- 
+2.20.1
+

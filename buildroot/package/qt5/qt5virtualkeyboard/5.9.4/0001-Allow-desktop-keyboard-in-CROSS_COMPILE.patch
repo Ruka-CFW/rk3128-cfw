@@ -1,0 +1,26 @@
+From 9113c9fa85cb7687f1a03535ef6ba2074b270a05 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Thu, 30 Apr 2020 14:23:53 +0800
+Subject: [PATCH] Allow desktop keyboard in CROSS_COMPILE
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/virtualkeyboard/virtualkeyboard.pro | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/virtualkeyboard/virtualkeyboard.pro b/src/virtualkeyboard/virtualkeyboard.pro
+index ca84cd2..87d7430 100644
+--- a/src/virtualkeyboard/virtualkeyboard.pro
++++ b/src/virtualkeyboard/virtualkeyboard.pro
+@@ -210,7 +210,7 @@ OTHER_FILES += \
+     content/components/*.qml \
+     qtvirtualkeyboard.json
+ 
+-!disable-desktop:isEmpty(CROSS_COMPILE):!android-embedded:!qnx {
++!disable-desktop:!android-embedded:!qnx {
+     SOURCES += desktopinputpanel.cpp inputview.cpp
+     HEADERS += desktopinputpanel.h inputview.h
+     DEFINES += QT_VIRTUALKEYBOARD_DESKTOP
+-- 
+2.20.1
+

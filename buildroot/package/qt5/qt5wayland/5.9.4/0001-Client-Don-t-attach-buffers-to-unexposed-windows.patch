@@ -1,0 +1,181 @@
+From dd23f321e8ae1f74639848ac78327bb91d90eb70 Mon Sep 17 00:00:00 2001
+From: Johan Klokkhammer Helsing <johan.helsing@qt.io>
+Date: Mon, 24 Sep 2018 13:04:51 +0200
+Subject: [PATCH 01/18] Client: Don't attach buffers to unexposed windows
+
+QBackingStore::flush is sometimes called with an unxeposed window, in that
+case, don't attach the buffer to the wl_surface immediately, as that causes
+protocol errors with xdg_shell.
+
+Flushed buffers are instead stored until we get the first configure event.
+
+[ChangeLog][QPA plugin][xdg-shell] Fixed a bug where buffers were sometimes
+attached and committed before the first configure event, causing protocol
+errors.
+
+Fixes: QTBUG-71345
+Change-Id: If9409d97bd25f6b13940c56141920a664c349c8e
+Reviewed-by: Paul Olav Tvete <paul.tvete@qt.io>
+Reviewed-by: David Edmundson <davidedmundson@kde.org>
+(cherry picked from commit 88a0246a46c30e08e9730d16cf8739773447d058)
+
+Conflicts:
+	src/client/qwaylandwindow.cpp
+	src/client/qwaylandwindow_p.h
+	src/client/qwaylandxdgshellv6.cpp
+	src/client/qwaylandxdgshellv6_p.h
+	src/plugins/shellintegration/xdg-shell/qwaylandxdgshell.cpp
+	src/plugins/shellintegration/xdg-shell/qwaylandxdgshell_p.h
+	tests/auto/client/client/mocksurface.cpp
+	tests/auto/client/client/mocksurface.h
+	tests/auto/client/shared/mockxdgshellv6.cpp
+	tests/auto/client/shared/mockxdgshellv6.h
+	tests/auto/client/xdgshellv6/tst_xdgshellv6.cpp
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/client/qwaylandshmbackingstore.cpp |  3 +--
+ src/client/qwaylandwindow.cpp          | 22 ++++++++++++++++++++++
+ src/client/qwaylandwindow_p.h          |  4 ++++
+ src/client/qwaylandxdgshellv6.cpp      | 14 ++++++++++----
+ src/client/qwaylandxdgshellv6_p.h      |  1 +
+ 5 files changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/src/client/qwaylandshmbackingstore.cpp b/src/client/qwaylandshmbackingstore.cpp
+index 045748a1..760ccf67 100644
+--- a/src/client/qwaylandshmbackingstore.cpp
++++ b/src/client/qwaylandshmbackingstore.cpp
+@@ -218,8 +218,7 @@ void QWaylandShmBackingStore::flush(QWindow *window, const QRegion &region, cons
+     mFrontBuffer = mBackBuffer;
+ 
+     QMargins margins = windowDecorationMargins();
+-
+-    waylandWindow()->commit(mFrontBuffer, region.translated(margins.left(), margins.top()));
++    waylandWindow()->safeCommit(mFrontBuffer, region.translated(margins.left(), margins.top()));
+ }
+ 
+ void QWaylandShmBackingStore::resize(const QSize &size, const QRegion &)
+diff --git a/src/client/qwaylandwindow.cpp b/src/client/qwaylandwindow.cpp
+index 6d7c0885..10c18c36 100644
+--- a/src/client/qwaylandwindow.cpp
++++ b/src/client/qwaylandwindow.cpp
+@@ -256,6 +256,7 @@ void QWaylandWindow::reset()
+     }
+ 
+     mMask = QRegion();
++    mQueuedBuffer = nullptr;
+ }
+ 
+ QWaylandWindow *QWaylandWindow::fromWlSurface(::wl_surface *surface)
+@@ -577,11 +578,32 @@ void QWaylandWindow::damage(const QRect &rect)
+     damage(rect.x(), rect.y(), rect.width(), rect.height());
+ }
+ 
++void QWaylandWindow::safeCommit(QWaylandBuffer *buffer, const QRegion &damage)
++{
++    if (isExposed()) {
++        commit(buffer, damage);
++    } else {
++        mQueuedBuffer = buffer;
++        mQueuedBufferDamage = damage;
++    }
++}
++
++void QWaylandWindow::handleExpose(const QRegion &region)
++{
++    QWindowSystemInterface::handleExposeEvent(window(), region);
++    if (mQueuedBuffer) {
++        commit(mQueuedBuffer, mQueuedBufferDamage);
++        mQueuedBuffer = nullptr;
++        mQueuedBufferDamage = QRegion();
++    }
++}
++
+ void QWaylandWindow::commit(QWaylandBuffer *buffer, const QRegion &damage)
+ {
+     if (!isInitialized())
+         return;
+ 
++    Q_ASSERT(isExposed());
+     attachOffset(buffer);
+     const QVector<QRect> rects = damage.rects();
+     for (const QRect &rect: rects)
+diff --git a/src/client/qwaylandwindow_p.h b/src/client/qwaylandwindow_p.h
+index bd4a3590..88738199 100644
+--- a/src/client/qwaylandwindow_p.h
++++ b/src/client/qwaylandwindow_p.h
+@@ -131,6 +131,8 @@ public:
+     using QtWayland::wl_surface::damage;
+     void damage(const QRect &rect);
+ 
++    void safeCommit(QWaylandBuffer *buffer, const QRegion &damage);
++    void handleExpose(const QRegion &region);
+     void commit(QWaylandBuffer *buffer, const QRegion &damage);
+ 
+     void waitForFrameSync();
+@@ -246,6 +248,8 @@ protected:
+     QRegion mMask;
+ 
+     QWaylandShmBackingStore *mBackingStore;
++    QWaylandBuffer *mQueuedBuffer = nullptr;
++    QRegion mQueuedBufferDamage;
+ 
+ private slots:
+     void handleScreenRemoved(QScreen *qScreen);
+diff --git a/src/client/qwaylandxdgshellv6.cpp b/src/client/qwaylandxdgshellv6.cpp
+index 7473174d..63c79c9c 100644
+--- a/src/client/qwaylandxdgshellv6.cpp
++++ b/src/client/qwaylandxdgshellv6.cpp
+@@ -176,9 +176,14 @@ void QWaylandXdgSurfaceV6::setType(Qt::WindowType type, QWaylandWindow *transien
+     }
+ }
+ 
++bool QWaylandXdgSurfaceV6::isExposed() const
++{
++    return m_configured;
++}
++
+ bool QWaylandXdgSurfaceV6::handleExpose(const QRegion &region)
+ {
+-    if (!m_configured && !region.isEmpty()) {
++    if (!isExposed() && !region.isEmpty()) {
+         m_exposeRegion = region;
+         return true;
+     }
+@@ -218,17 +223,18 @@ void QWaylandXdgSurfaceV6::setPopup(QWaylandWindow *parent, QWaylandInputDevice
+ 
+ void QWaylandXdgSurfaceV6::zxdg_surface_v6_configure(uint32_t serial)
+ {
+-    m_configured = true;
+     if (m_toplevel)
+         m_toplevel->applyConfigure();
+     else if (m_popup)
+         m_popup->applyConfigure();
+ 
++    m_configured = true;
++    ack_configure(serial);
++
+     if (!m_exposeRegion.isEmpty()) {
+-        QWindowSystemInterface::handleExposeEvent(m_window->window(), m_exposeRegion);
++        m_window->handleExpose(m_exposeRegion);
+         m_exposeRegion = QRegion();
+     }
+-    ack_configure(serial);
+ }
+ 
+ 
+diff --git a/src/client/qwaylandxdgshellv6_p.h b/src/client/qwaylandxdgshellv6_p.h
+index 769f1983..e824f99d 100644
+--- a/src/client/qwaylandxdgshellv6_p.h
++++ b/src/client/qwaylandxdgshellv6_p.h
+@@ -84,6 +84,7 @@ public:
+     void setAppId(const QString &appId) override;
+ 
+     void setType(Qt::WindowType type, QWaylandWindow *transientParent) override;
++    bool isExposed() const override;
+     bool handleExpose(const QRegion &) override;
+ 
+ protected:
+-- 
+2.20.1
+

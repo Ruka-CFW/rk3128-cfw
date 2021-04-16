@@ -1,0 +1,60 @@
+From 99506775574b6383bc098081758641e93a373c34 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Thu, 2 Jul 2020 14:58:49 +0800
+Subject: [PATCH 05/41] HACK: backend-drm: Avoid random crash when suspending
+
+Skip the repaint_status check since the weston_output_finish_frame()
+could also be called when turning off dpms.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ libweston/backend-drm/drm.c | 6 ++++--
+ libweston/backend-drm/kms.c | 1 +
+ libweston/compositor.c      | 2 --
+ 3 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/libweston/backend-drm/drm.c b/libweston/backend-drm/drm.c
+index 4a80e61..c436853 100644
+--- a/libweston/backend-drm/drm.c
++++ b/libweston/backend-drm/drm.c
+@@ -287,8 +287,10 @@ drm_output_update_complete(struct drm_output *output, uint32_t flags,
+ 	wl_list_for_each(ps, &output->state_cur->plane_list, link)
+ 		ps->complete = true;
+ 
+-	drm_output_state_free(output->state_last);
+-	output->state_last = NULL;
++	if (output->state_last) {
++		drm_output_state_free(output->state_last);
++		output->state_last = NULL;
++	}
+ 
+ 	if (output->destroy_pending) {
+ 		output->destroy_pending = false;
+diff --git a/libweston/backend-drm/kms.c b/libweston/backend-drm/kms.c
+index 94d190a..482f80b 100644
+--- a/libweston/backend-drm/kms.c
++++ b/libweston/backend-drm/kms.c
+@@ -689,6 +689,7 @@ drm_output_apply_state_legacy(struct drm_output_state *state)
+ 
+ 		drm_output_assign_state(state, DRM_STATE_APPLY_SYNC);
+ 		weston_compositor_read_presentation_clock(output->base.compositor, &now);
++
+ 		drm_output_update_complete(output,
+ 		                           WP_PRESENTATION_FEEDBACK_KIND_HW_COMPLETION,
+ 					   now.tv_sec, now.tv_nsec / 1000);
+diff --git a/libweston/compositor.c b/libweston/compositor.c
+index dbc6492..8b2deb9 100644
+--- a/libweston/compositor.c
++++ b/libweston/compositor.c
+@@ -2898,8 +2898,6 @@ weston_output_finish_frame(struct weston_output *output,
+ 	struct timespec now;
+ 	int64_t msec_rel;
+ 
+-
+-	assert(output->repaint_status == REPAINT_AWAITING_COMPLETION);
+ 	assert(stamp || (presented_flags & WP_PRESENTATION_FEEDBACK_INVALID));
+ 
+ 	weston_compositor_read_presentation_clock(compositor, &now);
+-- 
+2.20.1
+

@@ -1,0 +1,7 @@
+config BR2_PACKAGE_LIBRKDB
+	bool "rockchip librkdb"
+	select BR2_PACKAGE_LIBGLIB2
+	select BR2_PACKAGE_SQLITE
+	select BR2_PACKAGE_JSON_C
+	help
+	  rockchip database library

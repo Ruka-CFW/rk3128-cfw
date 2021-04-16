@@ -1,0 +1,56 @@
+From 4f9a9dbf297d370fb5835cca36ccbdf164dd3f12 Mon Sep 17 00:00:00 2001
+From: Philipp Zabel <p.zabel@pengutronix.de>
+Date: Wed, 17 Oct 2018 17:09:26 +0200
+Subject: [PATCH 12/45] glupload: debug output from dmabuf and dmabuf_direct
+ upload transform_caps
+
+https://bugzilla.gnome.org/show_bug.cgi?id=783521
+(cherry picked from commit c4edd80c8c8f6874db473e070873d32a4d890db6)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ gst-libs/gst/gl/gstglupload.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/gst-libs/gst/gl/gstglupload.c b/gst-libs/gst/gl/gstglupload.c
+index 8a45d0f870..bbe375fb88 100644
+--- a/gst-libs/gst/gl/gstglupload.c
++++ b/gst-libs/gst/gl/gstglupload.c
+@@ -518,6 +518,7 @@ static GstCaps *
+ _dma_buf_upload_transform_caps (gpointer impl, GstGLContext * context,
+     GstPadDirection direction, GstCaps * caps)
+ {
++  struct DmabufUpload *dmabuf = impl;
+   GstCapsFeatures *passthrough =
+       gst_caps_features_from_string
+       (GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION);
+@@ -565,6 +566,9 @@ _dma_buf_upload_transform_caps (gpointer impl, GstGLContext * context,
+ 
+   gst_caps_features_free (passthrough);
+ 
++  GST_DEBUG_OBJECT (dmabuf->upload, "transformed %" GST_PTR_FORMAT " into %"
++      GST_PTR_FORMAT, caps, ret);
++
+   return ret;
+ }
+ 
+@@ -804,6 +808,7 @@ static GstCaps *
+ _direct_dma_buf_upload_transform_caps (gpointer impl, GstGLContext * context,
+     GstPadDirection direction, GstCaps * caps)
+ {
++  struct DmabufUpload *dmabuf = impl;
+   GstCapsFeatures *passthrough =
+       gst_caps_features_from_string
+       (GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION);
+@@ -859,6 +864,9 @@ _direct_dma_buf_upload_transform_caps (gpointer impl, GstGLContext * context,
+ 
+   gst_caps_features_free (passthrough);
+ 
++  GST_DEBUG_OBJECT (dmabuf->upload, "transformed %" GST_PTR_FORMAT " into %"
++      GST_PTR_FORMAT, caps, ret);
++
+   return ret;
+ }
+ 
+-- 
+2.11.0
+

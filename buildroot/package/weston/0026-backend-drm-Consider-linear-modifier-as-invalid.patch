@@ -1,0 +1,104 @@
+From 61b572d3a08adeafcd2d1b0df78c08d2863cf426 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Tue, 1 Sep 2020 08:51:17 +0800
+Subject: [PATCH 26/41] backend-drm: Consider linear modifier as invalid
+
+There's no need to use modifier APIs for linear.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ libweston/backend-drm/fb.c            | 4 ++--
+ libweston/backend-drm/state-propose.c | 2 +-
+ libweston/linux-dmabuf.h              | 4 ++++
+ libweston/pixman-renderer.c           | 2 +-
+ libweston/renderer-gl/gl-renderer.c   | 4 ++--
+ 5 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/libweston/backend-drm/fb.c b/libweston/backend-drm/fb.c
+index e7349c4..2bc72d4 100644
+--- a/libweston/backend-drm/fb.c
++++ b/libweston/backend-drm/fb.c
+@@ -79,7 +79,7 @@ drm_fb_addfb(struct drm_backend *b, struct drm_fb *fb)
+ 
+ 	/* If we have a modifier set, we must only use the WithModifiers
+ 	 * entrypoint; we cannot import it through legacy ioctls. */
+-	if (b->fb_modifiers && fb->modifier != DRM_FORMAT_MOD_INVALID) {
++	if (b->fb_modifiers && DRM_MOD_VALID(fb->modifier)) {
+ 		/* KMS demands that if a modifier is set, it must be the same
+ 		 * for all planes. */
+ 		for (i = 0; i < ARRAY_LENGTH(mods) && fb->handles[i]; i++)
+@@ -290,7 +290,7 @@ drm_fb_get_from_dmabuf(struct linux_dmabuf_buffer *dmabuf,
+ 
+ 	/* The legacy FD-import path does not allow us to supply modifiers,
+ 	 * multiple planes, or buffer offsets. */
+-	if (dmabuf->attributes.modifier[0] != DRM_FORMAT_MOD_INVALID ||
++	if (DRM_MOD_VALID(dmabuf->attributes.modifier[0]) ||
+ 	    dmabuf->attributes.n_planes > 1 ||
+ 	    dmabuf->attributes.offset[0] > 0) {
+ #ifdef HAVE_GBM_FD_IMPORT
+diff --git a/libweston/backend-drm/state-propose.c b/libweston/backend-drm/state-propose.c
+index 057087e..faee1ad 100644
+--- a/libweston/backend-drm/state-propose.c
++++ b/libweston/backend-drm/state-propose.c
+@@ -141,7 +141,7 @@ drm_output_plane_has_valid_format(struct drm_plane *plane,
+ 		if (plane->formats[i].format != fb->format->format)
+ 			continue;
+ 
+-		if (fb->modifier == DRM_FORMAT_MOD_INVALID)
++		if (!DRM_MOD_VALID(fb->modifier))
+ 			return true;
+ 
+ 		for (j = 0; j < plane->formats[i].count_modifiers; j++) {
+diff --git a/libweston/linux-dmabuf.h b/libweston/linux-dmabuf.h
+index 926dd9e..b786fbd 100644
+--- a/libweston/linux-dmabuf.h
++++ b/libweston/linux-dmabuf.h
+@@ -36,6 +36,10 @@
+ #define DRM_FORMAT_MOD_LINEAR 0
+ #endif
+ 
++/* modifier is not linear or invalid */
++#define DRM_MOD_VALID(mod) \
++	((mod) != DRM_FORMAT_MOD_LINEAR && (mod) != DRM_FORMAT_MOD_INVALID)
++
+ struct linux_dmabuf_buffer;
+ typedef void (*dmabuf_user_data_destroy_func)(
+ 			struct linux_dmabuf_buffer *buffer);
+diff --git a/libweston/pixman-renderer.c b/libweston/pixman-renderer.c
+index ee76278..0159770 100644
+--- a/libweston/pixman-renderer.c
++++ b/libweston/pixman-renderer.c
+@@ -1096,7 +1096,7 @@ pixman_renderer_import_dmabuf(struct weston_compositor *ec,
+ 	int i;
+ 
+ 	for (i = 0; i < attributes->n_planes; i++) {
+-		if (attributes->modifier[i] != DRM_FORMAT_MOD_INVALID)
++		if (DRM_MOD_VALID(attributes->modifier[i]))
+ 			return false;
+ 	}
+ 
+diff --git a/libweston/renderer-gl/gl-renderer.c b/libweston/renderer-gl/gl-renderer.c
+index 8106270..a81509d 100644
+--- a/libweston/renderer-gl/gl-renderer.c
++++ b/libweston/renderer-gl/gl-renderer.c
+@@ -2039,7 +2039,7 @@ import_simple_dmabuf(struct gl_renderer *gr,
+ 		attribs[atti++] = EGL_YUV_NARROW_RANGE_EXT;
+ 	}
+ 
+-	if (attributes->modifier[0] != DRM_FORMAT_MOD_INVALID) {
++	if (DRM_MOD_VALID(attributes->modifier[0])) {
+ 		if (!gr->has_dmabuf_import_modifiers)
+ 			return NULL;
+ 		has_modifier = true;
+@@ -2479,7 +2479,7 @@ gl_renderer_import_dmabuf(struct weston_compositor *ec,
+ 
+ 	for (i = 0; i < dmabuf->attributes.n_planes; i++) {
+ 		/* return if EGL doesn't support import modifiers */
+-		if (dmabuf->attributes.modifier[i] != DRM_FORMAT_MOD_INVALID)
++		if (DRM_MOD_VALID(dmabuf->attributes.modifier[i]))
+ 			if (!gr->has_dmabuf_import_modifiers)
+ 				return false;
+ 
+-- 
+2.20.1
+

@@ -1,0 +1,43 @@
+From 78011d3f90a149ad1f7a0a3339d09940d3be8f69 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 29 Jan 2021 09:47:49 +0800
+Subject: [PATCH 1/2] cmake: Fix FindeSPDI.cmake cross compile error
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ cmake/FindeSPDI.cmake | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/cmake/FindeSPDI.cmake b/cmake/FindeSPDI.cmake
+index 151fa0c..3e8fd89 100644
+--- a/cmake/FindeSPDI.cmake
++++ b/cmake/FindeSPDI.cmake
+@@ -30,7 +30,10 @@ elseif(APPLE)
+ elseif(UNIX)
+   set(eSPDI_INCLUDE_DIR ${eSPDI_ROOT}/linux/include)
+ 
++if(NOT __arch)
+   execute_process(COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE __arch)
++endif()
++
+   message(STATUS "__arch: ${__arch}")
+   #if(${__arch} STREQUAL "x86_64")
+   #if(${__arch} MATCHES "^(x86|i686|i386)$")
+@@ -53,12 +56,14 @@ find_path(eSPDI_INCLUDE_DIRS
+   NAMES eSPDI.h
+   PATHS ${eSPDI_INCLUDE_DIR} ${CMAKE_EXTRA_INCLUDES}
+   NO_SYSTEM_PATH
++  CMAKE_FIND_ROOT_PATH_BOTH
+ )
+ 
+ find_library(eSPDI_LIBRARY
+   NAMES ${eSPDI_LIBRARY_NAME}
+   PATHS ${eSPDI_LIB_DIR} ${CMAKE_EXTRA_LIBRARIES}
+   NO_SYSTEM_PATH
++  CMAKE_FIND_ROOT_PATH_BOTH
+ )
+ set(eSPDI_LIBS ${eSPDI_LIBRARY})
+ 
+-- 
+2.20.1
+

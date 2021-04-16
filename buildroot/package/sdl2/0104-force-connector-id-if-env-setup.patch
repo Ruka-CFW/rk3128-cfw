@@ -1,0 +1,53 @@
+From 9be429e86876aed89177e671abc30529f385fb7d Mon Sep 17 00:00:00 2001
+From: Hertz Wang <wangh@rock-chips.com>
+Date: Fri, 4 Jan 2019 21:26:17 +0800
+Subject: [PATCH 1/1] force connector id if env setup
+
+Signed-off-by: Hertz Wang <wangh@rock-chips.com>
+---
+ src/video/kmsdrm/SDL_kmsdrmvideo.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/video/kmsdrm/SDL_kmsdrmvideo.c b/src/video/kmsdrm/SDL_kmsdrmvideo.c
+index 631ddba..91e47f0 100644
+--- a/src/video/kmsdrm/SDL_kmsdrmvideo.c
++++ b/src/video/kmsdrm/SDL_kmsdrmvideo.c
+@@ -278,6 +278,8 @@ KMSDRM_VideoInit(_THIS)
+     drmModePlaneRes *plane_res = NULL;
+     SDL_DisplayMode current_mode;
+     SDL_VideoDisplay display;
++    char *force_conn_id_str = getenv("ForceConnectID");
++    int force_conn_id = 0;
+ 
+     /* Allocate display internal data */
+     SDL_DisplayData *data = (SDL_DisplayData *) SDL_calloc(1, sizeof(SDL_DisplayData));
+@@ -287,6 +289,9 @@ KMSDRM_VideoInit(_THIS)
+ 
+     SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "KMSDRM_VideoInit()");
+ 
++    if (force_conn_id_str)
++        force_conn_id = atoi(force_conn_id_str);
++
+     /* Open /dev/dri/cardNN */
+     devname = (char *) SDL_calloc(1, 16);
+     if (devname == NULL) {
+@@ -324,9 +329,16 @@ KMSDRM_VideoInit(_THIS)
+         if (connector == NULL)
+             continue;
+ 
++        if (force_conn_id != 0 && connector->connector_id == force_conn_id) {
++            vdata->saved_conn_id = connector->connector_id;
++            break;
++        }
++
+         if (connector->connection == DRM_MODE_CONNECTED &&
+             connector->count_modes > 0 &&
+             connector->encoder_id > 0) {
++            if (force_conn_id != 0 && connector->connector_id != force_conn_id)
++                continue;
+             SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "Found connector %d with %d modes, encoder_id %d.",
+                          connector->connector_id, connector->count_modes, connector->encoder_id);
+             vdata->saved_conn_id = connector->connector_id;
+-- 
+2.7.4
+

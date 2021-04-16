@@ -1,0 +1,38 @@
+From 85f3450b70c4cf597b8e1372ad76521a07c72ee6 Mon Sep 17 00:00:00 2001
+From: Caesar Wang <wxt@rock-chips.com>
+Date: Mon, 23 Dec 2019 16:34:25 +0800
+Subject: [PATCH] ffmpeg: change RK_FORMAT_YCrCb_420_SP to
+ RK_FORMAT_YCbCr_420_SP
+
+That match the kernel rga driver that had changed.
+
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
+ libavcodec/rkmppdec.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/libavcodec/rkmppdec.c b/libavcodec/rkmppdec.c
+index 71b720d..f4e03e2 100644
+--- a/libavcodec/rkmppdec.c
++++ b/libavcodec/rkmppdec.c
+@@ -73,7 +73,7 @@ typedef struct {
+ static int get_rga_format(int av_fmt) {
+     switch (av_fmt) {
+         case AV_PIX_FMT_NV12:
+-            return RK_FORMAT_YCrCb_420_SP;
++            return RK_FORMAT_YCbCr_420_SP;
+         case AV_PIX_FMT_YUV420P:
+             return RK_FORMAT_YCbCr_420_P;
+         default:
+@@ -113,7 +113,7 @@ static int rkmpp_write_nv12(MppBuffer mpp_buffer, int mpp_vir_width,
+     src_info.mmuFlag = 1;
+     // mpp decoder always return nv12(yuv420sp)
+     rga_set_rect(&src_info.rect, 0, 0, width, height,
+-                 mpp_vir_width, mpp_vir_height, RK_FORMAT_YCrCb_420_SP);
++                 mpp_vir_width, mpp_vir_height, RK_FORMAT_YCbCr_420_SP);
+ 
+     dst_info.fd = -1;
+     // dst_frame data[*] must be continuous
+-- 
+2.7.4
+

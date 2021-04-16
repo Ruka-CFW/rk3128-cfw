@@ -1,0 +1,39 @@
+From 7d01d2f9df4b0f1591e7b2c005fb8f7e0333ecfe Mon Sep 17 00:00:00 2001
+From: zyh <zyh@rock-chips.com>
+Date: Wed, 26 Apr 2017 19:32:25 +0800
+Subject: [PATCH] fix authentication err for echo
+
+Signed-off-by: zyh <zyh@rock-chips.com>
+---
+ src/adapter.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/adapter.c b/src/adapter.c
+index f4fbf82..7b6e492 100644
+--- a/src/adapter.c
++++ b/src/adapter.c
+@@ -5839,9 +5839,9 @@ static gboolean process_auth_queue(gpointer user_data)
+ 
+ 		auth->agent = agent_get(NULL);
+ 		if (auth->agent == NULL) {
+-			btd_warn(adapter->dev_id,
+-					"Authentication attempt without agent");
+-			auth->cb(&err, auth->user_data);
++		//	btd_warn(adapter->dev_id,
++		//			"Authentication attempt without agent");
++			auth->cb(NULL, auth->user_data);
+ 			goto next;
+ 		}
+ 
+@@ -6184,7 +6184,7 @@ static void user_confirm_request_callback(uint16_t index, uint16_t length,
+ 		btd_error(adapter->dev_id,
+ 				"device_confirm_passkey: %s", strerror(-err));
+ 		btd_adapter_confirm_reply(adapter, &ev->addr.bdaddr,
+-							ev->addr.type, FALSE);
++							ev->addr.type, TRUE);
+ 	}
+ }
+ 
+-- 
+1.9.1
+

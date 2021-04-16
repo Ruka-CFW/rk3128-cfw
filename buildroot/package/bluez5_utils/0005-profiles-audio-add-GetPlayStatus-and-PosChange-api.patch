@@ -1,0 +1,167 @@
+From 571b3aaba39a6aef0635ce6f3c6ce133acef8d4a Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Mon, 29 Jul 2019 03:47:58 +0000
+Subject: [PATCH] profiles: audio: add GetPlayStatus and PosChange api
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ profiles/audio/avrcp.c  | 18 ++++++++++++++++++
+ profiles/audio/player.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+ profiles/audio/player.h |  2 ++
+ 3 files changed, 67 insertions(+)
+ mode change 100755 => 100644 profiles/audio/avrcp.c
+
+diff --git a/profiles/audio/avrcp.c b/profiles/audio/avrcp.c
+old mode 100755
+new mode 100644
+index 7244fe3..692f175
+--- a/profiles/audio/avrcp.c
++++ b/profiles/audio/avrcp.c
+@@ -2994,6 +2994,17 @@ static int ct_list_items(struct media_player *mp, const char *name,
+ 	return 0;
+ }
+ 
++static int ct_get_play_status(struct media_player *mp, void *user_data)
++{
++	struct avrcp_player *player = user_data;
++	struct avrcp *session;
++
++	session = player->sessions->data;
++	avrcp_get_play_status(session);
++
++	return 0;
++}
++
+ static void avrcp_change_path(struct avrcp *session, uint8_t direction,
+ 								uint64_t uid)
+ {
+@@ -3313,6 +3324,7 @@ static const struct media_player_callback ct_cbs = {
+ 	.play_item	= ct_play_item,
+ 	.add_to_nowplaying = ct_add_to_nowplaying,
+ 	.total_items = ct_get_total_numberofitems,
++	.get_play_status = ct_get_play_status,
+ };
+ 
+ static struct avrcp_player *create_ct_player(struct avrcp *session,
+@@ -3805,6 +3817,12 @@ static gboolean avrcp_get_capabilities_resp(struct avctp *conn, uint8_t code,
+ 	if (!session->controller || !session->controller->player)
+ 		return FALSE;
+ 
++	if ((events & (1 << AVRCP_EVENT_PLAYBACK_POS_CHANGED))) {
++		struct avrcp_player *player = session->controller->player;
++		struct media_player *mp = player->user_data;
++		media_player_set_poschange(mp, true);
++	}
++
+ 	if (!(events & (1 << AVRCP_EVENT_SETTINGS_CHANGED)))
+ 		avrcp_list_player_attributes(session);
+ 
+diff --git a/profiles/audio/player.c b/profiles/audio/player.c
+index 048f98f..eaaa54c 100644
+--- a/profiles/audio/player.c
++++ b/profiles/audio/player.c
+@@ -101,6 +101,7 @@ struct media_player {
+ 	struct player_callback	*cb;
+ 	GSList			*pending;
+ 	GSList			*folders;
++	bool            pos_change;
+ };
+ 
+ static void append_track(void *key, void *value, void *user_data)
+@@ -450,6 +451,36 @@ static gboolean get_playlist(const GDBusPropertyTable *property,
+ 	return TRUE;
+ }
+ 
++static gboolean get_position_change(const GDBusPropertyTable *property,
++					DBusMessageIter *iter, void *data)
++{
++	struct media_player *mp = data;
++	dbus_bool_t pos_change;
++
++	pos_change = mp->pos_change;
++
++	dbus_message_iter_append_basic(iter, DBUS_TYPE_BOOLEAN, &pos_change);
++
++	return TRUE;
++}
++
++static DBusMessage *media_player_getstatus(DBusConnection *conn, DBusMessage *msg,
++								void *data)
++{
++	struct media_player *mp = data;
++	struct player_callback *cb = mp->cb;
++	int err;
++
++	if (cb->cbs->get_play_status == NULL)
++		return btd_error_not_supported(msg);
++
++	err = cb->cbs->get_play_status(mp, cb->user_data);
++	if (err < 0)
++		return btd_error_failed(msg, strerror(-err));
++
++	return g_dbus_create_reply(msg, DBUS_TYPE_INVALID);
++}
++
+ static DBusMessage *media_player_play(DBusConnection *conn, DBusMessage *msg,
+ 								void *data)
+ {
+@@ -703,6 +734,7 @@ static const GDBusMethodTable media_player_methods[] = {
+ 	{ GDBUS_METHOD("Previous", NULL, NULL, media_player_previous) },
+ 	{ GDBUS_METHOD("FastForward", NULL, NULL, media_player_fast_forward) },
+ 	{ GDBUS_METHOD("Rewind", NULL, NULL, media_player_rewind) },
++	{ GDBUS_METHOD("GetPlayStatus", NULL, NULL, media_player_getstatus) },
+ 	{ }
+ };
+ 
+@@ -725,6 +757,7 @@ static const GDBusPropertyTable media_player_properties[] = {
+ 	{ "Browsable", "b", get_browsable, NULL, browsable_exists },
+ 	{ "Searchable", "b", get_searchable, NULL, searchable_exists },
+ 	{ "Playlist", "o", get_playlist, NULL, playlist_exists },
++	{ "PosChange", "b", get_position_change, NULL, NULL },
+ 	{ }
+ };
+ 
+@@ -1516,6 +1549,20 @@ static struct media_item *media_folder_find_item(struct media_folder *folder,
+ 	return NULL;
+ }
+ 
++void media_player_set_poschange(struct media_player *mp, bool enabled)
++{
++	if (mp->pos_change == enabled)
++		return;
++
++	DBG("%s", enabled ? "true" : "false");
++
++	mp->pos_change = enabled;
++
++	g_dbus_emit_property_changed(btd_get_dbus_connection(),
++					mp->path, MEDIA_PLAYER_INTERFACE,
++					"PosChange");
++}
++
+ static DBusMessage *media_item_play(DBusConnection *conn, DBusMessage *msg,
+ 								void *data)
+ {
+diff --git a/profiles/audio/player.h b/profiles/audio/player.h
+index 536394c..70c89b6 100644
+--- a/profiles/audio/player.h
++++ b/profiles/audio/player.h
+@@ -66,6 +66,7 @@ struct media_player_callback {
+ 					uint64_t uid, void *user_data);
+ 	int (*total_items) (struct media_player *mp, const char *name,
+ 						void *user_data);
++	int (*get_play_status) (struct media_player *mp, void *user_data);
+ };
+ 
+ struct media_player *media_player_controller_create(const char *path,
+@@ -90,6 +91,7 @@ void media_player_set_searchable(struct media_player *mp, bool enabled);
+ void media_player_set_folder(struct media_player *mp, const char *path,
+ 								uint32_t items);
+ void media_player_set_playlist(struct media_player *mp, const char *name);
++void media_player_set_poschange(struct media_player *mp, bool enabled);
+ struct media_item *media_player_set_playlist_item(struct media_player *mp,
+ 								uint64_t uid);
+ 
+-- 
+2.7.4
+

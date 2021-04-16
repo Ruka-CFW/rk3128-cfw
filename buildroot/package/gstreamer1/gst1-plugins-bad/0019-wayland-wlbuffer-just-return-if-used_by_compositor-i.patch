@@ -1,0 +1,32 @@
+From a5b9c8d5c90f4e1f1c6eb49897029464b47b0915 Mon Sep 17 00:00:00 2001
+From: Haihua Hu <jared.hu@nxp.com>
+Date: Thu, 18 Oct 2018 13:35:04 +0800
+Subject: [PATCH 19/60] wayland/wlbuffer: just return if used_by_compositor is
+ true when attach
+
+When buffer is used by compositor, we don't need attach it and hold one
+more reference. Just check used_by_compositor, just return if it is true.
+Assert error log is not need, this is normal behavior.
+---
+ ext/wayland/wlbuffer.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/ext/wayland/wlbuffer.c b/ext/wayland/wlbuffer.c
+index 4ac99ef4b..21214604f 100644
+--- a/ext/wayland/wlbuffer.c
++++ b/ext/wayland/wlbuffer.c
+@@ -220,7 +220,10 @@ gst_wl_buffer_force_release_and_unref (GstWlBuffer * self)
+ void
+ gst_wl_buffer_attach (GstWlBuffer * self, struct wl_surface *surface)
+ {
+-  g_return_if_fail (self->used_by_compositor == FALSE);
++  if (self->used_by_compositor) {
++    GST_DEBUG_OBJECT (self, "buffer used by compositor %p", self->gstbuffer);
++    return;
++  }
+ 
+   wl_surface_attach (surface, self->wlbuffer, 0, 0);
+ 
+-- 
+2.20.1
+

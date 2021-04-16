@@ -1,0 +1,64 @@
+From 5de871f12148ac61c8abee05e13640f1324bdea2 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sat, 9 May 2020 17:23:59 +0800
+Subject: [PATCH 13/18] qwaylandxdgshellv6: Support switching between
+ fullscreen and maximized
+
+1/ The weston expected a commit to apply new window states.
+2/ Switching between fullscreen and maximized requests unsetting the old
+state firstly.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/client/qwaylandxdgshellv6.cpp | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/src/client/qwaylandxdgshellv6.cpp b/src/client/qwaylandxdgshellv6.cpp
+index 3a84b5d7..6889d6c5 100644
+--- a/src/client/qwaylandxdgshellv6.cpp
++++ b/src/client/qwaylandxdgshellv6.cpp
+@@ -70,6 +70,9 @@ void QWaylandXdgSurfaceV6::Toplevel::applyConfigure()
+ {
+     //TODO: resize, activate etc
+     m_xdgSurface->m_window->configure(0, m_configureState.width, m_configureState.height);
++
++    // Trigger a update to commit new state
++    m_xdgSurface->m_window->requestUpdate();
+ }
+ 
+ void QWaylandXdgSurfaceV6::Toplevel::updatePosition()
+@@ -297,8 +300,13 @@ void QWaylandXdgSurfaceV6::setMaximized()
+ 
+ void QWaylandXdgSurfaceV6::setFullscreen()
+ {
+-    if (m_toplevel)
+-        m_toplevel->set_fullscreen(nullptr);
++    if (!m_toplevel)
++        return;
++
++    if (m_toplevel->m_configureState.maximized)
++        m_toplevel->unset_maximized();
++
++    m_toplevel->set_fullscreen(nullptr);
+ }
+ 
+ void QWaylandXdgSurfaceV6::setNormal()
+@@ -314,8 +322,13 @@ void QWaylandXdgSurfaceV6::setNormal()
+ 
+ void QWaylandXdgSurfaceV6::setMinimized()
+ {
+-    if (m_toplevel)
+-        m_toplevel->set_minimized();
++    if (!m_toplevel)
++        return;
++
++    if (m_toplevel->m_configureState.fullscreen)
++        m_toplevel->unset_fullscreen();
++
++    m_toplevel->set_minimized();
+ }
+ 
+ 
+-- 
+2.20.1
+

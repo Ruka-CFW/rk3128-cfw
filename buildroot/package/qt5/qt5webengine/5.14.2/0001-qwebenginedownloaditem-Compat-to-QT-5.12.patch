@@ -1,0 +1,30 @@
+From abe3981b00b3d36a9d6b84d92ac4b5ae5762a281 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sat, 18 Apr 2020 13:03:06 +0800
+Subject: [PATCH 1/9] qwebenginedownloaditem: Compat to QT 5.12
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/webenginewidgets/api/qwebenginedownloaditem.h | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/src/webenginewidgets/api/qwebenginedownloaditem.h b/src/webenginewidgets/api/qwebenginedownloaditem.h
+index 8d98799..97e785a 100644
+--- a/src/webenginewidgets/api/qwebenginedownloaditem.h
++++ b/src/webenginewidgets/api/qwebenginedownloaditem.h
+@@ -118,12 +118,8 @@ public:
+     qint64 receivedBytes() const;
+     QUrl url() const;
+     QString mimeType() const;
+-#if QT_DEPRECATED_SINCE(5, 14)
+-    QT_DEPRECATED_VERSION_X(5, 14, "Use downloadDirectory() and downloadFileName() instead")
+     QString path() const;
+-    QT_DEPRECATED_VERSION_X(5, 14, "Use setDownloadDirectory() and setDownloadFileName() instead")
+     void setPath(QString path);
+-#endif
+     bool isFinished() const;
+     bool isPaused() const;
+     SavePageFormat savePageFormat() const;
+-- 
+2.20.1
+

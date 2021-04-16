@@ -1,0 +1,43 @@
+From f407493ed0413fbe425fb71370696d1d7885c390 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Thu, 7 May 2020 09:12:08 +0800
+Subject: [PATCH 08/15] qwaylandwindow: Support setting window flags
+
+Support setting window flags through app_id, for example:
+app_id = "flags=stay-on-top|stay-on-bottom|no-focus"
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/client/qwaylandwindow.cpp | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/src/client/qwaylandwindow.cpp b/src/client/qwaylandwindow.cpp
+index 1b95e02a..12f50e0d 100644
+--- a/src/client/qwaylandwindow.cpp
++++ b/src/client/qwaylandwindow.cpp
+@@ -769,8 +769,21 @@ void QWaylandWindow::setWindowState(Qt::WindowStates states)
+ 
+ void QWaylandWindow::setWindowFlags(Qt::WindowFlags flags)
+ {
+-    if (mShellSurface)
++    if (mShellSurface) {
++        // HACK: Set window flags through app id
++        char s[128] = "flags=";
++
++#define SET_FLAG(flag, str) \
++        if (flags & (flag)) strcat(s, str "|"); \
++        else strcat(s, "-" str "|");
++
++        SET_FLAG(Qt::WindowStaysOnTopHint, "stay-on-top");
++        SET_FLAG(Qt::WindowStaysOnBottomHint, "stay-on-bottom");
++        SET_FLAG(Qt::WindowDoesNotAcceptFocus, "no-focus");
++        mShellSurface->setAppId(QLatin1String(s));
++
+         mShellSurface->setWindowFlags(flags);
++    }
+ 
+     mFlags = flags;
+     createDecoration();
+-- 
+2.20.1
+

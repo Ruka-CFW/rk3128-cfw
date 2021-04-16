@@ -1,0 +1,8 @@
+config BR2_PACKAGE_GSTREAMER1_ROCKCHIP_EXTRA
+	bool "Gstreamer Rockchip extra plugins"
+	select BR2_PACKAGE_GST1_PLUGINS_BASE
+	select BR2_PACKAGE_LIBV4L
+	help
+	  GStreamer Rockchip offers graphics/camera for rockchip platform.
+
+          https://github.com/rockchip-linux/gstreamer-rockchip-extra

@@ -1,0 +1,32 @@
+From 6390bd6bd8f2749dabee4fab3482541da9a83980 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Mon, 11 Mar 2019 11:51:00 +0800
+Subject: [PATCH 09/13] gstreamer: mediaplayer: Force redo setMedia after
+ renderer changed
+
+Somehow the playbin3 will screw up when setVideoRenderer been called
+after setMedia.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp b/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
+index 8dceb25..5972041 100755
+--- a/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
++++ b/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
+@@ -637,6 +637,10 @@ void QGstreamerPlayerSession::setVideoRenderer(QObject *videoOutput)
+         switch (m_pendingState) {
+         case QMediaPlayer::PausedState:
+             gst_element_set_state(m_playbin, GST_STATE_PAUSED);
++
++            if (!m_everPlayed)
++                emit invalidMedia();
++
+             break;
+         case QMediaPlayer::PlayingState:
+             gst_element_set_state(m_playbin, GST_STATE_PLAYING);
+-- 
+2.20.1
+

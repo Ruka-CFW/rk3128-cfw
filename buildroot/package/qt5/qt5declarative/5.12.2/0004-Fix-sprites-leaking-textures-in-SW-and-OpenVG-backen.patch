@@ -1,0 +1,95 @@
+From 2c938a0a6708959d8564b237d7ee9797489c1b5a Mon Sep 17 00:00:00 2001
+From: Eirik Aavitsland <eirik.aavitsland@qt.io>
+Date: Wed, 2 Oct 2019 09:45:57 +0200
+Subject: [PATCH 4/6] Fix sprites leaking textures in SW and OpenVG backends
+
+When a QSGSpriteNode is initialized with a texture, it is supposed to
+take ownership of the texture and delete it when the node gets
+deleted. In the default backend, this happens automatically: The
+texture gets assigned to the node's QSGMaterial object, and the node
+has set the OwnsMaterial flag, and so the inherited QSGGeometry
+destructor takes care of deleting the material, which deletes the
+texture.
+
+However, the Software and OpenVG backends do not have material
+objects, so the above mechanism does not apply, and so the texture
+objects are leaked. Fix by deleting the texture object directly from
+the SoftwareSpriteNode and OpenVGSpriteNode destructors.
+
+Fixes: QTBUG-77019
+Change-Id: I503d704f66593ba6a36c969db80f74f715382b6b
+Reviewed-by: Andy Nichols <andy.nichols@qt.io>
+(cherry picked from commit f4744a77224009cb46a254614106b9034a84fd4f)
+---
+ src/plugins/scenegraph/openvg/qsgopenvgspritenode.cpp        | 2 +-
+ src/plugins/scenegraph/openvg/qsgopenvgspritenode.h          | 2 +-
+ .../adaptations/software/qsgsoftwarespritenode.cpp           | 5 +++++
+ .../adaptations/software/qsgsoftwarespritenode_p.h           | 3 ++-
+ 4 files changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/src/plugins/scenegraph/openvg/qsgopenvgspritenode.cpp b/src/plugins/scenegraph/openvg/qsgopenvgspritenode.cpp
+index fb24df7471..1b75d450aa 100644
+--- a/src/plugins/scenegraph/openvg/qsgopenvgspritenode.cpp
++++ b/src/plugins/scenegraph/openvg/qsgopenvgspritenode.cpp
+@@ -52,7 +52,7 @@ QSGOpenVGSpriteNode::QSGOpenVGSpriteNode()
+ 
+ QSGOpenVGSpriteNode::~QSGOpenVGSpriteNode()
+ {
+-
++    delete m_texture;
+ }
+ 
+ void QSGOpenVGSpriteNode::setTexture(QSGTexture *texture)
+diff --git a/src/plugins/scenegraph/openvg/qsgopenvgspritenode.h b/src/plugins/scenegraph/openvg/qsgopenvgspritenode.h
+index d47b389a0b..dba4e663be 100644
+--- a/src/plugins/scenegraph/openvg/qsgopenvgspritenode.h
++++ b/src/plugins/scenegraph/openvg/qsgopenvgspritenode.h
+@@ -66,7 +66,7 @@ public:
+     void render() override;
+ 
+ private:
+-    QSGOpenVGTexture *m_texture;
++    QSGOpenVGTexture *m_texture = nullptr;
+     float m_time;
+     QPoint m_sourceA;
+     QPoint m_sourceB;
+diff --git a/src/quick/scenegraph/adaptations/software/qsgsoftwarespritenode.cpp b/src/quick/scenegraph/adaptations/software/qsgsoftwarespritenode.cpp
+index d4e5e98d68..17e8bdc2f9 100644
+--- a/src/quick/scenegraph/adaptations/software/qsgsoftwarespritenode.cpp
++++ b/src/quick/scenegraph/adaptations/software/qsgsoftwarespritenode.cpp
+@@ -49,6 +49,11 @@ QSGSoftwareSpriteNode::QSGSoftwareSpriteNode()
+     setGeometry((QSGGeometry*)1);
+ }
+ 
++QSGSoftwareSpriteNode::~QSGSoftwareSpriteNode()
++{
++    delete m_texture;
++}
++
+ void QSGSoftwareSpriteNode::setTexture(QSGTexture *texture)
+ {
+     m_texture = qobject_cast<QSGSoftwarePixmapTexture*>(texture);
+diff --git a/src/quick/scenegraph/adaptations/software/qsgsoftwarespritenode_p.h b/src/quick/scenegraph/adaptations/software/qsgsoftwarespritenode_p.h
+index 577a30c051..4015537395 100644
+--- a/src/quick/scenegraph/adaptations/software/qsgsoftwarespritenode_p.h
++++ b/src/quick/scenegraph/adaptations/software/qsgsoftwarespritenode_p.h
+@@ -64,6 +64,7 @@ class QSGSoftwareSpriteNode : public QSGSpriteNode
+ {
+ public:
+     QSGSoftwareSpriteNode();
++    ~QSGSoftwareSpriteNode() override;
+ 
+     void setTexture(QSGTexture *texture) override;
+     void setTime(float time) override;
+@@ -81,7 +82,7 @@ public:
+ 
+ private:
+ 
+-    QSGSoftwarePixmapTexture *m_texture;
++    QSGSoftwarePixmapTexture *m_texture = nullptr;
+     float m_time;
+     QPoint m_sourceA;
+     QPoint m_sourceB;
+-- 
+2.20.1
+

@@ -1,0 +1,30 @@
+From 04d38d66cb5a1b870f52fbf436cbc28368240157 Mon Sep 17 00:00:00 2001
+From: "james.lin" <james.lin@rock-chips.com>
+Date: Mon, 8 Jan 2018 16:36:21 +0800
+Subject: [PATCH] [PATCH]: enable hevc,h264,h263,mpeg2,mpeg4,vp8,vp9 rkvdec
+ accel
+
+Change-Id: Ie49f15c772bc58d575a999bfe6f94ddcf42bb488
+Signed-off-by: james.lin <james.lin@rock-chips.com>
+---
+ configure.ac | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index 9a3f322..b92d9f5 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -371,6 +371,10 @@ else
+         --disable-omx-rpi --disable-cuda --disable-cuvid --disable-libmfx \
+         --disable-libnpp --disable-iconv --disable-jni --enable-optimizations"
+ 
++  emblibav_configure_args="$emblibav_configure_args --enable-hwaccel=hevc_rkvdec --enable-hwaccel=hevc_rkvdec10 \
++        --enable-hwaccel=h264_rkvdec --enable-hwaccel=h264_rkvdec10 --enable-hwaccel=vp8_rkvdec --enable-hwaccel=vp9_rkvdec \
++        --enable-hwaccel=h263_rkvdec --enable-hwaccel=mpeg2video_rkvdec --enable-hwaccel=mpeg4_rkvdec"
++
+   if test "x$enable_gpl" == "xyes"; then
+     emblibav_configure_args="$emblibav_configure_args --enable-gpl"
+   fi
+-- 
+2.7.4
+

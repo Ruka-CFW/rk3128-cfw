@@ -1,0 +1,33 @@
+From 02c526272f84614ee7981a586f44ec3290969078 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 7 Aug 2020 12:09:58 +0800
+Subject: [PATCH] gdk: wayland: Fix gl init error
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ gdk/wayland/gdkglcontext-wayland.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/gdk/wayland/gdkglcontext-wayland.c b/gdk/wayland/gdkglcontext-wayland.c
+index a221025..2376959 100644
+--- a/gdk/wayland/gdkglcontext-wayland.c
++++ b/gdk/wayland/gdkglcontext-wayland.c
+@@ -326,8 +326,13 @@ gdk_wayland_display_init_gl (GdkDisplay *display)
+   if (!eglInitialize (dpy, &major, &minor))
+     return FALSE;
+ 
+-  if (!eglBindAPI (EGL_OPENGL_API))
+-    return FALSE;
++  if (_gdk_gl_flags & GDK_GL_GLES) {
++    if (!eglBindAPI (EGL_OPENGL_ES_API))
++      return FALSE;
++  } else {
++    if (!eglBindAPI (EGL_OPENGL_API))
++      return FALSE;
++  }
+ 
+   display_wayland->egl_display = dpy;
+   display_wayland->egl_major_version = major;
+-- 
+2.20.1
+

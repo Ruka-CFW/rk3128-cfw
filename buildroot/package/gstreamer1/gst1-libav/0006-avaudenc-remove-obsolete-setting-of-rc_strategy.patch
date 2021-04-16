@@ -1,0 +1,25 @@
+From 9cc57a74d80d389530ef6373474957e9fa61c1fa Mon Sep 17 00:00:00 2001
+From: Mathieu Duponchelle <mathieu@centricular.com>
+Date: Mon, 2 Jul 2018 17:10:03 +0200
+Subject: [PATCH 35/77] avaudenc: remove obsolete setting of rc_strategy
+
+https://bugzilla.gnome.org/show_bug.cgi?id=792900
+---
+ ext/libav/gstavaudenc.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/ext/libav/gstavaudenc.c b/ext/libav/gstavaudenc.c
+index 4a62c74..2a82273 100644
+--- a/ext/libav/gstavaudenc.c
++++ b/ext/libav/gstavaudenc.c
+@@ -283,7 +283,6 @@ gst_ffmpegaudenc_set_format (GstAudioEncoder * encoder, GstAudioInfo * info)
+   }
+ 
+   /* some other defaults */
+-  ffmpegaudenc->context->rc_strategy = 2;
+   ffmpegaudenc->context->b_frame_strategy = 0;
+   ffmpegaudenc->context->coder_type = 0;
+   ffmpegaudenc->context->context_model = 0;
+-- 
+2.17.1
+

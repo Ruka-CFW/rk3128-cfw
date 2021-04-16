@@ -1,0 +1,29 @@
+From 4dec0f48c00624ad6445fe6f63ab66fbc26d0dbf Mon Sep 17 00:00:00 2001
+From: Yao Xiao <xiaoyao@rock-chips.com>
+Date: Tue, 6 Aug 2019 06:28:47 +0000
+Subject: [PATCH 1/1] bluez5: fix obex permissions
+
+Signed-off-by: Yao Xiao <xiaoyao@rock-chips.com>
+---
+ src/bluetooth.conf | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/bluetooth.conf b/src/bluetooth.conf
+index 0c0b221..8aa6ac1 100644
+--- a/src/bluetooth.conf
++++ b/src/bluetooth.conf
+@@ -9,8 +9,11 @@
+ 
+   <policy user="root">
+     <allow own="org.bluez"/>
++    <allow own="org.bluez.obex"/>
+     <allow send_destination="org.bluez"/>
++    <allow send_destination="org.bluez.obex"/>
+     <allow send_interface="org.bluez.Agent1"/>
++    <allow send_interface="org.bluez.obex"/>
+     <allow send_interface="org.bluez.MediaEndpoint1"/>
+     <allow send_interface="org.bluez.MediaPlayer1"/>
+     <allow send_interface="org.bluez.Profile1"/>
+-- 
+2.7.4
+

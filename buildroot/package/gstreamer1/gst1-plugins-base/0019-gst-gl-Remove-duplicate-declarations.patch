@@ -1,0 +1,70 @@
+From 8b033969d4891c7d3f927696fe1ebf3946b3fb6c Mon Sep 17 00:00:00 2001
+From: Maciej Wolny <maciej.wolny@codethink.co.uk>
+Date: Mon, 19 Nov 2018 15:09:25 +0000
+Subject: [PATCH 19/45] gst-gl: Remove duplicate declarations
+
+This causes 'redefinition of typedef ...' errors on GCC 4.5.3
+
+(cherry picked from commit f1556c1660c005853329afda14cb3d9387e71845)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.h | 3 +--
+ gst-libs/gst/gl/gstgldebug.h              | 2 --
+ gst-libs/gst/gl/gstglfuncs.h              | 4 ++--
+ 3 files changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.h b/gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.h
+index 3d132a24b1..e89af2f537 100644
+--- a/gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.h
++++ b/gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.h
+@@ -24,6 +24,7 @@
+ #include <gbm.h>
+ #include <gst/gl/gl.h>
+ #include <gst/gl/egl/gstegl.h>
++#include <gst/gl/gbm/gstgldisplay_gbm.h>
+ 
+ G_BEGIN_DECLS
+ 
+@@ -37,8 +38,6 @@ G_BEGIN_DECLS
+ typedef struct _GstGLWindowGBMEGL        GstGLWindowGBMEGL;
+ typedef struct _GstGLWindowGBMEGLClass   GstGLWindowGBMEGLClass;
+ 
+-typedef struct _GstGLDisplayGBM GstGLDisplayGBM;
+-
+ struct _GstGLWindowGBMEGL {
+   /*< private >*/
+   GstGLWindow parent;
+diff --git a/gst-libs/gst/gl/gstgldebug.h b/gst-libs/gst/gl/gstgldebug.h
+index 99e6ce225b..2daff7a641 100644
+--- a/gst-libs/gst/gl/gstgldebug.h
++++ b/gst-libs/gst/gl/gstgldebug.h
+@@ -25,8 +25,6 @@
+ 
+ G_BEGIN_DECLS
+ 
+-typedef struct _GstGLAsyncDebug GstGLAsyncDebug;
+-
+ typedef gchar * (*GstGLAsyncDebugLogGetMessage) (gpointer user_data);
+ 
+ /**
+diff --git a/gst-libs/gst/gl/gstglfuncs.h b/gst-libs/gst/gl/gstglfuncs.h
+index 805abcf3df..e3bf8746d1 100644
+--- a/gst-libs/gst/gl/gstglfuncs.h
++++ b/gst-libs/gst/gl/gstglfuncs.h
+@@ -93,11 +93,11 @@ G_BEGIN_DECLS
+   ret (GSTGLAPI *name) args;
+ #define GST_GL_EXT_END()
+ 
+-typedef struct _GstGLFuncs
++struct _GstGLFuncs
+ {
+ #include <gst/gl/glprototypes/all_functions.h>
+   gpointer padding[GST_PADDING_LARGE*6];
+-} GstGLFuncs;
++};
+ 
+ #undef GST_GL_EXT_BEGIN
+ #undef GST_GL_EXT_FUNCTION
+-- 
+2.11.0
+

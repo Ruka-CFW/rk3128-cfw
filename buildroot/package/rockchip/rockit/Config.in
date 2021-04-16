@@ -1,0 +1,6 @@
+config BR2_PACKAGE_ROCKIT
+    bool "rockit"
+    select BR2_PACKAGE_MPP
+    select BR2_PACKAGE_FFMPEG
+    help
+      rockit

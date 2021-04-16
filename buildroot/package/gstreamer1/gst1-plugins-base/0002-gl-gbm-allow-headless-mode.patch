@@ -1,0 +1,79 @@
+From 66bc41223d4b8b1a1588102b6c7b2b8651d3c99a Mon Sep 17 00:00:00 2001
+From: freyr <ciceromarcus@yandex.ru>
+Date: Mon, 30 Jul 2018 10:03:11 +0300
+Subject: [PATCH 02/45] gl/gbm: allow headless mode
+
+Don't require an output for the GBM backend.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=794716
+(cherry picked from commit 810d560a2f90086b62369f9d38c64dbaa5f969ec)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ gst-libs/gst/gl/gbm/gstgldisplay_gbm.c    |  3 +--
+ gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.c | 20 +++++++++++++++++---
+ 2 files changed, 18 insertions(+), 5 deletions(-)
+
+diff --git a/gst-libs/gst/gl/gbm/gstgldisplay_gbm.c b/gst-libs/gst/gl/gbm/gstgldisplay_gbm.c
+index ae4c3cf213..0781812e85 100644
+--- a/gst-libs/gst/gl/gbm/gstgldisplay_gbm.c
++++ b/gst-libs/gst/gl/gbm/gstgldisplay_gbm.c
+@@ -400,8 +400,7 @@ gst_gl_display_gbm_new (void)
+   display->drm_fd = drm_fd;
+ 
+   if (!gst_gl_display_gbm_setup_drm (display)) {
+-    GST_ERROR ("Failed to initialize DRM");
+-    goto cleanup;
++    GST_WARNING ("Failed to initialize DRM");
+   }
+ 
+   if (!gst_gl_display_gbm_setup_gbm (display)) {
+diff --git a/gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.c b/gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.c
+index 04d1eec1f8..0d68b92514 100644
+--- a/gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.c
++++ b/gst-libs/gst/gl/gbm/gstglwindow_gbm_egl.c
+@@ -149,6 +149,12 @@ draw_cb (gpointer data)
+     .revents = 0,
+   };
+ 
++  /* No display connected */
++  if (!display->drm_mode_info) {
++    GST_ERROR ("No display connected");
++    return;
++  };
++
+   /* Rendering, page flipping etc. are connect this way:
+    *
+    * The frames are stored in buffer objects (BOs). Inside the eglSwapBuffers()
+@@ -295,6 +301,15 @@ gst_gl_window_gbm_init_surface (GstGLWindowGBMEGL * window_egl)
+   GstGLContext *context = gst_gl_window_get_context (window);
+   GstGLContextEGL *context_egl = GST_GL_CONTEXT_EGL (context);
+   EGLint gbm_format;
++  int hdisplay, vdisplay;
++
++  if (drm_mode_info) {
++    vdisplay = drm_mode_info->vdisplay;
++    hdisplay = drm_mode_info->hdisplay;
++  } else {
++    vdisplay = 0;
++    hdisplay = 0;
++  }
+ 
+   /* With GBM-based EGL displays and configs, the native visual ID
+    * is a GBM pixel format. */
+@@ -308,11 +323,10 @@ gst_gl_window_gbm_init_surface (GstGLWindowGBMEGL * window_egl)
+   /* Create a GBM surface that shall contain the BOs we are
+    * going to render into. */
+   window_egl->gbm_surf = gbm_surface_create (display->gbm_dev,
+-      drm_mode_info->hdisplay, drm_mode_info->vdisplay, gbm_format,
++      hdisplay, vdisplay, gbm_format,
+       GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
+ 
+-  gst_gl_window_resize (window, drm_mode_info->hdisplay,
+-      drm_mode_info->vdisplay);
++  gst_gl_window_resize (window, hdisplay, vdisplay);
+ 
+   GST_DEBUG ("Successfully created GBM surface");
+ 
+-- 
+2.11.0
+

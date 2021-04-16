@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Start linux launcher...
+#
+
+case "$1" in
+  start)
+		printf "Starting launcher: "
+		export LC_ALL='zh_CN.utf8'
+		export QT_QPA_PLATFORM=wayland
+
+                # music
+                /usr/bin/audioservice &
+
+		# bt
+		/usr/libexec/bluetooth/bluetoothd --compat &
+
+		export QT_GSTREAMER_WINDOW_VIDEOSINK=kmssink
+
+		#for rkisp plugin
+		export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/gstreamer-1.0
+
+		#for waylandsink
+		#export QT_GSTREAMER_WINDOW_VIDEOSINK=waylandsink
+
+		#for QLauncher wayland
+		mkdir -p /tmp/.xdg &&  chmod 0700 /tmp/.xdg
+		export XDG_RUNTIME_DIR=/tmp/.xdg
+		weston --tty=2 --idle-time=0&
+		sleep 1
+		/usr/local/QLauncher/QLauncher &
+	;;
+  stop)
+		killall QLauncher
+		#killall CarMachine
+		killall weston
+		printf "stop finished"
+        ;;
+  *)
+        echo "Usage: $0 {start|stop}"
+        exit 1
+        ;;
+esac
+exit 0

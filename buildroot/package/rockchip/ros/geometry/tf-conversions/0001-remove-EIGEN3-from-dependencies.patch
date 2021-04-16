@@ -1,0 +1,37 @@
+From 2099e47ea4a5f7800b294f7358645464e4877566 Mon Sep 17 00:00:00 2001
+From: "Zain.Wang" <wzz@rock-chips.com>
+Date: Mon, 17 Sep 2018 18:05:56 +0800
+Subject: [PATCH] remove EIGEN3 from dependencies
+
+EIGEN3 only support include file, just config EIGEN3_INCLUDE_DIRS can
+work as well.
+
+Signed-off-by: Zain.Wang <wzz@rock-chips.com>
+---
+ tf_conversions/CMakeLists.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/tf_conversions/CMakeLists.txt b/tf_conversions/CMakeLists.txt
+index 543bbdb..827d0b7 100644
+--- a/tf_conversions/CMakeLists.txt
++++ b/tf_conversions/CMakeLists.txt
+@@ -3,14 +3,14 @@ project(tf_conversions)
+ 
+ find_package(orocos_kdl REQUIRED)
+ find_package(catkin REQUIRED cmake_modules geometry_msgs kdl_conversions tf)
+-find_package(Eigen3 REQUIRED)
++#find_package(Eigen3 REQUIRED)
+ 
+ catkin_python_setup()
+ 
+ catkin_package(
+   INCLUDE_DIRS include
+   LIBRARIES ${PROJECT_NAME}
+-  DEPENDS EIGEN3 orocos_kdl
++  DEPENDS orocos_kdl # EIGEN3
+   CATKIN_DEPENDS geometry_msgs kdl_conversions tf
+ )
+ 
+-- 
+2.7.4
+

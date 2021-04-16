@@ -1,0 +1,42 @@
+From 30e83ff0d64acf95d9a449a23ec8b6a66c32c1b1 Mon Sep 17 00:00:00 2001
+From: "wenping.zhang" <wenping.zhang@rock-chips.com>
+Date: Wed, 8 Feb 2017 18:02:25 +0800
+Subject: [PATCH] fix complie error if enable glibc.
+
+Change-Id: Icfbd57644e942bba586b1c46e58307ff5ee8810c
+Signed-off-by: wenping.zhang <wenping.zhang@rock-chips.com>
+---
+ CMakeLists.txt | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c32c826..c647a28 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,7 +2,7 @@ project(libcutils)
+ 
+ enable_language(ASM)
+ 
+-add_definitions(-DANDROID_SMP=1 -DHAVE_PTHREADS -DHAVE_SYS_SOCKET_H)
++add_definitions(-DANDROID_SMP=1 -DHAVE_PTHREADS -DHAVE_SYS_SOCKET_H -DHAVE_STRLCPY=0 -DHAVE_MEMSET32 -DHAVE_MEMSET16)
+ 
+ set(LIBCUTILS_SRC_FILES
+     hashmap.c
+@@ -36,6 +36,7 @@ set(LIBCUTILS_SRC_FILES
+     qtaguid.c
+     trace.c
+     uevent.c
++    memory.c
+     arch-arm/memset32.S
+ )
+ 
+@@ -45,4 +46,4 @@ install(DIRECTORY cutils DESTINATION include)
+ 
+ target_include_directories(cutils
+     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+-)
+\ No newline at end of file
++)
+-- 
+1.9.1
+

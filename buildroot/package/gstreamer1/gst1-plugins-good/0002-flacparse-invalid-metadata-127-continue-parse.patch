@@ -1,0 +1,31 @@
+From 508c5cbd1976e30ed67ffe7558cfbd9af3e161c8 Mon Sep 17 00:00:00 2001
+From: "james.lin" <james.lin@rock-chips.com>
+Date: Tue, 23 Jan 2018 19:19:36 +0800
+Subject: [PATCH 2/2] flacparse: invalid metadata 127 continue parse
+
+Signed-off-by: james.lin <james.lin@rock-chips.com>
+---
+ gst/audioparsers/gstflacparse.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gst/audioparsers/gstflacparse.c b/gst/audioparsers/gstflacparse.c
+index 90176af..9bdfcab 100644
+--- a/gst/audioparsers/gstflacparse.c
++++ b/gst/audioparsers/gstflacparse.c
+@@ -1561,11 +1561,11 @@ gst_flac_parse_parse_frame (GstBaseParse * parse, GstBaseParseFrame * frame,
+     gboolean is_last = map.data[0] >> 7;
+     guint type = (map.data[0] & 0x7F);
+ 
+-    if (type == 127) {
++    /*if (type == 127) {
+       GST_WARNING_OBJECT (flacparse, "Invalid metadata block type 127");
+       res = GST_BASE_PARSE_FLOW_DROPPED;
+       goto cleanup;
+-    }
++    }*/
+ 
+     GST_DEBUG_OBJECT (flacparse, "Handling metadata block of type %u", type);
+ 
+-- 
+2.11.0
+

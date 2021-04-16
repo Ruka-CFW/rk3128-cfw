@@ -1,0 +1,9 @@
+config BR2_PACKAGE_GSTREAMER1_ROCKCHIP
+	bool "Gstreamer Rockchip plugins"
+	depends on BR2_PACKAGE_MPP
+	select BR2_PACKAGE_GST1_PLUGINS_BASE
+	help
+	  GStreamer Rockchip offers the hardware accleration decoder/encoder
+          for Rockchip Platform.
+
+          https://github.com/rockchip-linux/gstreamer-rockchip

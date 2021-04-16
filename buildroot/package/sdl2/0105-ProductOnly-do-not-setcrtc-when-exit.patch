@@ -1,0 +1,70 @@
+From b5ce65773889394712fd5780d5216b3870ee737b Mon Sep 17 00:00:00 2001
+From: Hans Yang <yhx@rock-chips.com>
+Date: Tue, 15 Jan 2019 18:04:43 +0800
+Subject: [PATCH] ProductOnly: do not setcrtc when exit
+
+---
+ src/audio/alsa/SDL_alsa_audio.c    |  4 ++++
+ src/video/kmsdrm/SDL_kmsdrmvideo.c | 18 ++++++++++--------
+ 2 files changed, 14 insertions(+), 8 deletions(-)
+
+diff --git a/src/audio/alsa/SDL_alsa_audio.c b/src/audio/alsa/SDL_alsa_audio.c
+index 68a72d2..7cca7d7 100644
+--- a/src/audio/alsa/SDL_alsa_audio.c
++++ b/src/audio/alsa/SDL_alsa_audio.c
+@@ -226,15 +226,19 @@ get_audio_device(void *handle, const int channels)
+     /* !!! FIXME: we also check "SDL_AUDIO_DEVICE_NAME" at the higher level. */
+     device = SDL_getenv("AUDIODEV");    /* Is there a standard variable name? */
+     if (device != NULL) {
++        printf("sdl get_audio_device: %s\n", device);
+         return device;
+     }
+ 
+     if (channels == 6) {
++        printf("sdl get_audio_device: plug:surround51\n");
+         return "plug:surround51";
+     } else if (channels == 4) {
++        printf("sdl get_audio_device: plug:surround40\n");
+         return "plug:surround40";
+     }
+ 
++    printf("sdl get_audio_device: default\n");
+     return "default";
+ }
+ 
+diff --git a/src/video/kmsdrm/SDL_kmsdrmvideo.c b/src/video/kmsdrm/SDL_kmsdrmvideo.c
+index 215bcf3..8c362c8 100644
+--- a/src/video/kmsdrm/SDL_kmsdrmvideo.c
++++ b/src/video/kmsdrm/SDL_kmsdrmvideo.c
+@@ -511,18 +511,20 @@ KMSDRM_VideoQuit(_THIS)
+         SDL_GL_UnloadLibrary();
+     }
+ 
+-    if(vdata->saved_crtc != NULL) {
+-        if(vdata->drm_fd > 0 && vdata->saved_conn_id > 0) {
+-            /* Restore saved CRTC settings */
+-            drmModeCrtc *crtc = vdata->saved_crtc;
+-            if(KMSDRM_drmModeSetCrtc(vdata->drm_fd, crtc->crtc_id, crtc->buffer_id,
++    if (!getenv("SDL2_DISPLAY_PLANE_TYPE")) {
++        if(vdata->saved_crtc != NULL) {
++            if((vdata->drm_fd > 0) && (vdata->saved_conn_id > 0)) {
++                /* Restore saved CRTC settings */
++                drmModeCrtc *crtc = vdata->saved_crtc;
++                if(KMSDRM_drmModeSetCrtc(vdata->drm_fd, crtc->crtc_id, crtc->buffer_id,
+                                      crtc->x, crtc->y, &vdata->saved_conn_id, 1,
+                                      &crtc->mode) != 0) {
+-                SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "Could not restore original CRTC mode");
++                    SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "Could not restore original CRTC mode");
++                }
+             }
++            KMSDRM_drmModeFreeCrtc(vdata->saved_crtc);
++            vdata->saved_crtc = NULL;
+         }
+-        KMSDRM_drmModeFreeCrtc(vdata->saved_crtc);
+-        vdata->saved_crtc = NULL;
+     }
+     if (vdata->gbm != NULL) {
+         KMSDRM_gbm_device_destroy(vdata->gbm);
+-- 
+2.7.4
+

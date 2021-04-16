@@ -1,0 +1,5 @@
+source "package/emulators/retroarch/batocera-bezel/Config.in"
+source "package/emulators/retroarch/libretro/Config.in"
+source "package/emulators/retroarch/retroarch/Config.in"
+source "package/emulators/retroarch/retroarch-assets/Config.in"
+source "package/emulators/retroarch/shaders/Config.in"

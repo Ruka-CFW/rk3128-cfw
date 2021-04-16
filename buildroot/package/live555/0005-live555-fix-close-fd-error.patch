@@ -1,0 +1,26 @@
+From a9bc13efdf4c6eb891a4c5e53bec3ace58e8f613 Mon Sep 17 00:00:00 2001
+From: "jkand.huang" <jkand.huang@rock-chips.com>
+Date: Wed, 17 Jun 2020 17:05:31 +0800
+Subject: [PATCH] live555: fix close fd error.
+
+Signed-off-by: jkand.huang <jkand.huang@rock-chips.com>
+---
+ liveMedia/RTSPServer.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/liveMedia/RTSPServer.cpp b/liveMedia/RTSPServer.cpp
+index 5b53812..af053c1 100644
+--- a/liveMedia/RTSPServer.cpp
++++ b/liveMedia/RTSPServer.cpp
+@@ -574,7 +574,7 @@ void RTSPServer::RTSPClientConnection::closeSocketsRTSP() {
+   fOurRTSPServer.stopTCPStreamingOnSocket(fClientOutputSocket);
+ 
+   // Turn off background handling on our input socket (and output socket, if different); then close it (or them):
+-  if (fClientOutputSocket != fClientInputSocket) {
++  if (fClientOutputSocket != fClientInputSocket && fClientInputSocket != -1) {
+     envir().taskScheduler().disableBackgroundHandling(fClientOutputSocket);
+     ::closeSocket(fClientOutputSocket);
+   }
+-- 
+2.26.1
+

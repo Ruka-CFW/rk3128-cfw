@@ -1,0 +1,42 @@
+From 8fb59f818a96cc1837e9e5f5e77f74a7a1dddd92 Mon Sep 17 00:00:00 2001
+From: Nicolas Dufresne <nicolas.dufresne@collabora.com>
+Date: Wed, 31 Oct 2018 18:26:42 +0000
+Subject: [PATCH 15/45] glupload: Do prepend the preferred caps
+
+The direct dmabuf upload does color conversion, so when it transforms
+the caps, it replaces the format with all formats found through the
+format query. When this uploader can't be used, it makes the upstream
+source pick a unsupported format.
+
+To fix this, we only append the caps with a list of format. So the
+source will only pick one of these formats if the downstream preferred
+format is not supported. A negotiation failure after this would be
+normal.
+
+This fixes pipelines without a glcolorconvert element.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=783521
+(cherry picked from commit c8c7672ffb2d46fbfdfbbd014332428ca2f6446a)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ gst-libs/gst/gl/gstglupload.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/gst-libs/gst/gl/gstglupload.c b/gst-libs/gst/gl/gstglupload.c
+index bbe375fb88..56fd3b1170 100644
+--- a/gst-libs/gst/gl/gstglupload.c
++++ b/gst-libs/gst/gl/gstglupload.c
+@@ -850,7 +850,9 @@ _direct_dma_buf_upload_transform_caps (gpointer impl, GstGLContext * context,
+ 
+     g_value_init (&formats, GST_TYPE_LIST);
+     gst_value_deserialize (&formats, format_str);
+-    gst_caps_set_value (ret, "format", &formats);
++    tmp = gst_caps_copy (ret);
++    gst_caps_set_value (tmp, "format", &formats);
++    gst_caps_append (ret, tmp);
+     g_free (format_str);
+     g_value_unset (&formats);
+ 
+-- 
+2.11.0
+

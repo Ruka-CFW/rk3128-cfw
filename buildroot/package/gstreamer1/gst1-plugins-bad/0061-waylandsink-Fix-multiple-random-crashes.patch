@@ -1,0 +1,44 @@
+From 2e3a067978babd0011be3d253f8acd0bff1ea3f4 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Thu, 26 Nov 2020 12:19:54 +0800
+Subject: [PATCH] waylandsink: Fix multiple random crashes
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ ext/wayland/gstwaylandsink.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/ext/wayland/gstwaylandsink.c b/ext/wayland/gstwaylandsink.c
+index fca09fb7b..78f57c1f8 100644
+--- a/ext/wayland/gstwaylandsink.c
++++ b/ext/wayland/gstwaylandsink.c
+@@ -631,10 +631,15 @@ frame_redraw_callback (void *data, struct wl_callback *callback, uint32_t time)
+ 
+   g_mutex_lock (&sink->render_lock);
+   sink->redraw_pending = FALSE;
+-  sink->window->callback = NULL;
+-  g_mutex_unlock (&sink->render_lock);
+ 
++  if (!sink->window) {
++    g_mutex_unlock (&sink->render_lock);
++    return;
++  }
++
++  sink->window->callback = NULL;
+   wl_callback_destroy (callback);
++  g_mutex_unlock (&sink->render_lock);
+ }
+ 
+ static const struct wl_callback_listener frame_callback_listener = {
+@@ -1008,7 +1013,7 @@ gst_wayland_sink_expose (GstVideoOverlay * overlay)
+   GST_DEBUG_OBJECT (sink, "expose");
+ 
+   g_mutex_lock (&sink->render_lock);
+-  if (sink->last_buffer && !sink->redraw_pending) {
++  if (sink->window && sink->last_buffer && !sink->redraw_pending) {
+     GST_DEBUG_OBJECT (sink, "redrawing last buffer");
+     render_last_buffer (sink, TRUE);
+   }
+-- 
+2.20.1
+

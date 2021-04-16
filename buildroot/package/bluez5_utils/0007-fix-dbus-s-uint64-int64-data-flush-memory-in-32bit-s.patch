@@ -1,0 +1,46 @@
+From 542a954eb02669a8db065c6f757905564922ce20 Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Thu, 26 Sep 2019 06:28:35 +0000
+Subject: [PATCH] fix dbus's uint64/int64 data flush memory in 32bit system
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ gdbus/client.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/gdbus/client.c b/gdbus/client.c
+index dd5d2eb..9dda0f5 100644
+--- a/gdbus/client.c
++++ b/gdbus/client.c
+@@ -227,10 +227,24 @@ static void iter_append_iter(DBusMessageIter *base, DBusMessageIter *iter)
+ 	type = dbus_message_iter_get_arg_type(iter);
+ 
+ 	if (dbus_type_is_basic(type)) {
+-		const void *value;
+-
+-		dbus_message_iter_get_basic(iter, &value);
+-		dbus_message_iter_append_basic(base, type, &value);
++		switch(type) {
++			case DBUS_TYPE_INT64:
++			case DBUS_TYPE_UINT64:
++			case DBUS_TYPE_DOUBLE:
++			{
++				dbus_uint64_t value;
++				dbus_message_iter_get_basic(iter, &value);
++				dbus_message_iter_append_basic(base, type, &value);
++				break;
++			}
++			default:
++			{
++				const void *value;
++				dbus_message_iter_get_basic(iter, &value);
++				dbus_message_iter_append_basic(base, type, &value);
++				break;
++			}
++		}
+ 	} else if (dbus_type_is_container(type)) {
+ 		DBusMessageIter iter_sub, base_sub;
+ 		char *sig;
+-- 
+2.7.4
+

@@ -1,0 +1,65 @@
+From d28b782a5761f4760038a3118b93206b17bdb235 Mon Sep 17 00:00:00 2001
+From: Damian Hobson-Garcia <dhobsong@igel.co.jp>
+Date: Wed, 21 Mar 2018 13:18:17 +0200
+Subject: [PATCH 4/9] Add mmap via libv4l to generic_v4l2_device
+
+This patch allows to use v4l2_mmap calls instead of mmap on v4l2
+device fd, when using with linux.
+
+Change-Id: I3de518f7e3ea2fe8a60bc80b8afcece17f76f153
+---
+ .../chromium/media/gpu/v4l2/generic_v4l2_device.cc     | 10 ++++++++++
+ src/3rdparty/chromium/media/gpu/v4l2/v4l2.sig          |  2 ++
+ .../media/gpu/v4l2/v4l2_video_decode_accelerator.cc    |  1 +
+ 3 files changed, 13 insertions(+)
+
+diff --git a/src/3rdparty/chromium/media/gpu/v4l2/generic_v4l2_device.cc b/src/3rdparty/chromium/media/gpu/v4l2/generic_v4l2_device.cc
+index 3920e956c..7981acfc8 100644
+--- a/src/3rdparty/chromium/media/gpu/v4l2/generic_v4l2_device.cc
++++ b/src/3rdparty/chromium/media/gpu/v4l2/generic_v4l2_device.cc
+@@ -100,10 +100,20 @@ void* GenericV4L2Device::Mmap(void* addr,
+                               int flags,
+                               unsigned int offset) {
+   DCHECK(device_fd_.is_valid());
++#if BUILDFLAG(USE_LIBV4L2)
++  if (use_libv4l2_)
++    return v4l2_mmap(addr, len, prot, flags, device_fd_.get(), offset);
++#endif
+   return mmap(addr, len, prot, flags, device_fd_.get(), offset);
+ }
+ 
+ void GenericV4L2Device::Munmap(void* addr, unsigned int len) {
++#if BUILDFLAG(USE_LIBV4L2)
++  if (use_libv4l2_) {
++    v4l2_munmap(addr, len);
++    return;
++  }
++#endif
+   munmap(addr, len);
+ }
+ 
+diff --git a/src/3rdparty/chromium/media/gpu/v4l2/v4l2.sig b/src/3rdparty/chromium/media/gpu/v4l2/v4l2.sig
+index 4269fb48d..71b5b3787 100644
+--- a/src/3rdparty/chromium/media/gpu/v4l2/v4l2.sig
++++ b/src/3rdparty/chromium/media/gpu/v4l2/v4l2.sig
+@@ -8,3 +8,5 @@
+ LIBV4L_PUBLIC int v4l2_close(int fd);
+ LIBV4L_PUBLIC int v4l2_ioctl(int fd, unsigned long int request, ...);
+ LIBV4L_PUBLIC int v4l2_fd_open(int fd, int v4l2_flags);
++LIBV4L_PUBLIC void *v4l2_mmap(void *start, size_t length, int prot, int flags, int fd, int64_t offset);
++LIBV4L_PUBLIC int v4l2_munmap(void *_start, size_t length);
+diff --git a/src/3rdparty/chromium/media/gpu/v4l2/v4l2_video_decode_accelerator.cc b/src/3rdparty/chromium/media/gpu/v4l2/v4l2_video_decode_accelerator.cc
+index 10fc90e6e..64d0d4a14 100644
+--- a/src/3rdparty/chromium/media/gpu/v4l2/v4l2_video_decode_accelerator.cc
++++ b/src/3rdparty/chromium/media/gpu/v4l2/v4l2_video_decode_accelerator.cc
+@@ -31,6 +31,7 @@
+ #include "media/base/unaligned_shared_memory.h"
+ #include "media/base/video_frame_layout.h"
+ #include "media/base/video_types.h"
++#include "media/gpu/buildflags.h"
+ #include "media/gpu/image_processor_factory.h"
+ #include "media/gpu/macros.h"
+ #include "media/gpu/v4l2/v4l2_image_processor.h"
+-- 
+2.20.1
+

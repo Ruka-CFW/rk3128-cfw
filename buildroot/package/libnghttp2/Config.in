@@ -1,0 +1,8 @@
+config BR2_PACKAGE_LIBNGHTTP2
+	bool "libnghttp2"
+	help
+	  libnghttp2 is a tool for getting files from FTP, HTTP, Gopher, Telnet,
+	  and Dict servers, using any of the supported protocols.
+
+	  http://nghttp2.org/
+

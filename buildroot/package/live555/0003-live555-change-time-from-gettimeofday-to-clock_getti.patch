@@ -1,0 +1,153 @@
+From cb276426d8669cf3031f68ef583dc125addd4704 Mon Sep 17 00:00:00 2001
+From: "jkand.huang" <jkand.huang@rock-chips.com>
+Date: Wed, 29 Apr 2020 16:10:27 +0800
+Subject: [PATCH] live555: change time from gettimeofday to clock_gettime.
+
+Signed-off-by: jkand.huang <jkand.huang@rock-chips.com>
+---
+ groupsock/GroupsockHelper.cpp        | 88 ++--------------------------
+ groupsock/include/GroupsockHelper.hh |  8 +--
+ groupsock/include/NetCommon.h        |  2 +-
+ 3 files changed, 8 insertions(+), 90 deletions(-)
+
+diff --git a/groupsock/GroupsockHelper.cpp b/groupsock/GroupsockHelper.cpp
+index 9821931..16b3ab1 100644
+--- a/groupsock/GroupsockHelper.cpp
++++ b/groupsock/GroupsockHelper.cpp
+@@ -26,7 +26,7 @@ extern "C" int initializeWinsockIfNecessary();
+ #else
+ #include <stdarg.h>
+ #include <time.h>
+-#include <sys/time.h>
++//#include <sys/time.h>
+ #include <fcntl.h>
+ #define initializeWinsockIfNecessary() 1
+ #endif
+@@ -758,87 +758,11 @@ char const* timestampString() {
+   return (char const*)&timeString;
+ }
+ 
+-#if (defined(__WIN32__) || defined(_WIN32)) && !defined(__MINGW32__)
+-// For Windoze, we need to implement our own gettimeofday()
+-
+-// used to make sure that static variables in gettimeofday() aren't initialized simultaneously by multiple threads
+-static LONG initializeLock_gettimeofday = 0;  
+-
+-#if !defined(_WIN32_WCE)
+-#include <sys/timeb.h>
+-#endif
+-
+ int gettimeofday(struct timeval* tp, int* /*tz*/) {
+-  static LARGE_INTEGER tickFrequency, epochOffset;
+-
+-  static Boolean isInitialized = False;
+-
+-  LARGE_INTEGER tickNow;
+-
+-#if !defined(_WIN32_WCE)
+-  QueryPerformanceCounter(&tickNow);
+-#else
+-  tickNow.QuadPart = GetTickCount();
+-#endif
+- 
+-  if (!isInitialized) {
+-    if(1 == InterlockedIncrement(&initializeLock_gettimeofday)) {
+-#if !defined(_WIN32_WCE)
+-      // For our first call, use "ftime()", so that we get a time with a proper epoch.
+-      // For subsequent calls, use "QueryPerformanceCount()", because it's more fine-grain.
+-      struct timeb tb;
+-      ftime(&tb);
+-      tp->tv_sec = tb.time;
+-      tp->tv_usec = 1000*tb.millitm;
+-
+-      // Also get our counter frequency:
+-      QueryPerformanceFrequency(&tickFrequency);
+-#else
+-      /* FILETIME of Jan 1 1970 00:00:00. */
+-      const LONGLONG epoch = 116444736000000000LL;
+-      FILETIME fileTime;
+-      LARGE_INTEGER time;
+-      GetSystemTimeAsFileTime(&fileTime);
+-
+-      time.HighPart = fileTime.dwHighDateTime;
+-      time.LowPart = fileTime.dwLowDateTime;
+-
+-      // convert to from 100ns time to unix timestamp in seconds, 1000*1000*10
+-      tp->tv_sec = (long)((time.QuadPart - epoch) / 10000000L);
+-
+-      /*
+-        GetSystemTimeAsFileTime has just a seconds resolution,
+-        thats why wince-version of gettimeofday is not 100% accurate, usec accuracy would be calculated like this:
+-        // convert 100 nanoseconds to usec
+-        tp->tv_usec= (long)((time.QuadPart - epoch)%10000000L) / 10L;
+-      */
+-      tp->tv_usec = 0;
+-
+-      // resolution of GetTickCounter() is always milliseconds
+-      tickFrequency.QuadPart = 1000;
+-#endif     
+-      // compute an offset to add to subsequent counter times, so we get a proper epoch:
+-      epochOffset.QuadPart
+-          = tp->tv_sec * tickFrequency.QuadPart + (tp->tv_usec * tickFrequency.QuadPart) / 1000000L - tickNow.QuadPart;
+-      
+-      // next caller can use ticks for time calculation
+-      isInitialized = True; 
+-      return 0;
+-    } else {
+-        InterlockedDecrement(&initializeLock_gettimeofday);
+-        // wait until first caller has initialized static values
+-        while(!isInitialized){
+-          Sleep(1);
+-        }
+-    }
+-  }
+-
+-  // adjust our tick count so that we get a proper epoch:
+-  tickNow.QuadPart += epochOffset.QuadPart;
+-
+-  tp->tv_sec =  (long)(tickNow.QuadPart / tickFrequency.QuadPart);
+-  tp->tv_usec = (long)(((tickNow.QuadPart % tickFrequency.QuadPart) * 1000000L) / tickFrequency.QuadPart);
+-
++  struct timespec timeNow = {0, 0};
++  clock_gettime(CLOCK_MONOTONIC, &timeNow);
++  tp->tv_sec = timeNow.tv_sec;
++  tp->tv_usec = timeNow.tv_nsec/1000;
+   return 0;
+ }
+-#endif
++
+diff --git a/groupsock/include/GroupsockHelper.hh b/groupsock/include/GroupsockHelper.hh
+index 8ca4275..0313d67 100644
+--- a/groupsock/include/GroupsockHelper.hh
++++ b/groupsock/include/GroupsockHelper.hh
+@@ -129,13 +129,7 @@ struct _groupsockPriv { // There should be only one of these allocated
+ _groupsockPriv* groupsockPriv(UsageEnvironment& env); // allocates it if necessary
+ void reclaimGroupsockPriv(UsageEnvironment& env);
+ 
+-
+-#if (defined(__WIN32__) || defined(_WIN32)) && !defined(__MINGW32__)
+-// For Windoze, we need to implement our own gettimeofday()
+-extern int gettimeofday(struct timeval*, int*);
+-#else
+-#include <sys/time.h>
+-#endif
++int gettimeofday(struct timeval*, int*);
+ 
+ // The following are implemented in inet.c:
+ extern "C" netAddressBits our_inet_addr(char const*);
+diff --git a/groupsock/include/NetCommon.h b/groupsock/include/NetCommon.h
+index 4ec115b..9495a66 100644
+--- a/groupsock/include/NetCommon.h
++++ b/groupsock/include/NetCommon.h
+@@ -93,7 +93,7 @@ typedef unsigned char u_int8_t;
+ /* Unix */
+ #include <sys/types.h>
+ #include <sys/socket.h>
+-#include <sys/time.h>
++//#include <sys/time.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
+ #include <netdb.h>
+-- 
+2.26.1
+

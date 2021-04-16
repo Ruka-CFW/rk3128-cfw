@@ -1,0 +1,74 @@
+From ad92eefd0d60d9f63b862861bf613ae68c4e1c79 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Wed, 28 Nov 2018 17:04:59 +0800
+Subject: [PATCH 03/15] qwaylanddisplay: Refactor flushRequests() for multiple
+ readers
+
+Cancel reading when no events polled, since the other clients, e.g.
+waylandsink, might already read the events before us.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/client/qwaylanddisplay.cpp | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
+
+diff --git a/src/client/qwaylanddisplay.cpp b/src/client/qwaylanddisplay.cpp
+index fe094f6f..ba4ce931 100644
+--- a/src/client/qwaylanddisplay.cpp
++++ b/src/client/qwaylanddisplay.cpp
+@@ -84,6 +84,7 @@
+ #include <QtCore/QDebug>
+ 
+ #include <errno.h>
++#include <poll.h>
+ 
+ QT_BEGIN_NAMESPACE
+ 
+@@ -214,24 +215,38 @@ void QWaylandDisplay::checkError() const
+ 
+ void QWaylandDisplay::flushRequests()
+ {
+-    if (wl_display_prepare_read(mDisplay) == 0) {
++    struct pollfd fd;
++    int ret;
++
++    // 1. Prepare exclusive reading
++    while (wl_display_prepare_read(mDisplay) != 0)
++        wl_display_dispatch_pending(mDisplay);
++
++    // 2. Nonblock event reading
++    fd.fd = wl_display_get_fd(mDisplay);
++    fd.events = POLLIN | POLLERR | POLLHUP;
++    ret = poll(&fd, 1, 0);
++    if (ret > 0 && fd.revents & POLLIN)
+         wl_display_read_events(mDisplay);
+-    }
++    else
++        wl_display_cancel_read(mDisplay);
+ 
+-    if (wl_display_dispatch_pending(mDisplay) < 0)
++    // 3. Error check
++    if (wl_display_get_error(mDisplay) != 0)
+         checkError();
+ 
++    // 4. Dispatch events on our queues
++    wl_display_dispatch_pending(mDisplay);
++
+     {
+         QReadLocker locker(&m_frameQueueLock);
+         for (const FrameQueue &q : mExternalQueues) {
+             QMutexLocker locker(q.mutex);
+-            while (wl_display_prepare_read_queue(mDisplay, q.queue) != 0)
+-                wl_display_dispatch_queue_pending(mDisplay, q.queue);
+-            wl_display_read_events(mDisplay);
+             wl_display_dispatch_queue_pending(mDisplay, q.queue);
+         }
+     }
+ 
++    // 5. Final flush
+     wl_display_flush(mDisplay);
+ }
+ 
+-- 
+2.20.1
+

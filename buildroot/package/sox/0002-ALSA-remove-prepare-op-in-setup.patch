@@ -1,0 +1,29 @@
+From 64a6203322109c4bbbad043b159925fc4f156ee7 Mon Sep 17 00:00:00 2001
+From: Zain Wang <wzz@rock-chips.com>
+Date: Wed, 16 Dec 2020 16:32:36 +0800
+Subject: [PATCH] ALSA: remove prepare op in setup
+
+snd_pcm_prepare has run in snd_pcm_hw_params.
+ALSA Lib Version: 1.1.5
+
+Signed-off-by: Zain Wang <wzz@rock-chips.com>
+---
+ src/alsa.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/alsa.c b/src/alsa.c
+index daf040a..e6648bf 100644
+--- a/src/alsa.c
++++ b/src/alsa.c
+@@ -153,7 +153,7 @@ static int setup(sox_format_t * ft)
+ 
+   _(snd_pcm_hw_params, (p->pcm, params));           /* Configure ALSA */
+   snd_pcm_hw_params_free(params), params = NULL;
+-  _(snd_pcm_prepare, (p->pcm));
++  /* _(snd_pcm_prepare, (p->pcm));		    // snd_pcm_hw_params_free has prepared */
+   p->buf_len *= ft->signal.channels;                /* No longer in `frames' */
+   p->buf = lsx_malloc(p->buf_len * formats[p->format].bytes);
+   return SOX_SUCCESS;
+-- 
+2.29.0
+

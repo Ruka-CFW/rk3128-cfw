@@ -1,0 +1,167 @@
+From 03a298362f4fd5cd1037d51c4850581592dfb9fa Mon Sep 17 00:00:00 2001
+From: Hertz Wang <wangh@rock-chips.com>
+Date: Sat, 13 Oct 2018 20:28:12 +0800
+Subject: [PATCH 1/1] copy or translate data by rga
+
+Signed-off-by: Hertz Wang <wangh@rock-chips.com>
+---
+ v4l2grab.c | 98 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 96 insertions(+), 2 deletions(-)
+
+diff --git a/v4l2grab.c b/v4l2grab.c
+index 8165c53..1cf6962 100644
+--- a/v4l2grab.c
++++ b/v4l2grab.c
+@@ -90,6 +90,9 @@ typedef enum {
+ struct buffer {
+         void *                  start;
+         size_t                  length;
++#ifdef IO_MMAP
++        int                     fd;
++#endif
+ };
+ 
+ static io_method        io              = IO_METHOD_MMAP;
+@@ -97,6 +100,13 @@ static int              fd              = -1;
+ struct buffer *         buffers         = NULL;
+ static unsigned int     n_buffers       = 0;
+ 
++#ifdef ENABLE_RGA
++#include <rga/RgaApi.h>
++// rga buffer
++static bo_t bo;
++static int rga_buffer_fd = -1;
++#endif
++
+ // global settings
+ static unsigned int width = 640;
+ static unsigned int height = 480;
+@@ -246,6 +256,9 @@ static int frameRead(void)
+ #ifdef IO_USERPTR
+ 	unsigned int i;
+ #endif
++#ifdef IO_MMAP
++	void *buffer_ptr = NULL;
++#endif
+ 
+ 	switch (io) {
+ #ifdef IO_READ
+@@ -297,7 +310,43 @@ static int frameRead(void)
+ 
+ 			assert(buf.index < n_buffers);
+ 
+-			imageProcess(buffers[buf.index].start,buf.timestamp);
++			buffer_ptr = buffers[buf.index].start;
++#ifdef ENABLE_RGA
++			{
++				// test rga read buffer from v4l2
++				rga_info_t src;
++				rga_info_t dst;
++
++				memset(&src, 0, sizeof(rga_info_t));
++				// TOFIX:
++				// result to wrong image if use the exported fd from usb camera
++				src.fd = -1; //buffers[buf.index].fd;
++				src.virAddr = buffers[buf.index].start;
++				src.mmuFlag = 1;
++				rga_set_rect(&src.rect, 0, 0, width, height, width, height,
++							 RK_FORMAT_YCbCr_420_P);
++
++				memset(&dst, 0, sizeof(rga_info_t));
++				dst.fd = rga_buffer_fd;
++				dst.mmuFlag = 1;
++				rga_set_rect(&dst.rect, 0, 0, width, height, width, height,
++							 RK_FORMAT_YCbCr_420_P);
++
++				if (c_RkRgaBlit(&src, &dst, NULL))
++					errno_exit("rga copy blit failed");
++				buffer_ptr = bo.ptr;
++			}
++#endif
++			{
++				// dump yuv data
++				int fd = open("/tmp/dump.yuv", O_RDWR | O_CREAT);
++				if (fd < 0)
++					errno_exit("create /tmp/dump.yuv failed");
++				write(fd, buffer_ptr, width * height * 3 / 2);
++				close(fd);
++			}
++
++			imageProcess(buffer_ptr, buf.timestamp);
+ 
+ 			if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
+ 				errno_exit("VIDIOC_QBUF");
+@@ -505,9 +554,22 @@ static void deviceUninit(void)
+ 
+ #ifdef IO_MMAP
+ 		case IO_METHOD_MMAP:
+-			for (i = 0; i < n_buffers; ++i)
++			for (i = 0; i < n_buffers; ++i) {
+ 				if (-1 == v4l2_munmap(buffers[i].start, buffers[i].length))
+ 					errno_exit("munmap");
++				if (buffers[i].fd >= 0)
++					close(buffers[i].fd);
++			}
++#ifdef ENABLE_RGA
++			if (rga_buffer_fd >= 0) {
++				close(rga_buffer_fd);
++				rga_buffer_fd = -1;
++			}
++			if (c_RkRgaUnmap(&bo))
++				printf("c_RkRgaUnmap error : %s\n", strerror(errno));
++			if (c_RkRgaFree(&bo))
++				printf("c_RkRgaFree error : %s\n", strerror(errno));
++#endif
+ 			break;
+ #endif
+ 
+@@ -543,6 +605,22 @@ static void readInit(unsigned int buffer_size)
+ #endif
+ 
+ #ifdef IO_MMAP
++static void buffer_export(int v4lfd, enum v4l2_buf_type bt, int index, int *dmafd)
++{
++	struct v4l2_exportbuffer expbuf;
++
++	memset(&expbuf, 0, sizeof(expbuf));
++	expbuf.type = bt;
++	expbuf.index = index;
++	if (ioctl(v4lfd, VIDIOC_EXPBUF, &expbuf) == -1) {
++		perror("VIDIOC_EXPBUF");
++		*dmafd = -1;
++		return;
++	}
++
++	*dmafd = expbuf.fd;
++}
++
+ static void mmapInit(void)
+ {
+ 	struct v4l2_requestbuffers req;
+@@ -591,7 +669,23 @@ static void mmapInit(void)
+ 
+ 		if (MAP_FAILED == buffers[n_buffers].start)
+ 			errno_exit("mmap");
++
++		buffer_export(fd, buf.type, buf.index, &buffers[n_buffers].fd);
+ 	}
++#ifdef ENABLE_RGA
++	memset(&bo, 0, sizeof(bo));
++	if (1) {
++		int ret = c_RkRgaGetAllocBuffer(&bo, width, height, 32);
++		if (ret)
++			errno_exit("rga alloc buffer failed");
++		ret = c_RkRgaGetMmap(&bo);
++		if (ret)
++			errno_exit("rga get mmap failed");
++		ret = c_RkRgaGetBufferFd(&bo, &rga_buffer_fd);
++		if (ret)
++			errno_exit("rga get buffer fd failed");
++	}
++#endif
+ }
+ #endif
+ 
+-- 
+2.7.4
+

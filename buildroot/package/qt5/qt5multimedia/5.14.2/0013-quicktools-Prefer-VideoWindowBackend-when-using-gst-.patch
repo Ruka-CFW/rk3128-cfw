@@ -1,0 +1,52 @@
+From b45a3b58d323464d4d3b651a71d73a2cb2b4b6ed Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 15 Jan 2021 16:27:59 +0800
+Subject: [PATCH 13/13] quicktools: Prefer VideoWindowBackend when using gst
+ sink
+
+Prefer VideoWindowBackend for video overlay.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/qtmultimediaquicktools/qdeclarativevideooutput.cpp | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/qtmultimediaquicktools/qdeclarativevideooutput.cpp b/src/qtmultimediaquicktools/qdeclarativevideooutput.cpp
+index 3216650..f7b08e4 100644
+--- a/src/qtmultimediaquicktools/qdeclarativevideooutput.cpp
++++ b/src/qtmultimediaquicktools/qdeclarativevideooutput.cpp
+@@ -238,6 +238,7 @@ Q_GLOBAL_STATIC_WITH_ARGS(QMediaPluginLoader, videoBackendFactoryLoader,
+ bool QDeclarativeVideoOutput::createBackend(QMediaService *service)
+ {
+     bool backendAvailable = false;
++    bool preferWindowBackend = !qgetenv( "QT_GSTREAMER_WINDOW_VIDEOSINK" ).isEmpty();
+ 
+     const auto instances = videoBackendFactoryLoader()->instances(QLatin1String("declarativevideobackend"));
+     for (QObject *instance : instances) {
+@@ -249,8 +250,10 @@ bool QDeclarativeVideoOutput::createBackend(QMediaService *service)
+             }
+         }
+     }
++
++retry:
+ #if QT_CONFIG(opengl)
+-    if (!backendAvailable) {
++    if (!backendAvailable && !preferWindowBackend) {
+         m_backend.reset(new QDeclarativeVideoRendererBackend(this));
+         if (m_backend->init(service))
+             backendAvailable = true;
+@@ -266,6 +269,11 @@ bool QDeclarativeVideoOutput::createBackend(QMediaService *service)
+             backendAvailable = true;
+     }
+ 
++    if (!backendAvailable && preferWindowBackend) {
++        preferWindowBackend = false;
++        goto retry;
++    }
++
+     if (backendAvailable) {
+         // Since new backend has been created needs to update its geometry.
+         m_geometryDirty = true;
+-- 
+2.20.1
+

@@ -1,0 +1,56 @@
+From 5c689d294c8a87f07aabf9e7ba536425124c4cfc Mon Sep 17 00:00:00 2001
+From: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Date: Fri, 9 Nov 2018 09:32:49 +0100
+Subject: [PATCH 17/45] glupload: dmabuf: be explicit about gl formats used
+
+Rather then letting gst_gl_memory_setup_buffer guess the GL format used
+for an eglimage after importing a dmabuf be explicit about it. This
+fixes issues where dmabuf import may have used another format then
+gst_gl_format_from_video_info would guess on the basis of the available
+GL extensions.
+
+In particular on etnaviv the gst_gl_format_from_video_info would
+assuming a luminance + alpha GL format is used for YUY2, but the dmabuf
+import will always use RG88. Which causes images to end up somewhat pink when
+displayed on the screen.
+
+(cherry picked from commit 989f53383b6e833183167e7c1e08a5bb9bb4d267)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ gst-libs/gst/gl/gstglupload.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/gst-libs/gst/gl/gstglupload.c b/gst-libs/gst/gl/gstglupload.c
+index 56fd3b1170..382638787d 100644
+--- a/gst-libs/gst/gl/gstglupload.c
++++ b/gst-libs/gst/gl/gstglupload.c
+@@ -490,6 +490,7 @@ struct DmabufUpload
+   GstGLUpload *upload;
+ 
+   GstEGLImage *eglimage[GST_VIDEO_MAX_PLANES];
++  GstGLFormat formats[GST_VIDEO_MAX_PLANES];
+   GstBuffer *outbuf;
+   GstGLVideoAllocationParams *params;
+   guint n_mem;
+@@ -721,6 +722,7 @@ _dma_buf_upload_accept (gpointer impl, GstBuffer * buffer, GstCaps * in_caps,
+       return FALSE;
+ 
+     _set_cached_eglimage (mems[i], dmabuf->eglimage[i], cache_id);
++    dmabuf->formats[i] = dmabuf->eglimage[i]->format;
+   }
+ 
+   return TRUE;
+@@ -745,8 +747,8 @@ _dma_buf_upload_perform_gl_thread (GstGLContext * context,
+ 
+   /* FIXME: buffer pool */
+   dmabuf->outbuf = gst_buffer_new ();
+-  gst_gl_memory_setup_buffer (allocator, dmabuf->outbuf, dmabuf->params, NULL,
+-      (gpointer *) dmabuf->eglimage, dmabuf->n_mem);
++  gst_gl_memory_setup_buffer (allocator, dmabuf->outbuf, dmabuf->params,
++      dmabuf->formats, (gpointer *) dmabuf->eglimage, dmabuf->n_mem);
+   gst_object_unref (allocator);
+ }
+ 
+-- 
+2.11.0
+

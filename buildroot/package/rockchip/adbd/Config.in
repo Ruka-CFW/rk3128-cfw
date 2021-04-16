@@ -1,0 +1,6 @@
+config BR2_PACKAGE_ADBD
+	bool "adbd porting for Linux"
+	depends on BR2_PACKAGE_LIBCUTILS
+
+comment "adbd needs libcutils"
+	depends on !BR2_PACKAGE_LIBCUTILS

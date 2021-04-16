@@ -1,0 +1,92 @@
+From 3ce08c2f7974c1b2d43ff7cc1becf49af76e7e43 Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Tue, 8 Oct 2019 12:43:32 +0800
+Subject: [PATCH] fix D-Bus failed to register media player interface
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ profiles/audio/avrcp.c | 45 ++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 42 insertions(+), 3 deletions(-)
+
+diff --git a/profiles/audio/avrcp.c b/profiles/audio/avrcp.c
+index 692f175..56dc45c 100644
+--- a/profiles/audio/avrcp.c
++++ b/profiles/audio/avrcp.c
+@@ -3327,6 +3327,35 @@ static const struct media_player_callback ct_cbs = {
+ 	.get_play_status = ct_get_play_status,
+ };
+ 
++
++static struct avrcp_player *find_ct_player_by_path(struct avrcp *session, uint16_t id, char *path)
++{
++	GSList *l;
++	char *player_path = g_strdup_printf("%s/player%u", path, id);
++
++	for (l = session->controller->players; l; l = l->next) {
++		struct avrcp_player *player = l->data;
++
++		if(!player->user_data) {
++			DBG("player->user_data = NULL");
++			continue;
++		}
++
++		if(!strcmp(media_player_get_path(player->user_data), player_path)) {
++			if (player->id != id)
++				player->id = id;
++
++			DBG("Find player, id = %d, path = %s", id, player_path);
++			g_free(player_path);
++			return player;
++		}
++	}
++
++	DBG("No matching player, id = %d, path = %s", id, player_path);
++	g_free(player_path);
++	return NULL;
++}
++
+ static struct avrcp_player *create_ct_player(struct avrcp *session,
+ 								uint16_t id)
+ {
+@@ -3334,12 +3363,18 @@ static struct avrcp_player *create_ct_player(struct avrcp *session,
+ 	struct media_player *mp;
+ 	const char *path;
+ 
++	path = device_get_path(session->dev);
++	if(!path)
++		return NULL;
++
++	player = find_ct_player_by_path(session, id, path);
++	if(player != NULL)
++		return player;
++
+ 	player = g_new0(struct avrcp_player, 1);
+ 	player->id = id;
+ 	player->sessions = g_slist_prepend(player->sessions, session);
+ 
+-	path = device_get_path(session->dev);
+-
+ 	mp = media_player_controller_create(path, id);
+ 	if (mp == NULL)
+ 		return NULL;
+@@ -3366,12 +3401,16 @@ static struct avrcp_player *find_ct_player(struct avrcp *session, uint16_t id)
+ 		struct avrcp_player *player = l->data;
+ 
+ 		if (player->id == 0) {
++			DBG("Find player, player->id = 0, id = %d", id);
+ 			player->id = id;
++
+ 			return player;
+ 		}
+ 
+-		if (player->id == id)
++		if (player->id == id) {
++			DBG("Find player, player->id = %d", player->id);
+ 			return player;
++		}
+ 	}
+ 
+ 	return NULL;
+-- 
+2.7.4
+

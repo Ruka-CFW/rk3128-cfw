@@ -1,0 +1,26 @@
+From 70be1e0416cc05d259b61458afe1a3363b149665 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 10 Apr 2020 16:16:08 +0800
+Subject: [PATCH 6/8] media: gpu: v4l2: Use POLLIN for pending event
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/3rdparty/chromium/media/gpu/v4l2/generic_v4l2_device.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/3rdparty/chromium/media/gpu/v4l2/generic_v4l2_device.cc b/src/3rdparty/chromium/media/gpu/v4l2/generic_v4l2_device.cc
+index 02b0a2869..1dc485a24 100644
+--- a/src/3rdparty/chromium/media/gpu/v4l2/generic_v4l2_device.cc
++++ b/src/3rdparty/chromium/media/gpu/v4l2/generic_v4l2_device.cc
+@@ -90,7 +90,7 @@ bool GenericV4L2Device::Poll(bool poll_device, bool* event_pending) {
+     VPLOGF(1) << "poll() failed";
+     return false;
+   }
+-  *event_pending = (pollfd != -1 && pollfds[pollfd].revents & POLLPRI);
++  *event_pending = (pollfd != -1 && pollfds[pollfd].revents & POLLIN);
+   return true;
+ }
+ 
+-- 
+2.20.1
+

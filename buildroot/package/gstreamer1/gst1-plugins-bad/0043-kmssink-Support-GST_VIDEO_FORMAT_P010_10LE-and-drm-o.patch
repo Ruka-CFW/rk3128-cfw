@@ -1,0 +1,66 @@
+From d983651e9d658308c83a0697bb04d621ad2ba056 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Mon, 15 Jun 2020 09:50:41 +0800
+Subject: [PATCH 43/60] kmssink: Support GST_VIDEO_FORMAT_P010_10LE and drm
+ open hacks
+
+Signed-off-by: Binyuan Lan <lby@rock-chips.com>
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ sys/kms/gstkmsallocator.c | 5 +++++
+ sys/kms/gstkmssink.c      | 9 +++++++++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/sys/kms/gstkmsallocator.c b/sys/kms/gstkmsallocator.c
+index a0343922b..2c536a466 100644
+--- a/sys/kms/gstkmsallocator.c
++++ b/sys/kms/gstkmsallocator.c
+@@ -466,6 +466,11 @@ gst_kms_allocator_add_fb (GstKMSAllocator * alloc, GstKMSMemory * kmsmem,
+ 
+     pitches[i] = GST_VIDEO_INFO_PLANE_STRIDE (vinfo, i);
+     offsets[i] = in_offsets[i];
++
++    if ((GST_VIDEO_INFO_FORMAT(vinfo) == GST_VIDEO_FORMAT_P010_10LE) && (w >= 3840)) {
++	    pitches[i] *= 2;
++	    h = GST_VIDEO_INFO_HEIGHT (vinfo) / 2;
++    }
+   }
+ 
+   GST_DEBUG_OBJECT (alloc, "bo handles: %d, %d, %d, %d", bo_handles[0],
+diff --git a/sys/kms/gstkmssink.c b/sys/kms/gstkmssink.c
+index 44067a539..15f808bcb 100644
+--- a/sys/kms/gstkmssink.c
++++ b/sys/kms/gstkmssink.c
+@@ -52,6 +52,8 @@
+ #include <drm_fourcc.h>
+ #include <string.h>
+ 
++#include <fcntl.h>
++
+ #include "gstkmssink.h"
+ #include "gstkmsutils.h"
+ #include "gstkmsbufferpool.h"
+@@ -726,6 +728,10 @@ gst_kms_sink_start (GstBaseSink * bsink)
+     self->fd = drmOpen (self->devname, self->bus_id);
+   else
+     self->fd = kms_open (&self->devname);
++
++  if (self->fd < 0)
++    self->fd = open ("/dev/dri/card0", O_RDWR);
++
+   if (self->fd < 0)
+     goto open_failed;
+ 
+@@ -1632,6 +1638,9 @@ retry_set_plane:
+     src.h = GST_VIDEO_INFO_HEIGHT (vinfo);
+   }
+ 
++  if ((GST_VIDEO_INFO_FORMAT(&self->vinfo) == GST_VIDEO_FORMAT_P010_10LE) && (src.w >= 3840))
++    src.h /=2;
++
+   /* handle out of screen case */
+   if ((result.x + result.w) > self->hdisplay)
+     result.w = self->hdisplay - result.x;
+-- 
+2.20.1
+

@@ -1,0 +1,30 @@
+From 2609360ce76702db1d7062381e00bf1e35849682 Mon Sep 17 00:00:00 2001
+From: Nicolas Dufresne <nicolas.dufresne@collabora.com>
+Date: Tue, 6 Nov 2018 22:07:52 +0000
+Subject: [PATCH 13/60] kmssink: Accept underscore in property
+
+Otherwise sdi_mode and similar properties would be canonicalised to
+sdi-mode.
+---
+ sys/kms/gstkmssink.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/sys/kms/gstkmssink.c b/sys/kms/gstkmssink.c
+index 927a7b13b..d52e99c0a 100644
+--- a/sys/kms/gstkmssink.c
++++ b/sys/kms/gstkmssink.c
+@@ -579,7 +579,10 @@ set_drm_property (gint fd, guint32 object, guint32 object_type,
+     /* GstStructure parser limits the set of supported character, so we
+      * replace the invalid characters with '-'. In DRM, this is generally
+      * replacing spaces into '-'. */
+-    g_strcanon (property->name, G_CSET_a_2_z G_CSET_A_2_Z G_CSET_DIGITS, '-');
++    g_strcanon (property->name, G_CSET_a_2_z G_CSET_A_2_Z G_CSET_DIGITS "_",
++        '-');
++
++    GST_LOG ("found property %s (looking for %s)", property->name, prop_name);
+ 
+     if (!strcmp (property->name, prop_name)) {
+       drmModeObjectSetProperty (fd, object, object_type,
+-- 
+2.20.1
+

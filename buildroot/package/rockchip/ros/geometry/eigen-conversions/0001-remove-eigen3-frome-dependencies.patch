@@ -1,0 +1,26 @@
+From a50aa7719a1e36e979748f422ca48651fdc0b8ee Mon Sep 17 00:00:00 2001
+From: "Zain.Wang" <wzz@rock-chips.com>
+Date: Mon, 17 Sep 2018 18:27:31 +0800
+Subject: [PATCH] remove eigen3 frome dependencies
+
+Signed-off-by: Zain.Wang <wzz@rock-chips.com>
+---
+ eigen_conversions/CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/eigen_conversions/CMakeLists.txt b/eigen_conversions/CMakeLists.txt
+index 5277aea..ef2231b 100644
+--- a/eigen_conversions/CMakeLists.txt
++++ b/eigen_conversions/CMakeLists.txt
+@@ -3,7 +3,7 @@ project(eigen_conversions)
+ 
+ find_package(orocos_kdl REQUIRED)
+ find_package(catkin REQUIRED cmake_modules geometry_msgs std_msgs)
+-find_package(Eigen3 REQUIRED)
++#find_package(Eigen3 REQUIRED)
+ 
+ include_directories(SYSTEM ${EIGEN3_INCLUDE_DIRS})
+ include_directories(include ${catkin_INCLUDE_DIRS} ${orocos_kdl_INCLUDE_DIRS})
+-- 
+2.7.4
+

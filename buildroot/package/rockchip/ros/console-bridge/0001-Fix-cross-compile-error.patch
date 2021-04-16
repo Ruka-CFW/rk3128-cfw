@@ -1,0 +1,26 @@
+From d97fc3d7a6ddb6d0a8e82979b4f93a4a3f8b47a0 Mon Sep 17 00:00:00 2001
+From: "zain.wang" <wzz@rock-chips.com>
+Date: Wed, 29 Aug 2018 23:20:13 +0800
+Subject: [PATCH] Fix cross-compile error
+
+Signed-off-by: zain.wang <wzz@rock-chips.com>
+---
+ console_bridge-config.cmake.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/console_bridge-config.cmake.in b/console_bridge-config.cmake.in
+index a64762b..1f21e26 100644
+--- a/console_bridge-config.cmake.in
++++ b/console_bridge-config.cmake.in
+@@ -3,7 +3,7 @@ if (@PKG_NAME@_CONFIG_INCLUDED)
+ endif()
+ set(@PKG_NAME@_CONFIG_INCLUDED TRUE)
+ 
+-set(@PKG_NAME@_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include")
++set(@PKG_NAME@_INCLUDE_DIRS "@STAGING_DIR@@CMAKE_INSTALL_PREFIX@/include")
+ 
+ foreach(lib @PKG_LIBRARIES@)
+   set(onelib "${lib}-NOTFOUND")
+-- 
+2.17.1
+

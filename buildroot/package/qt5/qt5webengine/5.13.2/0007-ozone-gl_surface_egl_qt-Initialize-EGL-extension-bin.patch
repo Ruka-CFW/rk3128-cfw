@@ -1,0 +1,29 @@
+From af11a0d9ee737b542d9cd4e8ae0c9f660cb4b304 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 17 Apr 2020 22:48:12 +0800
+Subject: [PATCH 7/8] ozone: gl_surface_egl_qt: Initialize EGL extension
+ bindings
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/core/ozone/gl_surface_egl_qt.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/core/ozone/gl_surface_egl_qt.cpp b/src/core/ozone/gl_surface_egl_qt.cpp
+index 8715a5095..e7ea2d78a 100644
+--- a/src/core/ozone/gl_surface_egl_qt.cpp
++++ b/src/core/ozone/gl_surface_egl_qt.cpp
+@@ -113,6 +113,10 @@ bool GLSurfaceEGLQt::InitializeOneOff()
+ 
+ bool GLSurfaceEGLQt::InitializeExtensionSettingsOneOff()
+ {
++    if (!s_initialized)
++        return false;
++
++    g_driver_egl.InitializeExtensionBindings();
+     return s_initialized;
+ }
+ 
+-- 
+2.20.1
+

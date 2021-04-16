@@ -1,0 +1,161 @@
+From 98ece7b882b1a23b7d17d6cdffd034a159158698 Mon Sep 17 00:00:00 2001
+From: Damian Hobson-Garcia <dhobsong@igel.co.jp>
+Date: Wed, 15 Jul 2020 13:30:48 +0900
+Subject: [PATCH 39/60] waylandsink: use GstMemory instead of GstBuffer for
+ cache lookup
+
+The GstMemory objects contained in a GstBuffer could be replaced
+by an upstream element, which would break the association beteen
+the GstBuffer and the wayland wl_buffer, make the cache lookup
+results incorrect.
+This patch changes the cache lookup to use the first GstMemory
+in a buffer instead.  For multi-plane buffers, this assumes that
+all of the GstMemory(s) will always be moved together as a set,
+and that the same (first) GstMemory isn't used with different
+combinations of other GstMemory(s).
+
+Part-of: <https://gitlab.freedesktop.org/gstreamer/gst-plugins-bad/-/merge_requests/1401>
+(cherry picked from commit e6944da13453e3861b0fd7e50c5c560dc93b5c63)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ ext/wayland/wlbuffer.c  | 21 +++++++++++++--------
+ ext/wayland/wldisplay.c | 18 +++++++++---------
+ ext/wayland/wldisplay.h |  6 +++---
+ 3 files changed, 25 insertions(+), 20 deletions(-)
+
+diff --git a/ext/wayland/wlbuffer.c b/ext/wayland/wlbuffer.c
+index 5882b03ec..7fed32c59 100644
+--- a/ext/wayland/wlbuffer.c
++++ b/ext/wayland/wlbuffer.c
+@@ -94,8 +94,10 @@ gst_wl_buffer_dispose (GObject * gobject)
+    * the GstWlBuffer from another thread, unregister_buffer() will
+    * block and in the end the display will increase the refcount
+    * of this GstWlBuffer, so it will not be finalized */
+-  if (self->display)
+-    gst_wl_display_unregister_buffer (self->display, self->gstbuffer);
++  if (self->display) {
++    GstMemory *mem0 = gst_buffer_peek_memory (self->gstbuffer, 0);
++    gst_wl_display_unregister_buffer (self->display, mem0);
++  }
+ 
+   G_OBJECT_CLASS (gst_wl_buffer_parent_class)->dispose (gobject);
+ }
+@@ -145,11 +147,11 @@ static const struct wl_buffer_listener buffer_listener = {
+ };
+ 
+ static void
+-gstbuffer_disposed (GstWlBuffer * self)
++gstmemory_disposed (GstWlBuffer * self)
+ {
+   g_assert (!self->used_by_compositor);
+ 
+-  GST_TRACE_OBJECT (self, "owning GstBuffer was finalized");
++  GST_TRACE_OBJECT (self, "owning GstMemory was finalized");
+ 
+   /* this will normally destroy the GstWlBuffer, unless the display is
+    * finalizing and it has taken an additional reference to it */
+@@ -161,18 +163,20 @@ gst_buffer_add_wl_buffer (GstBuffer * gstbuffer, struct wl_buffer *wlbuffer,
+     GstWlDisplay * display)
+ {
+   GstWlBuffer *self;
++  GstMemory *mem0;
+ 
+   self = g_object_new (GST_TYPE_WL_BUFFER, NULL);
+   self->gstbuffer = gstbuffer;
+   self->wlbuffer = wlbuffer;
+   self->display = display;
+ 
+-  gst_wl_display_register_buffer (self->display, self->gstbuffer, self);
++  mem0 = gst_buffer_peek_memory (gstbuffer, 0);
++  gst_wl_display_register_buffer (self->display, mem0, self);
+ 
+   wl_buffer_add_listener (self->wlbuffer, &buffer_listener, self);
+ 
+-  gst_mini_object_weak_ref (GST_MINI_OBJECT (gstbuffer),
+-      (GstMiniObjectNotify) gstbuffer_disposed, self);
++  gst_mini_object_weak_ref (GST_MINI_OBJECT (mem0),
++      (GstMiniObjectNotify) gstmemory_disposed, self);
+ 
+ 
+   return self;
+@@ -181,7 +185,8 @@ gst_buffer_add_wl_buffer (GstBuffer * gstbuffer, struct wl_buffer *wlbuffer,
+ GstWlBuffer *
+ gst_buffer_get_wl_buffer (GstWlDisplay * display, GstBuffer * gstbuffer)
+ {
+-  return gst_wl_display_lookup_buffer (display, gstbuffer);
++  GstMemory *mem0 = gst_buffer_peek_memory (gstbuffer, 0);
++  return gst_wl_display_lookup_buffer (display, mem0);
+ }
+ 
+ void
+diff --git a/ext/wayland/wldisplay.c b/ext/wayland/wldisplay.c
+index 649ce7a9a..0bb9dc729 100644
+--- a/ext/wayland/wldisplay.c
++++ b/ext/wayland/wldisplay.c
+@@ -385,36 +385,36 @@ gst_wl_display_new_existing (struct wl_display * display,
+ }
+ 
+ void
+-gst_wl_display_register_buffer (GstWlDisplay * self, gpointer gstbuffer,
++gst_wl_display_register_buffer (GstWlDisplay * self, gpointer gstmem,
+     gpointer wlbuffer)
+ {
+   g_assert (!self->shutting_down);
+ 
+-  GST_TRACE_OBJECT (self, "registering GstWlBuffer %p to GstBuffer %p",
+-      wlbuffer, gstbuffer);
++  GST_TRACE_OBJECT (self, "registering GstWlBuffer %p to GstMem %p",
++      wlbuffer, gstmem);
+ 
+   g_mutex_lock (&self->buffers_mutex);
+-  g_hash_table_replace (self->buffers, gstbuffer, wlbuffer);
++  g_hash_table_replace (self->buffers, gstmem, wlbuffer);
+   g_mutex_unlock (&self->buffers_mutex);
+ }
+ 
+ gpointer
+-gst_wl_display_lookup_buffer (GstWlDisplay * self, gpointer gstbuffer)
++gst_wl_display_lookup_buffer (GstWlDisplay * self, gpointer gstmem)
+ {
+   gpointer wlbuffer;
+   g_mutex_lock (&self->buffers_mutex);
+-  wlbuffer = g_hash_table_lookup (self->buffers, gstbuffer);
++  wlbuffer = g_hash_table_lookup (self->buffers, gstmem);
+   g_mutex_unlock (&self->buffers_mutex);
+   return wlbuffer;
+ }
+ 
+ void
+-gst_wl_display_unregister_buffer (GstWlDisplay * self, gpointer gstbuffer)
++gst_wl_display_unregister_buffer (GstWlDisplay * self, gpointer gstmem)
+ {
+-  GST_TRACE_OBJECT (self, "unregistering GstWlBuffer owned by %p", gstbuffer);
++  GST_TRACE_OBJECT (self, "unregistering GstWlBuffer owned by %p", gstmem);
+ 
+   g_mutex_lock (&self->buffers_mutex);
+   if (G_LIKELY (!self->shutting_down))
+-    g_hash_table_remove (self->buffers, gstbuffer);
++    g_hash_table_remove (self->buffers, gstmem);
+   g_mutex_unlock (&self->buffers_mutex);
+ }
+diff --git a/ext/wayland/wldisplay.h b/ext/wayland/wldisplay.h
+index 8ce9858fa..f2025a6a0 100644
+--- a/ext/wayland/wldisplay.h
++++ b/ext/wayland/wldisplay.h
+@@ -85,10 +85,10 @@ GstWlDisplay *gst_wl_display_new_existing (struct wl_display * display,
+     gboolean take_ownership, GError ** error);
+ 
+ /* see wlbuffer.c for explanation */
+-void gst_wl_display_register_buffer (GstWlDisplay * self, gpointer gstbuffer,
++void gst_wl_display_register_buffer (GstWlDisplay * self, gpointer gstmem,
+     gpointer wlbuffer);
+-void gst_wl_display_unregister_buffer (GstWlDisplay * self, gpointer gstbuffer);
+-gpointer gst_wl_display_lookup_buffer (GstWlDisplay * self, gpointer gstbuffer);
++void gst_wl_display_unregister_buffer (GstWlDisplay * self, gpointer gstmem);
++gpointer gst_wl_display_lookup_buffer (GstWlDisplay * self, gpointer gstmem);
+ 
+ gboolean gst_wl_display_check_format_for_shm (GstWlDisplay * display,
+     GstVideoFormat format);
+-- 
+2.20.1
+

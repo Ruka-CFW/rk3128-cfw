@@ -1,0 +1,29 @@
+From e2cf123c7ebdc335f3caa2c0d4ce06bf113d466e Mon Sep 17 00:00:00 2001
+From: "james.lin" <james.lin@rock-chips.com>
+Date: Wed, 17 Jan 2018 09:25:17 +0800
+Subject: [PATCH 06/13] qgstreamerplayersession: set m_videoIdentity
+ drop-buffer-flags 0x0
+
+Identity pass buffer process may change buffer writable property cause
+bufferpool unable to reuse memory.
+
+Signed-off-by: james.lin <james.lin@rock-chips.com>
+---
+ src/gsttools/qgstreamerplayersession.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/gsttools/qgstreamerplayersession.cpp b/src/gsttools/qgstreamerplayersession.cpp
+index ed3f16c..87679fd 100644
+--- a/src/gsttools/qgstreamerplayersession.cpp
++++ b/src/gsttools/qgstreamerplayersession.cpp
+@@ -172,6 +172,7 @@ void QGstreamerPlayerSession::initPlaybin()
+     qt_gst_object_ref_sink(GST_OBJECT(m_colorSpace));
+ #endif
+ 
++    g_object_set(G_OBJECT(m_videoIdentity), "drop-buffer-flags", 0, NULL);
+     m_nullVideoSink = gst_element_factory_make("fakesink", NULL);
+     g_object_set(G_OBJECT(m_nullVideoSink), "sync", true, NULL);
+     gst_object_ref(GST_OBJECT(m_nullVideoSink));
+-- 
+2.20.1
+

@@ -1,0 +1,35 @@
+From c1641b882b220a111acaaeb7fed3c5aab5b2ba52 Mon Sep 17 00:00:00 2001
+From: Hertz Wang <wangh@rock-chips.com>
+Date: Wed, 31 Oct 2018 19:51:28 +0800
+Subject: [PATCH 03/11] rkmppdec: fix do not send packet after flush
+
+Change-Id: I6e2c250b05991ab23b770da509f90e938bbc1cb6
+Signed-off-by: Hertz Wang <wangh@rock-chips.com>
+---
+ libavcodec/rkmppdec.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/libavcodec/rkmppdec.c b/libavcodec/rkmppdec.c
+index b44861c..e346b20 100644
+--- a/libavcodec/rkmppdec.c
++++ b/libavcodec/rkmppdec.c
+@@ -474,6 +474,8 @@ static int rkmpp_retrieve_frame(AVCodecContext *avctx, AVFrame *frame)
+         return AVERROR_EOF;
+     } else if (ret == MPP_ERR_TIMEOUT) {
+         av_log(avctx, AV_LOG_DEBUG, "Timeout when trying to get a frame from MPP\n");
++    } else {
++        av_log(avctx, AV_LOG_DEBUG, "MPP decode_get_frame ret = %d\n", ret);
+     }
+ 
+     return AVERROR(EAGAIN);
+@@ -545,6 +547,7 @@ static void rkmpp_flush(AVCodecContext *avctx)
+     ret = decoder->mpi->reset(decoder->ctx);
+     if (ret == MPP_OK) {
+         decoder->first_packet = 1;
++        decoder->eos_reached = 0;
+     } else
+         av_log(avctx, AV_LOG_ERROR, "Failed to reset MPI (code = %d)\n", ret);
+ }
+-- 
+2.7.4
+

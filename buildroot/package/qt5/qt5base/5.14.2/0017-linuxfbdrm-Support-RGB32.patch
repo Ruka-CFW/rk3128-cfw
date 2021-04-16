@@ -1,0 +1,35 @@
+From 5aa2756b05b7e04e04e1d9d3762d42ce7056d8ef Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Tue, 16 Apr 2019 21:11:12 +0800
+Subject: [PATCH 17/18] linuxfbdrm: Support RGB32
+
+Use QT_FB_DRM_RGB565/QT_FB_DRM_RGB32/QT_FB_DRM_ARGB32 macro to set fb
+format.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/platformsupport/kmsconvenience/qkmsdevice.cpp | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/platformsupport/kmsconvenience/qkmsdevice.cpp b/src/platformsupport/kmsconvenience/qkmsdevice.cpp
+index 6121faf36..bd8495135 100644
+--- a/src/platformsupport/kmsconvenience/qkmsdevice.cpp
++++ b/src/platformsupport/kmsconvenience/qkmsdevice.cpp
+@@ -390,6 +390,14 @@ QPlatformScreen *QKmsDevice::createScreenForConnector(drmModeResPtr resources,
+     qCDebug(qLcKmsDebug) << "Format is" << hex << drmFormat << dec << "requested_by_user =" << drmFormatExplicit
+                          << "for output" << connectorName;
+ 
++#ifdef QT_FB_DRM_RGB565
++    drmFormat = DRM_FORMAT_RGB565;
++#elif defined(QT_FB_DRM_RGB32)
++    drmFormat = DRM_FORMAT_XRGB8888;
++#elif defined(QT_FB_DRM_ARGB32)
++    drmFormat = DRM_FORMAT_ARGB8888;
++#endif
++
+     const QString cloneSource = userConnectorConfig.value(QStringLiteral("clones")).toString();
+     if (!cloneSource.isEmpty())
+         qCDebug(qLcKmsDebug) << "Output" << connectorName << " clones output " << cloneSource;
+-- 
+2.20.1
+

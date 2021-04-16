@@ -1,0 +1,28 @@
+From c0a9a2899fde1a25827ab842610fccba60b8b1ed Mon Sep 17 00:00:00 2001
+From: Yu YongZhen <yuyz@rock-chips.com>
+Date: Sat, 15 Jun 2019 13:32:46 +0800
+Subject: [PATCH] CMakefile: add APR_CONFIG_PATH for search apr-config
+
+Signed-off-by: Yu YongZhen <yuyz@rock-chips.com>
+---
+ CMakeLists.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0abcb93..0300603 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -51,8 +51,8 @@ if(CMAKE_HOST_WIN32)
+     find_library(CURL_LIBRARY NAMES libcurl PATHS ${EXTRA_LIB_PATH})
+ 
+ else()
+-	FIND_PROGRAM(APR_CONFIG_BIN NAMES apr-config apr-1-config PATHS /usr/bin /usr/local/bin /usr/local/apr/bin/)
+-	FIND_PROGRAM(APU_CONFIG_BIN NAMES apu-config apu-1-config PATHS /usr/bin /usr/local/bin /usr/local/apr/bin/)
++	FIND_PROGRAM(APR_CONFIG_BIN NAMES apr-config apr-1-config PATHS /usr/bin /usr/local/bin /usr/local/apr/bin/ ${APR_CONFIG_PATH})
++	FIND_PROGRAM(APU_CONFIG_BIN NAMES apu-config apu-1-config PATHS /usr/bin /usr/local/bin /usr/local/apr/bin/ ${APR_CONFIG_PATH})
+ 
+ 	IF (APR_CONFIG_BIN)
+ 		EXECUTE_PROCESS(
+-- 
+2.7.4
+

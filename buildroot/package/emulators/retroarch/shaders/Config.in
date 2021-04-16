@@ -1,0 +1,4 @@
+source "package/emulators/retroarch/shaders/batocera-shaders/Config.in"
+source "package/emulators/retroarch/shaders/common-shaders/Config.in"
+source "package/emulators/retroarch/shaders/glsl-shaders/Config.in"
+source "package/emulators/retroarch/shaders/slang-shaders/Config.in"

@@ -1,0 +1,80 @@
+From e3f9c5b79dc5f9bf02536709c6b2458444967bbe Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 3 Jul 2020 14:23:45 +0800
+Subject: [PATCH 15/41] pixman-renderer: Support yuv formats
+
+Support yuy2/yv12/i420/nv12.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ libweston/pixman-renderer.c | 28 ++++++++++++++++++++++++++++
+ meson.build                 |  7 +++++++
+ 2 files changed, 35 insertions(+)
+
+diff --git a/libweston/pixman-renderer.c b/libweston/pixman-renderer.c
+index cae8974..59081a3 100644
+--- a/libweston/pixman-renderer.c
++++ b/libweston/pixman-renderer.c
+@@ -652,6 +652,26 @@ pixman_renderer_attach(struct weston_surface *es, struct weston_buffer *buffer)
+ 		pixman_format = PIXMAN_r5g6b5;
+ 		es->is_opaque = true;
+ 		break;
++	case WL_SHM_FORMAT_YUYV:
++		pixman_format = PIXMAN_yuy2;
++		es->is_opaque = true;
++		break;
++	case WL_SHM_FORMAT_YVU420:
++		pixman_format = PIXMAN_yv12;
++		es->is_opaque = true;
++		break;
++#ifdef HAVE_PIXMAN_I420
++	case WL_SHM_FORMAT_YUV420:
++		pixman_format = PIXMAN_i420;
++		es->is_opaque = true;
++		break;
++#endif
++#ifdef HAVE_PIXMAN_NV12
++	case WL_SHM_FORMAT_NV12:
++		pixman_format = PIXMAN_nv12;
++		es->is_opaque = true;
++		break;
++#endif
+ 	default:
+ 		weston_log("Unsupported SHM buffer format 0x%x\n",
+ 			wl_shm_buffer_get_format(shm_buffer));
+@@ -878,6 +898,14 @@ pixman_renderer_init(struct weston_compositor *ec)
+ 						    debug_binding, ec);
+ 
+ 	wl_display_add_shm_format(ec->wl_display, WL_SHM_FORMAT_RGB565);
++	wl_display_add_shm_format(ec->wl_display, WL_SHM_FORMAT_YUYV);
++	wl_display_add_shm_format(ec->wl_display, WL_SHM_FORMAT_YVU420);
++#ifdef HAVE_PIXMAN_I420
++	wl_display_add_shm_format(ec->wl_display, WL_SHM_FORMAT_YUV420);
++#endif
++#ifdef HAVE_PIXMAN_NV12
++	wl_display_add_shm_format(ec->wl_display, WL_SHM_FORMAT_NV12);
++#endif
+ 
+ 	wl_signal_init(&renderer->destroy_signal);
+ 
+diff --git a/meson.build b/meson.build
+index e5b5359..6b46c96 100644
+--- a/meson.build
++++ b/meson.build
+@@ -153,6 +153,13 @@ dep_libdrm = dependency('libdrm', version: '>= 2.4.86')
+ dep_libdrm_headers = dep_libdrm.partial_dependency(compile_args: true)
+ dep_threads = dependency('threads')
+ 
++if cc.has_header_symbol('pixman.h', 'PIXMAN_nv12', dependencies : dep_pixman)
++	config_h.set('HAVE_PIXMAN_NV12', 1)
++endif
++if cc.has_header_symbol('pixman.h', 'PIXMAN_i420', dependencies : dep_pixman)
++	config_h.set('HAVE_PIXMAN_I420', 1)
++endif
++
+ subdir('include')
+ subdir('protocol')
+ subdir('shared')
+-- 
+2.20.1
+

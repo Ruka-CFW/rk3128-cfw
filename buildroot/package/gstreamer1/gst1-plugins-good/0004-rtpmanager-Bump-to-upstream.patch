@@ -1,0 +1,5020 @@
+From 8710c98949d173df2027a402009709b694b43cec Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Wed, 18 Sep 2019 18:06:14 +0800
+Subject: [PATCH] rtpmanager: Bump to upstream
+
+Bump to:
+8dd03042c rtpsession: add support for buffer lists on the recv path
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ gst/rtpmanager/Makefile.am          |   7 +-
+ gst/rtpmanager/gstrtpbin.c          | 370 ++++++++-------------------
+ gst/rtpmanager/gstrtpbin.h          |   3 +-
+ gst/rtpmanager/gstrtpdtmfmux.c      |   1 +
+ gst/rtpmanager/gstrtpfunnel.c       | 491 ++++++++++++++++++++++++++++++++++++
+ gst/rtpmanager/gstrtpfunnel.h       |  48 ++++
+ gst/rtpmanager/gstrtpjitterbuffer.c | 282 +++++++++++++--------
+ gst/rtpmanager/gstrtpmanager.c      |   5 +
+ gst/rtpmanager/gstrtpmux.c          |  53 ++--
+ gst/rtpmanager/gstrtpmux.h          |   4 +-
+ gst/rtpmanager/gstrtpptdemux.c      |  20 +-
+ gst/rtpmanager/gstrtpptdemux.h      |  10 +-
+ gst/rtpmanager/gstrtprtxqueue.c     |  13 +-
+ gst/rtpmanager/gstrtprtxreceive.c   |  14 +-
+ gst/rtpmanager/gstrtprtxsend.c      |  23 +-
+ gst/rtpmanager/gstrtpsession.c      | 219 +++++++++++-----
+ gst/rtpmanager/gstrtpsession.h      |   2 +
+ gst/rtpmanager/gstrtpssrcdemux.c    | 166 ++++++------
+ gst/rtpmanager/meson.build          |   3 +
+ gst/rtpmanager/rtpjitterbuffer.c    | 119 +++++++--
+ gst/rtpmanager/rtpjitterbuffer.h    |   6 +-
+ gst/rtpmanager/rtpsession.c         | 484 +++++++++++++++++++++++++++--------
+ gst/rtpmanager/rtpsession.h         |  17 +-
+ gst/rtpmanager/rtpsource.c          | 230 +++++++++++++----
+ gst/rtpmanager/rtpsource.h          |  12 +-
+ gst/rtpmanager/rtpstats.c           |  13 +-
+ gst/rtpmanager/rtpstats.h           |  11 +-
+ 27 files changed, 1869 insertions(+), 757 deletions(-)
+ create mode 100644 gst/rtpmanager/gstrtpfunnel.c
+ create mode 100644 gst/rtpmanager/gstrtpfunnel.h
+
+diff --git a/gst/rtpmanager/Makefile.am b/gst/rtpmanager/Makefile.am
+index 598e61f12..0defa2841 100644
+--- a/gst/rtpmanager/Makefile.am
++++ b/gst/rtpmanager/Makefile.am
+@@ -14,7 +14,8 @@ libgstrtpmanager_la_SOURCES = gstrtpmanager.c \
+ 			      rtpsession.c      \
+ 			      rtpsource.c      \
+ 			      rtpstats.c      \
+-			      gstrtpsession.c
++			      gstrtpsession.c \
++			      gstrtpfunnel.c
+ 
+ noinst_HEADERS = gstrtpbin.h \
+ 		 gstrtpdtmfmux.h \
+@@ -29,7 +30,9 @@ noinst_HEADERS = gstrtpbin.h \
+ 		 rtpsession.h  \
+ 		 rtpsource.h  \
+ 		 rtpstats.h  \
+-		 gstrtpsession.h
++		 gstrtpsession.h \
++		 gstrtpfunnel.h
++
+ 
+ libgstrtpmanager_la_CFLAGS = $(GST_PLUGINS_BASE_CFLAGS) $(GST_CFLAGS) \
+ 	$(GST_NET_CFLAGS) $(WARNING_CFLAGS) $(ERROR_CFLAGS)
+diff --git a/gst/rtpmanager/gstrtpbin.c b/gst/rtpmanager/gstrtpbin.c
+index ad99c5b85..39d2ab48c 100644
+--- a/gst/rtpmanager/gstrtpbin.c
++++ b/gst/rtpmanager/gstrtpbin.c
+@@ -19,6 +19,7 @@
+ 
+ /**
+  * SECTION:element-rtpbin
++ * @title: rtpbin
+  * @see_also: rtpjitterbuffer, rtpsession, rtpptdemux, rtpssrcdemux
+  *
+  * RTP bin combines the functions of #GstRtpSession, #GstRtpSsrcDemux,
+@@ -53,13 +54,6 @@
+  * SSRC in the RTP packets to its own SSRC and wil forward the packets on the
+  * send_rtp_src_\%u pad after updating its internal state.
+  *
+- * #GstRtpBin can also demultiplex incoming bundled streams. The first
+- * #GstRtpSession will have a #GstRtpSsrcDemux element splitting the streams
+- * based on their SSRC and potentially dispatched to a different #GstRtpSession.
+- * Because retransmission SSRCs need to be merged with the corresponding media
+- * stream the #GstRtpBin::on-bundled-ssrc signal is emitted so that the
+- * application can find out to which session the SSRC belongs.
+- *
+  * The session manager needs the clock-rate of the payload types it is handling
+  * and will signal the #GstRtpSession::request-pt-map signal when it needs such a
+  * mapping. One can clear the cached values with the #GstRtpSession::clear-pt-map
+@@ -92,8 +86,7 @@
+  * and 1 or more sink_\%u pads. A session will be made for each sink_\%u pad
+  * when the corresponding recv_rtp_sink_\%u pad is requested on #GstRtpBin.
+  *
+- * <refsect2>
+- * <title>Example pipelines</title>
++ * ## Example pipelines
+  * |[
+  * gst-launch-1.0 udpsrc port=5000 caps="application/x-rtp, ..." ! .recv_rtp_sink_0 \
+  *     rtpbin ! rtptheoradepay ! theoradec ! xvimagesink
+@@ -138,7 +131,7 @@
+  * synchronisation.
+  * Send RTCP reports for session 0 on port 5005 and RTCP reports for session 1
+  * on port 5007.
+- * </refsect2>
++ *
+  */
+ 
+ #ifdef HAVE_CONFIG_H
+@@ -204,9 +197,6 @@ static GstStaticPadTemplate rtpbin_send_rtp_src_template =
+     GST_STATIC_CAPS ("application/x-rtp;application/x-srtp")
+     );
+ 
+-#define GST_RTP_BIN_GET_PRIVATE(obj)  \
+-   (G_TYPE_INSTANCE_GET_PRIVATE ((obj), GST_TYPE_RTP_BIN, GstRtpBinPrivate))
+-
+ #define GST_RTP_BIN_LOCK(bin)   g_mutex_lock (&(bin)->priv->bin_lock)
+ #define GST_RTP_BIN_UNLOCK(bin) g_mutex_unlock (&(bin)->priv->bin_lock)
+ 
+@@ -262,6 +252,7 @@ enum
+   SIGNAL_RESET_SYNC,
+   SIGNAL_GET_SESSION,
+   SIGNAL_GET_INTERNAL_SESSION,
++  SIGNAL_GET_STORAGE,
+   SIGNAL_GET_INTERNAL_STORAGE,
+ 
+   SIGNAL_ON_NEW_SSRC,
+@@ -386,12 +377,12 @@ static void free_client (GstRtpBinClient * client, GstRtpBin * bin);
+ static void free_stream (GstRtpBinStream * stream, GstRtpBin * bin);
+ static GstRtpBinSession *create_session (GstRtpBin * rtpbin, gint id);
+ static GstPad *complete_session_sink (GstRtpBin * rtpbin,
+-    GstRtpBinSession * session, gboolean bundle_demuxer_needed);
++    GstRtpBinSession * session);
+ static void
+ complete_session_receiver (GstRtpBin * rtpbin, GstRtpBinSession * session,
+     guint sessid);
+ static GstPad *complete_session_rtcp (GstRtpBin * rtpbin,
+-    GstRtpBinSession * session, guint sessid, gboolean bundle_demuxer_needed);
++    GstRtpBinSession * session, guint sessid);
+ 
+ /* Manages the RTP stream for one SSRC.
+  *
+@@ -464,12 +455,6 @@ struct _GstRtpBinSession
+   /* Fec support */
+   GstElement *storage;
+ 
+-  /* Bundling support */
+-  GstElement *rtp_funnel;
+-  GstElement *rtcp_funnel;
+-  GstElement *bundle_demux;
+-  gulong bundle_demux_newpad_sig;
+-
+   GMutex lock;
+ 
+   /* list of GstRtpBinStream */
+@@ -670,102 +655,6 @@ ssrc_demux_pad_removed (GstElement * element, guint ssrc, GstPad * pad,
+   GST_RTP_BIN_UNLOCK (rtpbin);
+ }
+ 
+-static void
+-new_bundled_ssrc_pad_found (GstElement * element, guint ssrc, GstPad * pad,
+-    GstRtpBinSession * session)
+-{
+-  GValue result = G_VALUE_INIT;
+-  GValue params[2] = { G_VALUE_INIT, G_VALUE_INIT };
+-  guint session_id = 0;
+-  GstRtpBinSession *target_session = NULL;
+-  GstRtpBin *rtpbin = session->bin;
+-  gchar *name;
+-  GstPad *src_pad;
+-  GstPad *recv_rtp_sink = NULL;
+-  GstPad *recv_rtcp_sink = NULL;
+-  GstPadLinkReturn ret;
+-
+-  GST_RTP_BIN_DYN_LOCK (rtpbin);
+-  GST_DEBUG_OBJECT (rtpbin, "new bundled SSRC pad %08x, %s:%s", ssrc,
+-      GST_DEBUG_PAD_NAME (pad));
+-
+-  g_value_init (&result, G_TYPE_UINT);
+-  g_value_init (&params[0], GST_TYPE_ELEMENT);
+-  g_value_set_object (&params[0], rtpbin);
+-  g_value_init (&params[1], G_TYPE_UINT);
+-  g_value_set_uint (&params[1], ssrc);
+-
+-  g_signal_emitv (params,
+-      gst_rtp_bin_signals[SIGNAL_ON_BUNDLED_SSRC], 0, &result);
+-  g_value_unset (&params[0]);
+-
+-  session_id = g_value_get_uint (&result);
+-  if (session_id == 0) {
+-    target_session = session;
+-  } else {
+-    target_session = find_session_by_id (rtpbin, (gint) session_id);
+-    if (!target_session) {
+-      target_session = create_session (rtpbin, session_id);
+-    }
+-    if (!target_session) {
+-      /* create_session() warned already */
+-      GST_RTP_BIN_DYN_UNLOCK (rtpbin);
+-      return;
+-    }
+-
+-    if (!target_session->recv_rtp_sink) {
+-      recv_rtp_sink = complete_session_sink (rtpbin, target_session, FALSE);
+-    }
+-
+-    if (!target_session->recv_rtp_src)
+-      complete_session_receiver (rtpbin, target_session, session_id);
+-
+-    if (!target_session->recv_rtcp_sink) {
+-      recv_rtcp_sink =
+-          complete_session_rtcp (rtpbin, target_session, session_id, FALSE);
+-    }
+-  }
+-
+-  GST_DEBUG_OBJECT (rtpbin, "Assigning bundled ssrc %u to session %u", ssrc,
+-      session_id);
+-
+-  if (!recv_rtp_sink) {
+-    recv_rtp_sink =
+-        gst_element_get_request_pad (target_session->rtp_funnel, "sink_%u");
+-  }
+-
+-  if (!recv_rtcp_sink) {
+-    recv_rtcp_sink =
+-        gst_element_get_request_pad (target_session->rtcp_funnel, "sink_%u");
+-  }
+-
+-  name = g_strdup_printf ("src_%u", ssrc);
+-  src_pad = gst_element_get_static_pad (element, name);
+-  ret = gst_pad_link (src_pad, recv_rtp_sink);
+-  g_free (name);
+-  gst_object_unref (src_pad);
+-  gst_object_unref (recv_rtp_sink);
+-  if (ret != GST_PAD_LINK_OK) {
+-    g_warning
+-        ("rtpbin: failed to link bundle demuxer to receive rtp funnel for session %u",
+-        session_id);
+-  }
+-
+-  name = g_strdup_printf ("rtcp_src_%u", ssrc);
+-  src_pad = gst_element_get_static_pad (element, name);
+-  gst_pad_link (src_pad, recv_rtcp_sink);
+-  g_free (name);
+-  gst_object_unref (src_pad);
+-  gst_object_unref (recv_rtcp_sink);
+-  if (ret != GST_PAD_LINK_OK) {
+-    g_warning
+-        ("rtpbin: failed to link bundle demuxer to receive rtcp sink pad for session %u",
+-        session_id);
+-  }
+-
+-  GST_RTP_BIN_DYN_UNLOCK (rtpbin);
+-}
+-
+ /* create a session with the given id.  Must be called with RTP_BIN_LOCK */
+ static GstRtpBinSession *
+ create_session (GstRtpBin * rtpbin, gint id)
+@@ -784,6 +673,9 @@ create_session (GstRtpBin * rtpbin, gint id)
+   if (!(storage = gst_element_factory_make ("rtpstorage", NULL)))
+     goto no_storage;
+ 
++  /* need to sink the storage or otherwise signal handlers from bindings will
++   * take ownership of it and we don't own it anymore */
++  gst_object_ref_sink (storage);
+   g_signal_emit (rtpbin, gst_rtp_bin_signals[SIGNAL_NEW_STORAGE], 0, storage,
+       id);
+ 
+@@ -795,9 +687,6 @@ create_session (GstRtpBin * rtpbin, gint id)
+   sess->demux = demux;
+   sess->storage = storage;
+ 
+-  sess->rtp_funnel = gst_element_factory_make ("funnel", NULL);
+-  sess->rtcp_funnel = gst_element_factory_make ("funnel", NULL);
+-
+   sess->ptmap = g_hash_table_new_full (NULL, NULL, NULL,
+       (GDestroyNotify) gst_caps_unref);
+   rtpbin->sessions = g_slist_prepend (rtpbin->sessions, sess);
+@@ -845,10 +734,12 @@ create_session (GstRtpBin * rtpbin, gint id)
+ 
+   gst_bin_add (GST_BIN_CAST (rtpbin), session);
+   gst_bin_add (GST_BIN_CAST (rtpbin), demux);
+-  gst_bin_add (GST_BIN_CAST (rtpbin), sess->rtp_funnel);
+-  gst_bin_add (GST_BIN_CAST (rtpbin), sess->rtcp_funnel);
+   gst_bin_add (GST_BIN_CAST (rtpbin), storage);
+ 
++  /* unref the storage again, the bin has a reference now and
++   * we don't need it anymore */
++  gst_object_unref (storage);
++
+   GST_OBJECT_LOCK (rtpbin);
+   target = GST_STATE_TARGET (rtpbin);
+   GST_OBJECT_UNLOCK (rtpbin);
+@@ -856,8 +747,6 @@ create_session (GstRtpBin * rtpbin, gint id)
+   /* change state only to what's needed */
+   gst_element_set_state (demux, target);
+   gst_element_set_state (session, target);
+-  gst_element_set_state (sess->rtp_funnel, target);
+-  gst_element_set_state (sess->rtcp_funnel, target);
+   gst_element_set_state (storage, target);
+ 
+   return sess;
+@@ -944,9 +833,11 @@ free_session (GstRtpBinSession * sess, GstRtpBin * bin)
+ 
+   gst_element_set_locked_state (sess->demux, TRUE);
+   gst_element_set_locked_state (sess->session, TRUE);
++  gst_element_set_locked_state (sess->storage, TRUE);
+ 
+   gst_element_set_state (sess->demux, GST_STATE_NULL);
+   gst_element_set_state (sess->session, GST_STATE_NULL);
++  gst_element_set_state (sess->storage, GST_STATE_NULL);
+ 
+   remove_recv_rtp (bin, sess);
+   remove_recv_rtcp (bin, sess);
+@@ -955,6 +846,7 @@ free_session (GstRtpBinSession * sess, GstRtpBin * bin)
+ 
+   gst_bin_remove (GST_BIN_CAST (bin), sess->session);
+   gst_bin_remove (GST_BIN_CAST (bin), sess->demux);
++  gst_bin_remove (GST_BIN_CAST (bin), sess->storage);
+ 
+   g_slist_foreach (sess->elements, (GFunc) remove_bin_element, bin);
+   g_slist_free (sess->elements);
+@@ -1146,6 +1038,24 @@ gst_rtp_bin_get_internal_session (GstRtpBin * bin, guint session_id)
+   return internal_session;
+ }
+ 
++static GstElement *
++gst_rtp_bin_get_storage (GstRtpBin * bin, guint session_id)
++{
++  GstRtpBinSession *session;
++  GstElement *res = NULL;
++
++  GST_RTP_BIN_LOCK (bin);
++  GST_DEBUG_OBJECT (bin, "retrieving internal storage object, index: %u",
++      session_id);
++  session = find_session_by_id (bin, (gint) session_id);
++  if (session && session->storage) {
++    res = gst_object_ref (session->storage);
++  }
++  GST_RTP_BIN_UNLOCK (bin);
++
++  return res;
++}
++
+ static GObject *
+ gst_rtp_bin_get_internal_storage (GstRtpBin * bin, guint session_id)
+ {
+@@ -1834,6 +1744,9 @@ create_stream (GstRtpBinSession * session, guint32 ssrc)
+   g_object_set (buffer, "max-ts-offset-adjustment",
+       rtpbin->max_ts_offset_adjustment, NULL);
+ 
++  /* need to sink the jitterbufer or otherwise signal handlers from bindings will
++   * take ownership of it and we don't own it anymore */
++  gst_object_ref_sink (buffer);
+   g_signal_emit (rtpbin, gst_rtp_bin_signals[SIGNAL_NEW_JITTERBUFFER], 0,
+       buffer, session->id, ssrc);
+ 
+@@ -1841,6 +1754,10 @@ create_stream (GstRtpBinSession * session, guint32 ssrc)
+     gst_bin_add (GST_BIN_CAST (rtpbin), demux);
+   gst_bin_add (GST_BIN_CAST (rtpbin), buffer);
+ 
++  /* unref the jitterbuffer again, the bin has a reference now and
++   * we don't need it anymore */
++  gst_object_unref (buffer);
++
+   /* link stuff */
+   if (demux)
+     gst_element_link_pads_full (buffer, "src", demux, "sink",
+@@ -1964,7 +1881,7 @@ static void gst_rtp_bin_release_pad (GstElement * element, GstPad * pad);
+ static void gst_rtp_bin_handle_message (GstBin * bin, GstMessage * message);
+ 
+ #define gst_rtp_bin_parent_class parent_class
+-G_DEFINE_TYPE (GstRtpBin, gst_rtp_bin, GST_TYPE_BIN);
++G_DEFINE_TYPE_WITH_PRIVATE (GstRtpBin, gst_rtp_bin, GST_TYPE_BIN);
+ 
+ static gboolean
+ _gst_element_accumulator (GSignalInvocationHint * ihint,
+@@ -2009,8 +1926,6 @@ gst_rtp_bin_class_init (GstRtpBinClass * klass)
+   gstelement_class = (GstElementClass *) klass;
+   gstbin_class = (GstBinClass *) klass;
+ 
+-  g_type_class_add_private (klass, sizeof (GstRtpBinPrivate));
+-
+   gobject_class->dispose = gst_rtp_bin_dispose;
+   gobject_class->finalize = gst_rtp_bin_finalize;
+   gobject_class->set_property = gst_rtp_bin_set_property;
+@@ -2115,7 +2030,9 @@ gst_rtp_bin_class_init (GstRtpBinClass * klass)
+    * @rtpbin: the object which received the signal
+    * @id: the session id
+    *
+-   * Request the internal RTPStorage object as #GObject in session @id.
++   * Request the internal RTPStorage object as #GObject in session @id. This
++   * is the internal storage used by the RTPStorage element, which is used to
++   * keep a backlog of received RTP packets for the session @id.
+    *
+    * Since: 1.14
+    */
+@@ -2126,6 +2043,22 @@ gst_rtp_bin_class_init (GstRtpBinClass * klass)
+       G_TYPE_OBJECT, 1, G_TYPE_UINT);
+ 
+   /**
++   * GstRtpBin::get-storage:
++   * @rtpbin: the object which received the signal
++   * @id: the session id
++   *
++   * Request the RTPStorage element as #GObject in session @id. This element
++   * is used to keep a backlog of received RTP packets for the session @id.
++   *
++   * Since: 1.16
++   */
++  gst_rtp_bin_signals[SIGNAL_GET_STORAGE] =
++      g_signal_new ("get-storage", G_TYPE_FROM_CLASS (klass),
++      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION, G_STRUCT_OFFSET (GstRtpBinClass,
++          get_storage), NULL, NULL, g_cclosure_marshal_generic,
++      GST_TYPE_ELEMENT, 1, G_TYPE_UINT);
++
++  /**
+    * GstRtpBin::on-new-ssrc:
+    * @rtpbin: the object which received the signal
+    * @session: the session
+@@ -2468,29 +2401,6 @@ gst_rtp_bin_class_init (GstRtpBinClass * klass)
+           on_sender_ssrc_active), NULL, NULL, g_cclosure_marshal_generic,
+       G_TYPE_NONE, 2, G_TYPE_UINT, G_TYPE_UINT);
+ 
+-
+-  /**
+-   * GstRtpBin::on-bundled-ssrc:
+-   * @rtpbin: the object which received the signal
+-   * @ssrc: the bundled SSRC
+-   *
+-   * Notify of a new incoming bundled SSRC. If no handler is connected to the
+-   * signal then the #GstRtpSession created for the recv_rtp_sink_\%u
+-   * request pad will be managing this new SSRC. However if there is a handler
+-   * connected then the application can decided to dispatch this new stream to
+-   * another session by providing its ID as return value of the handler. This
+-   * can be particularly useful to keep retransmission SSRCs grouped with the
+-   * session for which they handle retransmission.
+-   *
+-   * Since: 1.12
+-   */
+-  gst_rtp_bin_signals[SIGNAL_ON_BUNDLED_SSRC] =
+-      g_signal_new ("on-bundled-ssrc", G_TYPE_FROM_CLASS (klass),
+-      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstRtpBinClass,
+-          on_bundled_ssrc), NULL, NULL,
+-      g_cclosure_marshal_generic, G_TYPE_UINT, 1, G_TYPE_UINT);
+-
+-
+   g_object_class_install_property (gobject_class, PROP_SDES,
+       g_param_spec_boxed ("sdes", "SDES",
+           "The SDES items of this session",
+@@ -2572,7 +2482,7 @@ gst_rtp_bin_class_init (GstRtpBinClass * klass)
+    *
+    * Enables RTP retransmission on all streams. To control retransmission on
+    * a per-SSRC basis, connect to the #GstRtpBin::new-jitterbuffer signal and
+-   * set the #GstRtpJitterBuffer::do-retransmission property on the
++   * set the #GstRtpJitterBuffer:do-retransmission property on the
+    * #GstRtpJitterBuffer object instead.
+    */
+   g_object_class_install_property (gobject_class, PROP_DO_RETRANSMISSION,
+@@ -2704,6 +2614,7 @@ gst_rtp_bin_class_init (GstRtpBinClass * klass)
+   klass->get_session = GST_DEBUG_FUNCPTR (gst_rtp_bin_get_session);
+   klass->get_internal_session =
+       GST_DEBUG_FUNCPTR (gst_rtp_bin_get_internal_session);
++  klass->get_storage = GST_DEBUG_FUNCPTR (gst_rtp_bin_get_storage);
+   klass->get_internal_storage =
+       GST_DEBUG_FUNCPTR (gst_rtp_bin_get_internal_storage);
+   klass->request_rtp_encoder = GST_DEBUG_FUNCPTR (gst_rtp_bin_request_encoder);
+@@ -2719,7 +2630,7 @@ gst_rtp_bin_init (GstRtpBin * rtpbin)
+ {
+   gchar *cname;
+ 
+-  rtpbin->priv = GST_RTP_BIN_GET_PRIVATE (rtpbin);
++  rtpbin->priv = gst_rtp_bin_get_instance_private (rtpbin);
+   g_mutex_init (&rtpbin->priv->bin_lock);
+   g_mutex_init (&rtpbin->priv->dyn_lock);
+ 
+@@ -3367,23 +3278,16 @@ copy_sticky_events (GstPad * pad, GstEvent ** event, gpointer user_data)
+   return TRUE;
+ }
+ 
+-/* a new pad (SSRC) was created in @session. This signal is emited from the
+- * payload demuxer. */
+ static void
+-new_payload_found (GstElement * element, guint pt, GstPad * pad,
+-    GstRtpBinStream * stream)
++expose_recv_src_pad (GstRtpBin * rtpbin, GstPad * pad, GstRtpBinStream * stream,
++    guint8 pt)
+ {
+-  GstRtpBin *rtpbin;
+   GstElementClass *klass;
+   GstPadTemplate *templ;
+   gchar *padname;
+   GstPad *gpad;
+ 
+-  rtpbin = stream->bin;
+-
+-  GST_DEBUG_OBJECT (rtpbin, "new payload pad %u", pt);
+-
+-  pad = gst_object_ref (pad);
++  gst_object_ref (pad);
+ 
+   if (stream->session->storage) {
+     GstElement *fec_decoder =
+@@ -3462,6 +3366,21 @@ fec_decoder_link_failed:
+   }
+ }
+ 
++/* a new pad (SSRC) was created in @session. This signal is emited from the
++ * payload demuxer. */
++static void
++new_payload_found (GstElement * element, guint pt, GstPad * pad,
++    GstRtpBinStream * stream)
++{
++  GstRtpBin *rtpbin;
++
++  rtpbin = stream->bin;
++
++  GST_DEBUG_OBJECT (rtpbin, "new payload pad %u", pt);
++
++  expose_recv_src_pad (rtpbin, pad, stream, pt);
++}
++
+ static void
+ payload_pad_removed (GstElement * element, GstPad * pad,
+     GstRtpBinStream * stream)
+@@ -3549,7 +3468,7 @@ payload_type_change (GstElement * element, guint pt, GstRtpBinSession * session)
+       0, session->id, pt);
+ }
+ 
+-/* emited when caps changed for the session */
++/* emitted when caps changed for the session */
+ static void
+ caps_changed (GstPad * pad, GParamSpec * pspec, GstRtpBinSession * session)
+ {
+@@ -3637,7 +3556,7 @@ new_ssrc_pad_found (GstElement * element, guint ssrc, GstPad * pad,
+     stream->demux_padremoved_sig = g_signal_connect (stream->demux,
+         "pad-removed", (GCallback) payload_pad_removed, stream);
+ 
+-    /* connect to the request-pt-map signal. This signal will be emited by the
++    /* connect to the request-pt-map signal. This signal will be emitted by the
+      * demuxer so that it can apply a proper caps on the buffers for the
+      * depayloaders. */
+     stream->demux_ptreq_sig = g_signal_connect (stream->demux,
+@@ -3645,33 +3564,23 @@ new_ssrc_pad_found (GstElement * element, guint ssrc, GstPad * pad,
+     /* connect to the  signal so it can be forwarded. */
+     stream->demux_ptchange_sig = g_signal_connect (stream->demux,
+         "payload-type-change", (GCallback) payload_type_change, session);
++
++    GST_RTP_SESSION_UNLOCK (session);
++    GST_RTP_BIN_SHUTDOWN_UNLOCK (rtpbin);
+   } else {
+     /* add rtpjitterbuffer src pad to pads */
+-    GstElementClass *klass;
+-    GstPadTemplate *templ;
+-    gchar *padname;
+-    GstPad *gpad, *pad;
++    GstPad *pad;
+ 
+     pad = gst_element_get_static_pad (stream->buffer, "src");
+ 
+-    /* ghost the pad to the parent */
+-    klass = GST_ELEMENT_GET_CLASS (rtpbin);
+-    templ = gst_element_class_get_pad_template (klass, "recv_rtp_src_%u_%u_%u");
+-    padname = g_strdup_printf ("recv_rtp_src_%u_%u_%u",
+-        stream->session->id, stream->ssrc, 255);
+-    gpad = gst_ghost_pad_new_from_template (padname, pad, templ);
+-    g_free (padname);
++    GST_RTP_SESSION_UNLOCK (session);
++    GST_RTP_BIN_SHUTDOWN_UNLOCK (rtpbin);
+ 
+-    gst_pad_set_active (gpad, TRUE);
+-    gst_pad_sticky_events_foreach (pad, copy_sticky_events, gpad);
+-    gst_element_add_pad (GST_ELEMENT_CAST (rtpbin), gpad);
++    expose_recv_src_pad (rtpbin, pad, stream, 255);
+ 
+     gst_object_unref (pad);
+   }
+ 
+-  GST_RTP_SESSION_UNLOCK (session);
+-  GST_RTP_BIN_SHUTDOWN_UNLOCK (rtpbin);
+-
+   return;
+ 
+   /* ERRORS */
+@@ -3689,39 +3598,11 @@ no_stream:
+   }
+ }
+ 
+-static void
+-session_maybe_create_bundle_demuxer (GstRtpBinSession * session)
+-{
+-  GstRtpBin *rtpbin;
+-
+-  if (session->bundle_demux)
+-    return;
+-
+-  rtpbin = session->bin;
+-  if (g_signal_has_handler_pending (rtpbin,
+-          gst_rtp_bin_signals[SIGNAL_ON_BUNDLED_SSRC], 0, TRUE)) {
+-    GST_DEBUG_OBJECT (rtpbin, "Adding a bundle SSRC demuxer to session %u",
+-        session->id);
+-    session->bundle_demux = gst_element_factory_make ("rtpssrcdemux", NULL);
+-    session->bundle_demux_newpad_sig = g_signal_connect (session->bundle_demux,
+-        "new-ssrc-pad", (GCallback) new_bundled_ssrc_pad_found, session);
+-
+-    gst_bin_add (GST_BIN_CAST (rtpbin), session->bundle_demux);
+-    gst_element_sync_state_with_parent (session->bundle_demux);
+-  } else {
+-    GST_DEBUG_OBJECT (rtpbin,
+-        "No handler for the on-bundled-ssrc signal so no need for a bundle SSRC demuxer in session %u",
+-        session->id);
+-  }
+-}
+-
+ static GstPad *
+-complete_session_sink (GstRtpBin * rtpbin, GstRtpBinSession * session,
+-    gboolean bundle_demuxer_needed)
++complete_session_sink (GstRtpBin * rtpbin, GstRtpBinSession * session)
+ {
+   guint sessid = session->id;
+   GstPad *recv_rtp_sink;
+-  GstPad *funnel_src;
+   GstElement *decoder;
+ 
+   g_assert (!session->recv_rtp_sink);
+@@ -3735,9 +3616,6 @@ complete_session_sink (GstRtpBin * rtpbin, GstRtpBinSession * session,
+   g_signal_connect (session->recv_rtp_sink, "notify::caps",
+       (GCallback) caps_changed, session);
+ 
+-  if (bundle_demuxer_needed)
+-    session_maybe_create_bundle_demuxer (session);
+-
+   GST_DEBUG_OBJECT (rtpbin, "requesting RTP decoder");
+   decoder = session_request_element (session, SIGNAL_REQUEST_RTP_DECODER);
+   if (decoder) {
+@@ -3755,14 +3633,8 @@ complete_session_sink (GstRtpBin * rtpbin, GstRtpBinSession * session,
+     if (decsrc == NULL)
+       goto dec_src_failed;
+ 
+-    if (session->bundle_demux) {
+-      GstPad *demux_sink;
+-      demux_sink = gst_element_get_static_pad (session->bundle_demux, "sink");
+-      ret = gst_pad_link (decsrc, demux_sink);
+-      gst_object_unref (demux_sink);
+-    } else {
+-      ret = gst_pad_link (decsrc, session->recv_rtp_sink);
+-    }
++    ret = gst_pad_link (decsrc, session->recv_rtp_sink);
++
+     gst_object_unref (decsrc);
+ 
+     if (ret != GST_PAD_LINK_OK)
+@@ -3770,19 +3642,9 @@ complete_session_sink (GstRtpBin * rtpbin, GstRtpBinSession * session,
+ 
+   } else {
+     GST_DEBUG_OBJECT (rtpbin, "no RTP decoder given");
+-    if (session->bundle_demux) {
+-      recv_rtp_sink =
+-          gst_element_get_static_pad (session->bundle_demux, "sink");
+-    } else {
+-      recv_rtp_sink =
+-          gst_element_get_request_pad (session->rtp_funnel, "sink_%u");
+-    }
++    recv_rtp_sink = gst_object_ref (session->recv_rtp_sink);
+   }
+ 
+-  funnel_src = gst_element_get_static_pad (session->rtp_funnel, "src");
+-  gst_pad_link (funnel_src, session->recv_rtp_sink);
+-  gst_object_unref (funnel_src);
+-
+   return recv_rtp_sink;
+ 
+   /* ERRORS */
+@@ -3940,11 +3802,10 @@ create_recv_rtp (GstRtpBin * rtpbin, GstPadTemplate * templ, const gchar * name)
+     return session->recv_rtp_sink_ghost;
+ 
+   /* setup the session sink pad */
+-  recv_rtp_sink = complete_session_sink (rtpbin, session, TRUE);
++  recv_rtp_sink = complete_session_sink (rtpbin, session);
+   if (!recv_rtp_sink)
+     goto session_sink_failed;
+ 
+-
+   GST_DEBUG_OBJECT (rtpbin, "ghosting session sink pad");
+   session->recv_rtp_sink_ghost =
+       gst_ghost_pad_new_from_template (name, recv_rtp_sink, templ);
+@@ -3985,11 +3846,6 @@ remove_recv_rtp (GstRtpBin * rtpbin, GstRtpBinSession * session)
+     g_signal_handler_disconnect (session->demux, session->demux_padremoved_sig);
+     session->demux_padremoved_sig = 0;
+   }
+-  if (session->bundle_demux_newpad_sig) {
+-    g_signal_handler_disconnect (session->bundle_demux,
+-        session->bundle_demux_newpad_sig);
+-    session->bundle_demux_newpad_sig = 0;
+-  }
+   if (session->recv_rtp_src) {
+     gst_object_unref (session->recv_rtp_src);
+     session->recv_rtp_src = NULL;
+@@ -4009,12 +3865,11 @@ remove_recv_rtp (GstRtpBin * rtpbin, GstRtpBinSession * session)
+ 
+ static GstPad *
+ complete_session_rtcp (GstRtpBin * rtpbin, GstRtpBinSession * session,
+-    guint sessid, gboolean bundle_demuxer_needed)
++    guint sessid)
+ {
+   GstElement *decoder;
+   GstPad *sinkdpad;
+   GstPad *decsink = NULL;
+-  GstPad *funnel_src;
+ 
+   /* get recv_rtp pad and store */
+   GST_DEBUG_OBJECT (rtpbin, "getting RTCP sink pad");
+@@ -4023,9 +3878,6 @@ complete_session_rtcp (GstRtpBin * rtpbin, GstRtpBinSession * session,
+   if (session->recv_rtcp_sink == NULL)
+     goto pad_failed;
+ 
+-  if (bundle_demuxer_needed)
+-    session_maybe_create_bundle_demuxer (session);
+-
+   GST_DEBUG_OBJECT (rtpbin, "getting RTCP decoder");
+   decoder = session_request_element (session, SIGNAL_REQUEST_RTCP_DECODER);
+   if (decoder) {
+@@ -4042,26 +3894,15 @@ complete_session_rtcp (GstRtpBin * rtpbin, GstRtpBinSession * session,
+     if (decsrc == NULL)
+       goto dec_src_failed;
+ 
+-    if (session->bundle_demux) {
+-      GstPad *demux_sink;
+-      demux_sink =
+-          gst_element_get_static_pad (session->bundle_demux, "rtcp_sink");
+-      ret = gst_pad_link (decsrc, demux_sink);
+-      gst_object_unref (demux_sink);
+-    } else {
+-      ret = gst_pad_link (decsrc, session->recv_rtcp_sink);
+-    }
++    ret = gst_pad_link (decsrc, session->recv_rtcp_sink);
++
+     gst_object_unref (decsrc);
+ 
+     if (ret != GST_PAD_LINK_OK)
+       goto dec_link_failed;
+   } else {
+     GST_DEBUG_OBJECT (rtpbin, "no RTCP decoder given");
+-    if (session->bundle_demux) {
+-      decsink = gst_element_get_static_pad (session->bundle_demux, "rtcp_sink");
+-    } else {
+-      decsink = gst_element_get_request_pad (session->rtcp_funnel, "sink_%u");
+-    }
++    decsink = gst_object_ref (session->recv_rtcp_sink);
+   }
+ 
+   /* get srcpad, link to SSRCDemux */
+@@ -4075,10 +3916,6 @@ complete_session_rtcp (GstRtpBin * rtpbin, GstRtpBinSession * session,
+   gst_pad_link_full (session->sync_src, sinkdpad, GST_PAD_LINK_CHECK_NOTHING);
+   gst_object_unref (sinkdpad);
+ 
+-  funnel_src = gst_element_get_static_pad (session->rtcp_funnel, "src");
+-  gst_pad_link (funnel_src, session->recv_rtcp_sink);
+-  gst_object_unref (funnel_src);
+-
+   return decsink;
+ 
+ pad_failed:
+@@ -4142,7 +3979,7 @@ create_recv_rtcp (GstRtpBin * rtpbin, GstPadTemplate * templ,
+   if (session->recv_rtcp_sink_ghost != NULL)
+     return session->recv_rtcp_sink_ghost;
+ 
+-  decsink = complete_session_rtcp (rtpbin, session, sessid, TRUE);
++  decsink = complete_session_rtcp (rtpbin, session, sessid);
+   if (!decsink)
+     goto create_error;
+ 
+@@ -4341,8 +4178,9 @@ create_error:
+   }
+ existing_session:
+   {
+-    g_warning ("rtpbin: session %u is already a sender", sessid);
+-    return FALSE;
++    GST_DEBUG_OBJECT (rtpbin,
++        "skipping src_%i setup, since it is already configured.", sessid);
++    return TRUE;
+   }
+ pad_failed:
+   {
+diff --git a/gst/rtpmanager/gstrtpbin.h b/gst/rtpmanager/gstrtpbin.h
+index aa93b0b49..c3c1fb572 100644
+--- a/gst/rtpmanager/gstrtpbin.h
++++ b/gst/rtpmanager/gstrtpbin.h
+@@ -109,6 +109,7 @@ struct _GstRtpBinClass {
+   void        (*reset_sync)           (GstRtpBin *rtpbin);
+   GstElement* (*get_session)          (GstRtpBin *rtpbin, guint session);
+   RTPSession* (*get_internal_session) (GstRtpBin *rtpbin, guint session);
++  GstElement* (*get_storage)          (GstRtpBin *rtpbin, guint session);
+   GObject*    (*get_internal_storage) (GstRtpBin *rtpbin, guint session);
+ 
+   /* session manager signals */
+@@ -136,8 +137,6 @@ struct _GstRtpBinClass {
+ 
+   void     (*on_new_sender_ssrc)      (GstRtpBin *rtpbin, guint session, guint32 ssrc);
+   void     (*on_sender_ssrc_active)   (GstRtpBin *rtpbin, guint session, guint32 ssrc);
+-
+-  guint    (*on_bundled_ssrc)         (GstRtpBin *rtpbin, guint ssrc);
+ };
+ 
+ GType gst_rtp_bin_get_type (void);
+diff --git a/gst/rtpmanager/gstrtpdtmfmux.c b/gst/rtpmanager/gstrtpdtmfmux.c
+index cc6d74756..cff68e518 100644
+--- a/gst/rtpmanager/gstrtpdtmfmux.c
++++ b/gst/rtpmanager/gstrtpdtmfmux.c
+@@ -27,6 +27,7 @@
+ 
+ /**
+  * SECTION:element-rtpdtmfmux
++ * @title: rtpdtmfmux
+  * @see_also: rtpdtmfsrc, dtmfsrc, rtpmux
+  *
+  * The RTP "DTMF" Muxer muxes multiple RTP streams into a valid RTP
+diff --git a/gst/rtpmanager/gstrtpfunnel.c b/gst/rtpmanager/gstrtpfunnel.c
+new file mode 100644
+index 000000000..155875bd5
+--- /dev/null
++++ b/gst/rtpmanager/gstrtpfunnel.c
+@@ -0,0 +1,491 @@
++/* RTP funnel element for GStreamer
++ *
++ * gstrtpfunnel.c:
++ *
++ * Copyright (C) <2017> Pexip.
++ *   Contact: Havard Graff <havard@pexip.com>
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Library General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Library General Public License for more details.
++ *
++ * You should have received a copy of the GNU Library General Public
++ * License along with this library; if not, write to the
++ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
++ * Boston, MA 02110-1301, USA.
++ */
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include "gstrtpfunnel.h"
++
++GST_DEBUG_CATEGORY_STATIC (gst_rtp_funnel_debug);
++#define GST_CAT_DEFAULT gst_rtp_funnel_debug
++
++struct _GstRtpFunnelPadClass
++{
++  GstPadClass class;
++};
++
++struct _GstRtpFunnelPad
++{
++  GstPad pad;
++  guint32 ssrc;
++};
++
++enum
++{
++  PROP_0,
++  PROP_COMMON_TS_OFFSET,
++};
++
++#define DEFAULT_COMMON_TS_OFFSET -1
++
++G_DEFINE_TYPE (GstRtpFunnelPad, gst_rtp_funnel_pad, GST_TYPE_PAD);
++
++static void
++gst_rtp_funnel_pad_class_init (GstRtpFunnelPadClass * klass)
++{
++  (void) klass;
++}
++
++static void
++gst_rtp_funnel_pad_init (GstRtpFunnelPad * pad)
++{
++  (void) pad;
++}
++
++struct _GstRtpFunnelClass
++{
++  GstElementClass class;
++};
++
++struct _GstRtpFunnel
++{
++  GstElement element;
++
++  GstPad *srcpad;
++  GstCaps *srccaps;
++  gboolean send_sticky_events;
++  GHashTable *ssrc_to_pad;
++  /* The last pad data was chained on */
++  GstPad *current_pad;
++
++  /* properties */
++  gint common_ts_offset;
++};
++
++#define RTP_CAPS "application/x-rtp"
++
++static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE ("sink_%u",
++    GST_PAD_SINK,
++    GST_PAD_REQUEST,
++    GST_STATIC_CAPS (RTP_CAPS));
++
++static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE ("src",
++    GST_PAD_SRC,
++    GST_PAD_ALWAYS,
++    GST_STATIC_CAPS (RTP_CAPS));
++
++#define gst_rtp_funnel_parent_class parent_class
++G_DEFINE_TYPE (GstRtpFunnel, gst_rtp_funnel, GST_TYPE_ELEMENT);
++
++
++static void
++gst_rtp_funnel_send_sticky (GstRtpFunnel * funnel, GstPad * pad)
++{
++  GstEvent *stream_start;
++  GstEvent *caps;
++
++  if (!funnel->send_sticky_events)
++    goto done;
++
++  stream_start = gst_pad_get_sticky_event (pad, GST_EVENT_STREAM_START, 0);
++  if (stream_start && !gst_pad_push_event (funnel->srcpad, stream_start)) {
++    GST_ERROR_OBJECT (funnel, "Could not push stream start");
++    goto done;
++  }
++
++  caps = gst_event_new_caps (funnel->srccaps);
++  if (caps && !gst_pad_push_event (funnel->srcpad, caps)) {
++    GST_ERROR_OBJECT (funnel, "Could not push caps");
++    goto done;
++  }
++
++  funnel->send_sticky_events = FALSE;
++
++done:
++  return;
++}
++
++static void
++gst_rtp_funnel_forward_segment (GstRtpFunnel * funnel, GstPad * pad)
++{
++  GstEvent *segment;
++
++  if (pad == funnel->current_pad) {
++    goto done;
++  }
++
++  segment = gst_pad_get_sticky_event (pad, GST_EVENT_SEGMENT, 0);
++  if (segment && !gst_pad_push_event (funnel->srcpad, segment)) {
++    GST_ERROR_OBJECT (funnel, "Could not push segment");
++    goto done;
++  }
++
++  funnel->current_pad = pad;
++
++done:
++  return;
++}
++
++static GstFlowReturn
++gst_rtp_funnel_sink_chain_object (GstPad * pad, GstRtpFunnel * funnel,
++    gboolean is_list, GstMiniObject * obj)
++{
++  GstFlowReturn res;
++
++  GST_DEBUG_OBJECT (pad, "received %" GST_PTR_FORMAT, obj);
++
++  GST_PAD_STREAM_LOCK (funnel->srcpad);
++
++  gst_rtp_funnel_send_sticky (funnel, pad);
++  gst_rtp_funnel_forward_segment (funnel, pad);
++
++  if (is_list)
++    res = gst_pad_push_list (funnel->srcpad, GST_BUFFER_LIST_CAST (obj));
++  else
++    res = gst_pad_push (funnel->srcpad, GST_BUFFER_CAST (obj));
++
++  GST_PAD_STREAM_UNLOCK (funnel->srcpad);
++
++  return res;
++}
++
++static GstFlowReturn
++gst_rtp_funnel_sink_chain_list (GstPad * pad, GstObject * parent,
++    GstBufferList * list)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (parent);
++
++  return gst_rtp_funnel_sink_chain_object (pad, funnel, TRUE,
++      GST_MINI_OBJECT_CAST (list));
++}
++
++static GstFlowReturn
++gst_rtp_funnel_sink_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (parent);
++
++  return gst_rtp_funnel_sink_chain_object (pad, funnel, FALSE,
++      GST_MINI_OBJECT_CAST (buffer));
++}
++
++static gboolean
++gst_rtp_funnel_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (parent);
++  gboolean forward = TRUE;
++  gboolean ret = TRUE;
++
++  GST_DEBUG_OBJECT (pad, "received event %" GST_PTR_FORMAT, event);
++
++  switch (GST_EVENT_TYPE (event)) {
++    case GST_EVENT_STREAM_START:
++    case GST_EVENT_SEGMENT:
++      forward = FALSE;
++      break;
++    case GST_EVENT_CAPS:
++    {
++      GstCaps *caps;
++      GstStructure *s;
++      guint ssrc;
++      gst_event_parse_caps (event, &caps);
++
++      if (!gst_caps_can_intersect (funnel->srccaps, caps)) {
++        GST_ERROR_OBJECT (funnel, "Can't intersect with caps %" GST_PTR_FORMAT,
++            caps);
++        g_assert_not_reached ();
++      }
++
++      s = gst_caps_get_structure (caps, 0);
++      if (gst_structure_get_uint (s, "ssrc", &ssrc)) {
++        GstRtpFunnelPad *fpad = GST_RTP_FUNNEL_PAD_CAST (pad);
++        fpad->ssrc = ssrc;
++        GST_DEBUG_OBJECT (pad, "Got ssrc: %u", ssrc);
++        GST_OBJECT_LOCK (funnel);
++        g_hash_table_insert (funnel->ssrc_to_pad, GUINT_TO_POINTER (ssrc), pad);
++        GST_OBJECT_UNLOCK (funnel);
++      }
++
++      forward = FALSE;
++      break;
++    }
++    default:
++      break;
++  }
++
++  if (forward) {
++    ret = gst_pad_event_default (pad, parent, event);
++  } else {
++    gst_event_unref (event);
++  }
++
++  return ret;
++}
++
++static gboolean
++gst_rtp_funnel_sink_query (GstPad * pad, GstObject * parent, GstQuery * query)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (parent);
++  gboolean res = FALSE;
++  (void) funnel;
++
++  switch (GST_QUERY_TYPE (query)) {
++    case GST_QUERY_CAPS:
++    {
++      GstCaps *filter_caps;
++      GstCaps *new_caps;
++
++      gst_query_parse_caps (query, &filter_caps);
++
++      if (filter_caps) {
++        new_caps = gst_caps_intersect_full (funnel->srccaps, filter_caps,
++            GST_CAPS_INTERSECT_FIRST);
++      } else {
++        new_caps = gst_caps_copy (funnel->srccaps);
++      }
++
++      if (funnel->common_ts_offset >= 0)
++        gst_caps_set_simple (new_caps, "timestamp-offset", G_TYPE_UINT,
++            (guint) funnel->common_ts_offset, NULL);
++
++      gst_query_set_caps_result (query, new_caps);
++      GST_DEBUG_OBJECT (pad, "Answering caps-query with caps: %"
++          GST_PTR_FORMAT, new_caps);
++      gst_caps_unref (new_caps);
++      res = TRUE;
++      break;
++    }
++    default:
++      res = gst_pad_query_default (pad, parent, query);
++      break;
++  }
++
++  return res;
++}
++
++static gboolean
++gst_rtp_funnel_src_event (GstPad * pad, GstObject * parent, GstEvent * event)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (parent);
++  gboolean handled = FALSE;
++  gboolean ret = TRUE;
++
++  GST_DEBUG_OBJECT (pad, "received event %" GST_PTR_FORMAT, event);
++
++  if (GST_EVENT_TYPE (event) == GST_EVENT_CUSTOM_UPSTREAM) {
++    const GstStructure *s = gst_event_get_structure (event);
++    GstPad *fpad;
++    guint ssrc;
++    if (s && gst_structure_get_uint (s, "ssrc", &ssrc)) {
++      handled = TRUE;
++
++      GST_OBJECT_LOCK (funnel);
++      fpad = g_hash_table_lookup (funnel->ssrc_to_pad, GUINT_TO_POINTER (ssrc));
++      if (fpad)
++        gst_object_ref (fpad);
++      GST_OBJECT_UNLOCK (funnel);
++
++      if (fpad) {
++        GST_INFO_OBJECT (pad, "Sending %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT,
++            event, fpad);
++        ret = gst_pad_push_event (fpad, event);
++        gst_object_unref (fpad);
++      } else {
++        gst_event_unref (event);
++      }
++    }
++  }
++
++  if (!handled) {
++    gst_pad_event_default (pad, parent, event);
++  }
++
++  return ret;
++}
++
++static GstPad *
++gst_rtp_funnel_request_new_pad (GstElement * element, GstPadTemplate * templ,
++    const gchar * name, const GstCaps * caps)
++{
++  GstPad *sinkpad;
++  (void) caps;
++
++  GST_DEBUG_OBJECT (element, "requesting pad");
++
++  sinkpad = GST_PAD_CAST (g_object_new (GST_TYPE_RTP_FUNNEL_PAD,
++          "name", name, "direction", templ->direction, "template", templ,
++          NULL));
++
++  gst_pad_set_chain_function (sinkpad,
++      GST_DEBUG_FUNCPTR (gst_rtp_funnel_sink_chain));
++  gst_pad_set_chain_list_function (sinkpad,
++      GST_DEBUG_FUNCPTR (gst_rtp_funnel_sink_chain_list));
++  gst_pad_set_event_function (sinkpad,
++      GST_DEBUG_FUNCPTR (gst_rtp_funnel_sink_event));
++  gst_pad_set_query_function (sinkpad,
++      GST_DEBUG_FUNCPTR (gst_rtp_funnel_sink_query));
++
++  GST_OBJECT_FLAG_SET (sinkpad, GST_PAD_FLAG_PROXY_CAPS);
++  GST_OBJECT_FLAG_SET (sinkpad, GST_PAD_FLAG_PROXY_ALLOCATION);
++
++  gst_pad_set_active (sinkpad, TRUE);
++
++  gst_element_add_pad (element, sinkpad);
++
++  GST_DEBUG_OBJECT (element, "requested pad %s:%s",
++      GST_DEBUG_PAD_NAME (sinkpad));
++
++  return sinkpad;
++}
++
++static void
++gst_rtp_funnel_set_property (GObject * object, guint prop_id,
++    const GValue * value, GParamSpec * pspec)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (object);
++
++  switch (prop_id) {
++    case PROP_COMMON_TS_OFFSET:
++      funnel->common_ts_offset = g_value_get_int (value);
++      break;
++    default:
++      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
++      break;
++  }
++}
++
++static void
++gst_rtp_funnel_get_property (GObject * object, guint prop_id, GValue * value,
++    GParamSpec * pspec)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (object);
++
++  switch (prop_id) {
++    case PROP_COMMON_TS_OFFSET:
++      g_value_set_int (value, funnel->common_ts_offset);
++      break;
++    default:
++      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
++      break;
++  }
++}
++
++static GstStateChangeReturn
++gst_rtp_funnel_change_state (GstElement * element, GstStateChange transition)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (element);
++  GstStateChangeReturn ret;
++
++  ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
++
++  switch (transition) {
++    case GST_STATE_CHANGE_PAUSED_TO_READY:
++      funnel->send_sticky_events = TRUE;
++      break;
++    default:
++      break;
++  }
++
++  return ret;
++}
++
++static gboolean
++_remove_pad_func (gpointer key, gpointer value, gpointer user_data)
++{
++  (void) key;
++  if (GST_PAD_CAST (value) == GST_PAD_CAST (user_data))
++    return TRUE;
++  return FALSE;
++}
++
++static void
++gst_rtp_funnel_release_pad (GstElement * element, GstPad * pad)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (element);
++
++  GST_DEBUG_OBJECT (funnel, "releasing pad %s:%s", GST_DEBUG_PAD_NAME (pad));
++
++  g_hash_table_foreach_remove (funnel->ssrc_to_pad, _remove_pad_func, pad);
++
++  gst_pad_set_active (pad, FALSE);
++  gst_element_remove_pad (GST_ELEMENT_CAST (funnel), pad);
++}
++
++static void
++gst_rtp_funnel_finalize (GObject * object)
++{
++  GstRtpFunnel *funnel = GST_RTP_FUNNEL_CAST (object);
++
++  gst_caps_unref (funnel->srccaps);
++  g_hash_table_destroy (funnel->ssrc_to_pad);
++
++  G_OBJECT_CLASS (parent_class)->finalize (object);
++}
++
++static void
++gst_rtp_funnel_class_init (GstRtpFunnelClass * klass)
++{
++  GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
++  GstElementClass *gstelement_class = GST_ELEMENT_CLASS (klass);
++
++  gobject_class->finalize = GST_DEBUG_FUNCPTR (gst_rtp_funnel_finalize);
++  gobject_class->get_property = GST_DEBUG_FUNCPTR (gst_rtp_funnel_get_property);
++  gobject_class->set_property = GST_DEBUG_FUNCPTR (gst_rtp_funnel_set_property);
++  gstelement_class->request_new_pad =
++      GST_DEBUG_FUNCPTR (gst_rtp_funnel_request_new_pad);
++  gstelement_class->release_pad =
++      GST_DEBUG_FUNCPTR (gst_rtp_funnel_release_pad);
++  gstelement_class->change_state =
++      GST_DEBUG_FUNCPTR (gst_rtp_funnel_change_state);
++
++  gst_element_class_set_static_metadata (gstelement_class, "RTP funnel",
++      "RTP Funneling",
++      "Funnel RTP buffers together for multiplexing",
++      "Havard Graff <havard@gstip.com>");
++
++  gst_element_class_add_static_pad_template (gstelement_class, &sink_template);
++  gst_element_class_add_static_pad_template (gstelement_class, &src_template);
++
++  g_object_class_install_property (gobject_class, PROP_COMMON_TS_OFFSET,
++      g_param_spec_int ("common-ts-offset", "Common Timestamp Offset",
++          "Use the same RTP timestamp offset for all sinkpads (-1 = disable)",
++          -1, G_MAXINT32, DEFAULT_COMMON_TS_OFFSET,
++          G_PARAM_CONSTRUCT | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++
++  GST_DEBUG_CATEGORY_INIT (gst_rtp_funnel_debug,
++      "gstrtpfunnel", 0, "funnel element");
++}
++
++static void
++gst_rtp_funnel_init (GstRtpFunnel * funnel)
++{
++  funnel->srcpad = gst_pad_new_from_static_template (&src_template, "src");
++  gst_pad_use_fixed_caps (funnel->srcpad);
++  gst_pad_set_event_function (funnel->srcpad,
++      GST_DEBUG_FUNCPTR (gst_rtp_funnel_src_event));
++  gst_element_add_pad (GST_ELEMENT (funnel), funnel->srcpad);
++
++  funnel->send_sticky_events = TRUE;
++  funnel->srccaps = gst_caps_new_empty_simple (RTP_CAPS);
++  funnel->ssrc_to_pad = g_hash_table_new (NULL, NULL);
++  funnel->current_pad = NULL;
++}
+diff --git a/gst/rtpmanager/gstrtpfunnel.h b/gst/rtpmanager/gstrtpfunnel.h
+new file mode 100644
+index 000000000..6fb16d07b
+--- /dev/null
++++ b/gst/rtpmanager/gstrtpfunnel.h
+@@ -0,0 +1,48 @@
++/* RTP funnel element for GStreamer
++ *
++ * gstrtpfunnel.h:
++ *
++ * Copyright (C) <2017> Pexip.
++ *   Contact: Havard Graff <havard@pexip.com>
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Library General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Library General Public License for more details.
++ *
++ * You should have received a copy of the GNU Library General Public
++ * License along with this library; if not, write to the
++ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
++ * Boston, MA 02110-1301, USA.
++ */
++#ifndef __GST_RTP_FUNNEL_H__
++#define __GST_RTP_FUNNEL_H__
++
++#include <gst/gst.h>
++
++G_BEGIN_DECLS
++
++typedef struct _GstRtpFunnelClass GstRtpFunnelClass;
++typedef struct _GstRtpFunnel GstRtpFunnel;
++
++#define GST_TYPE_RTP_FUNNEL (gst_rtp_funnel_get_type())
++#define GST_RTP_FUNNEL_CAST(obj) ((GstRtpFunnel *)(obj))
++
++GType gst_rtp_funnel_get_type (void);
++
++typedef struct _GstRtpFunnelPadClass GstRtpFunnelPadClass;
++typedef struct _GstRtpFunnelPad GstRtpFunnelPad;
++
++#define GST_TYPE_RTP_FUNNEL_PAD (gst_rtp_funnel_pad_get_type())
++#define GST_RTP_FUNNEL_PAD_CAST(obj) ((GstRtpFunnelPad *)(obj))
++
++GType gst_rtp_funnel_pad_get_type (void);
++
++G_END_DECLS
++
++#endif /* __GST_RTP_FUNNEL_H__ */
+diff --git a/gst/rtpmanager/gstrtpjitterbuffer.c b/gst/rtpmanager/gstrtpjitterbuffer.c
+index 678210be9..f57bef35f 100644
+--- a/gst/rtpmanager/gstrtpjitterbuffer.c
++++ b/gst/rtpmanager/gstrtpjitterbuffer.c
+@@ -30,6 +30,7 @@
+ 
+ /**
+  * SECTION:element-rtpjitterbuffer
++ * @title: rtpjitterbuffer
+  *
+  * This element reorders and removes duplicate RTP packets as they are received
+  * from a network source.
+@@ -47,7 +48,7 @@
+  * depayloader or other element to create concealment data or some other logic
+  * to gracefully handle the missing packets.
+  *
+- * The jitterbuffer will use the DTS (or PTS if no DTS is set) of the incomming
++ * The jitterbuffer will use the DTS (or PTS if no DTS is set) of the incoming
+  * buffer and the rtptime inside the RTP packet to create a PTS on the outgoing
+  * buffer.
+  *
+@@ -69,7 +70,7 @@
+  *
+  * - If seqnum N arrived, all seqnum older than
+  *     N - #GstRtpJitterBuffer:rtx-delay-reorder are considered late
+- *     immediately. This is to request fast feedback for abonormally reorder
++ *     immediately. This is to request fast feedback for abnormally reorder
+  *     packets before any of the previous timeouts is triggered.
+  *
+  * A late packet triggers the GstRTPRetransmissionRequest custom upstream
+@@ -88,14 +89,13 @@
+  *
+  * This element will automatically be used inside rtpbin.
+  *
+- * <refsect2>
+- * <title>Example pipelines</title>
++ * ## Example pipelines
+  * |[
+  * gst-launch-1.0 rtspsrc location=rtsp://192.168.1.133:8554/mpeg1or2AudioVideoTest ! rtpjitterbuffer ! rtpmpvdepay ! mpeg2dec ! xvimagesink
+  * ]| Connect to a streaming server and decode the MPEG video. The jitterbuffer is
+  * inserted into the pipeline to smooth out network jitter and to reorder the
+  * out-of-order RTP packets.
+- * </refsect2>
++ *
+  */
+ 
+ #ifdef HAVE_CONFIG_H
+@@ -200,16 +200,30 @@ enum
+     (g_mutex_unlock (&(priv)->jbuf_lock));			\
+ } G_STMT_END
+ 
++#define JBUF_WAIT_QUEUE(priv)   G_STMT_START {            \
++  GST_DEBUG ("waiting queue");                            \
++  (priv)->waiting_queue++;                                \
++  g_cond_wait (&(priv)->jbuf_queue, &(priv)->jbuf_lock);  \
++  (priv)->waiting_queue--;                                \
++  GST_DEBUG ("waiting queue done");                       \
++} G_STMT_END
++#define JBUF_SIGNAL_QUEUE(priv) G_STMT_START {            \
++  if (G_UNLIKELY ((priv)->waiting_queue)) {               \
++    GST_DEBUG ("signal queue, %d waiters", (priv)->waiting_queue); \
++    g_cond_signal (&(priv)->jbuf_queue);                  \
++  }                                                       \
++} G_STMT_END
++
+ #define JBUF_WAIT_TIMER(priv)   G_STMT_START {            \
+   GST_DEBUG ("waiting timer");                            \
+-  (priv)->waiting_timer = TRUE;                           \
++  (priv)->waiting_timer++;                                \
+   g_cond_wait (&(priv)->jbuf_timer, &(priv)->jbuf_lock);  \
+-  (priv)->waiting_timer = FALSE;                          \
++  (priv)->waiting_timer--;                                \
+   GST_DEBUG ("waiting timer done");                       \
+ } G_STMT_END
+ #define JBUF_SIGNAL_TIMER(priv) G_STMT_START {            \
+   if (G_UNLIKELY ((priv)->waiting_timer)) {               \
+-    GST_DEBUG ("signal timer");                           \
++    GST_DEBUG ("signal timer, %d waiters", (priv)->waiting_timer); \
+     g_cond_signal (&(priv)->jbuf_timer);                  \
+   }                                                       \
+ } G_STMT_END
+@@ -263,6 +277,8 @@ struct _GstRtpJitterBufferPrivate
+ 
+   RTPJitterBuffer *jbuf;
+   GMutex jbuf_lock;
++  gboolean waiting_queue;
++  GCond jbuf_queue;
+   gboolean waiting_timer;
+   GCond jbuf_timer;
+   gboolean waiting_event;
+@@ -274,6 +290,7 @@ struct _GstRtpJitterBufferPrivate
+   gboolean ts_discont;
+   gboolean active;
+   guint64 out_offset;
++  guint32 segment_seqnum;
+ 
+   gboolean timer_running;
+   GThread *timer_thread;
+@@ -400,10 +417,6 @@ typedef struct
+   guint num_rtx_received;
+ } TimerData;
+ 
+-#define GST_RTP_JITTER_BUFFER_GET_PRIVATE(o) \
+-  (G_TYPE_INSTANCE_GET_PRIVATE ((o), GST_TYPE_RTP_JITTER_BUFFER, \
+-                                GstRtpJitterBufferPrivate))
+-
+ static GstStaticPadTemplate gst_rtp_jitter_buffer_sink_template =
+ GST_STATIC_PAD_TEMPLATE ("sink",
+     GST_PAD_SINK,
+@@ -436,7 +449,8 @@ GST_STATIC_PAD_TEMPLATE ("src",
+ static guint gst_rtp_jitter_buffer_signals[LAST_SIGNAL] = { 0 };
+ 
+ #define gst_rtp_jitter_buffer_parent_class parent_class
+-G_DEFINE_TYPE (GstRtpJitterBuffer, gst_rtp_jitter_buffer, GST_TYPE_ELEMENT);
++G_DEFINE_TYPE_WITH_PRIVATE (GstRtpJitterBuffer, gst_rtp_jitter_buffer,
++    GST_TYPE_ELEMENT);
+ 
+ /* object overrides */
+ static void gst_rtp_jitter_buffer_set_property (GObject * object,
+@@ -516,8 +530,6 @@ gst_rtp_jitter_buffer_class_init (GstRtpJitterBufferClass * klass)
+   gobject_class = (GObjectClass *) klass;
+   gstelement_class = (GstElementClass *) klass;
+ 
+-  g_type_class_add_private (klass, sizeof (GstRtpJitterBufferPrivate));
+-
+   gobject_class->finalize = gst_rtp_jitter_buffer_finalize;
+ 
+   gobject_class->set_property = gst_rtp_jitter_buffer_set_property;
+@@ -673,7 +685,7 @@ gst_rtp_jitter_buffer_class_init (GstRtpJitterBufferClass * klass)
+   g_object_class_install_property (gobject_class, PROP_RTX_DELAY_REORDER,
+       g_param_spec_int ("rtx-delay-reorder", "RTX Delay Reorder",
+           "Sending retransmission event when this much reordering "
+-          "(0 disable, -1 automatic)",
++          "(0 disable)",
+           -1, G_MAXINT, DEFAULT_RTX_DELAY_REORDER,
+           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+   /**
+@@ -772,7 +784,7 @@ gst_rtp_jitter_buffer_class_init (GstRtpJitterBufferClass * klass)
+   g_object_class_install_property (gobject_class, PROP_MAX_DROPOUT_TIME,
+       g_param_spec_uint ("max-dropout-time", "Max dropout time",
+           "The maximum time (milliseconds) of missing packets tolerated.",
+-          0, G_MAXUINT, DEFAULT_MAX_DROPOUT_TIME,
++          0, G_MAXINT32, DEFAULT_MAX_DROPOUT_TIME,
+           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
+   g_object_class_install_property (gobject_class, PROP_MAX_MISORDER_TIME,
+@@ -786,64 +798,14 @@ gst_rtp_jitter_buffer_class_init (GstRtpJitterBufferClass * klass)
+    * Various jitterbuffer statistics. This property returns a GstStructure
+    * with name application/x-rtp-jitterbuffer-stats with the following fields:
+    *
+-   * <itemizedlist>
+-   * <listitem>
+-   *   <para>
+-   *   #guint64
+-   *   <classname>&quot;num-pushed&quot;</classname>:
+-   *   the number of packets pushed out.
+-   *   </para>
+-   * </listitem>
+-   * <listitem>
+-   *   <para>
+-   *   #guint64
+-   *   <classname>&quot;num-lost&quot;</classname>:
+-   *   the number of packets considered lost.
+-   *   </para>
+-   * </listitem>
+-   * <listitem>
+-   *   <para>
+-   *   #guint64
+-   *   <classname>&quot;num-late&quot;</classname>:
+-   *   the number of packets arriving too late.
+-   *   </para>
+-   * </listitem>
+-   * <listitem>
+-   *   <para>
+-   *   #guint64
+-   *   <classname>&quot;num-duplicates&quot;</classname>:
+-   *   the number of duplicate packets.
+-   *   </para>
+-   * </listitem>
+-   * <listitem>
+-   *   <para>
+-   *   #guint64
+-   *   <classname>&quot;rtx-count&quot;</classname>:
+-   *   the number of retransmissions requested.
+-   *   </para>
+-   * </listitem>
+-   * <listitem>
+-   *   <para>
+-   *   #guint64
+-   *   <classname>&quot;rtx-success-count&quot;</classname>:
+-   *   the number of successful retransmissions.
+-   *   </para>
+-   * </listitem>
+-   * <listitem>
+-   *   <para>
+-   *   #gdouble
+-   *   <classname>&quot;rtx-per-packet&quot;</classname>:
+-   *   average number of RTX per packet.
+-   *   </para>
+-   * </listitem>
+-   * <listitem>
+-   *   <para>
+-   *   #guint64
+-   *   <classname>&quot;rtx-rtt&quot;</classname>:
+-   *   average round trip time per RTX.
+-   *   </para>
+-   * </listitem>
+-   * </itemizedlist>
++   * * #guint64 `num-pushed`: the number of packets pushed out.
++   * * #guint64 `num-lost`: the number of packets considered lost.
++   * * #guint64 `num-late`: the number of packets arriving too late.
++   * * #guint64 `num-duplicates`: the number of duplicate packets.
++   * * #guint64 `rtx-count`: the number of retransmissions requested.
++   * * #guint64 `rtx-success-count`: the number of successful retransmissions.
++   * * #gdouble `rtx-per-packet`: average number of RTX per packet.
++   * * #guint64 `rtx-rtt`: average round trip time per RTX.
+    *
+    * Since: 1.4
+    */
+@@ -987,6 +949,7 @@ gst_rtp_jitter_buffer_class_init (GstRtpJitterBufferClass * klass)
+ 
+   GST_DEBUG_CATEGORY_INIT
+       (rtpjitterbuffer_debug, "rtpjitterbuffer", 0, "RTP Jitter Buffer");
++  GST_DEBUG_REGISTER_FUNCPTR (gst_rtp_jitter_buffer_chain_rtcp);
+ }
+ 
+ static void
+@@ -994,7 +957,7 @@ gst_rtp_jitter_buffer_init (GstRtpJitterBuffer * jitterbuffer)
+ {
+   GstRtpJitterBufferPrivate *priv;
+ 
+-  priv = GST_RTP_JITTER_BUFFER_GET_PRIVATE (jitterbuffer);
++  priv = gst_rtp_jitter_buffer_get_instance_private (jitterbuffer);
+   jitterbuffer->priv = priv;
+ 
+   priv->latency_ms = DEFAULT_LATENCY_MS;
+@@ -1024,10 +987,12 @@ gst_rtp_jitter_buffer_init (GstRtpJitterBuffer * jitterbuffer)
+   priv->last_pts = -1;
+   priv->last_rtptime = -1;
+   priv->avg_jitter = 0;
++  priv->segment_seqnum = GST_SEQNUM_INVALID;
+   priv->timers = g_array_new (FALSE, TRUE, sizeof (TimerData));
+   priv->rtx_stats_timers = timer_queue_new ();
+   priv->jbuf = rtp_jitter_buffer_new ();
+   g_mutex_init (&priv->jbuf_lock);
++  g_cond_init (&priv->jbuf_queue);
+   g_cond_init (&priv->jbuf_timer);
+   g_cond_init (&priv->jbuf_event);
+   g_cond_init (&priv->jbuf_query);
+@@ -1133,6 +1098,7 @@ gst_rtp_jitter_buffer_finalize (GObject * object)
+   g_array_free (priv->timers, TRUE);
+   timer_queue_free (priv->rtx_stats_timers);
+   g_mutex_clear (&priv->jbuf_lock);
++  g_cond_clear (&priv->jbuf_queue);
+   g_cond_clear (&priv->jbuf_timer);
+   g_cond_clear (&priv->jbuf_event);
+   g_cond_clear (&priv->jbuf_query);
+@@ -1581,6 +1547,7 @@ gst_rtp_jitter_buffer_flush_start (GstRtpJitterBuffer * jitterbuffer)
+   /* this unblocks any waiting pops on the src pad task */
+   JBUF_SIGNAL_EVENT (priv);
+   JBUF_SIGNAL_QUERY (priv, FALSE);
++  JBUF_SIGNAL_QUEUE (priv);
+   JBUF_UNLOCK (priv);
+ }
+ 
+@@ -1615,6 +1582,7 @@ gst_rtp_jitter_buffer_flush_stop (GstRtpJitterBuffer * jitterbuffer)
+   priv->last_rtptime = -1;
+   priv->last_in_pts = 0;
+   priv->equidistant = 0;
++  priv->segment_seqnum = GST_SEQNUM_INVALID;
+   GST_DEBUG_OBJECT (jitterbuffer, "flush and reset jitterbuffer");
+   rtp_jitter_buffer_flush (priv->jbuf, (GFunc) free_item, NULL);
+   rtp_jitter_buffer_disable_buffering (priv->jbuf, FALSE);
+@@ -1685,6 +1653,7 @@ gst_rtp_jitter_buffer_change_state (GstElement * element,
+       /* block until we go to PLAYING */
+       priv->blocked = TRUE;
+       priv->timer_running = TRUE;
++      priv->srcresult = GST_FLOW_OK;
+       priv->timer_thread =
+           g_thread_new ("timer", (GThreadFunc) wait_next_timeout, jitterbuffer);
+       JBUF_UNLOCK (priv);
+@@ -1723,9 +1692,11 @@ gst_rtp_jitter_buffer_change_state (GstElement * element,
+       JBUF_LOCK (priv);
+       gst_buffer_replace (&priv->last_sr, NULL);
+       priv->timer_running = FALSE;
++      priv->srcresult = GST_FLOW_FLUSHING;
+       unschedule_current_timer (jitterbuffer);
+       JBUF_SIGNAL_TIMER (priv);
+       JBUF_SIGNAL_QUERY (priv, FALSE);
++      JBUF_SIGNAL_QUEUE (priv);
+       JBUF_UNLOCK (priv);
+       g_thread_join (priv->timer_thread);
+       priv->timer_thread = NULL;
+@@ -1806,6 +1777,8 @@ queue_event (GstRtpJitterBuffer * jitterbuffer, GstEvent * event)
+       GstSegment segment;
+       gst_event_copy_segment (event, &segment);
+ 
++      priv->segment_seqnum = gst_event_get_seqnum (event);
++
+       /* we need time for now */
+       if (segment.format != GST_FORMAT_TIME) {
+         GST_DEBUG_OBJECT (jitterbuffer, "ignoring non-TIME newsegment");
+@@ -1813,6 +1786,7 @@ queue_event (GstRtpJitterBuffer * jitterbuffer, GstEvent * event)
+ 
+         gst_segment_init (&segment, GST_FORMAT_TIME);
+         event = gst_event_new_segment (&segment);
++        gst_event_set_seqnum (event, priv->segment_seqnum);
+       }
+ 
+       priv->segment = segment;
+@@ -1830,7 +1804,7 @@ queue_event (GstRtpJitterBuffer * jitterbuffer, GstEvent * event)
+   GST_DEBUG_OBJECT (jitterbuffer, "adding event");
+   item = alloc_item (event, ITEM_TYPE_EVENT, -1, -1, -1, 0, -1);
+   rtp_jitter_buffer_insert (priv->jbuf, item, &head, NULL);
+-  if (head)
++  if (head || priv->eos)
+     JBUF_SIGNAL_EVENT (priv);
+ 
+   return TRUE;
+@@ -2307,6 +2281,8 @@ remove_timer (GstRtpJitterBuffer * jitterbuffer, TimerData * timer)
+   GST_DEBUG_OBJECT (jitterbuffer, "removed index %d", idx);
+   g_array_remove_index_fast (priv->timers, idx);
+   timer->idx = idx;
++
++  JBUF_SIGNAL_TIMER (priv);
+ }
+ 
+ static void
+@@ -2316,6 +2292,7 @@ remove_all_timers (GstRtpJitterBuffer * jitterbuffer)
+   GST_DEBUG_OBJECT (jitterbuffer, "removed all timers");
+   g_array_set_size (priv->timers, 0);
+   unschedule_current_timer (jitterbuffer);
++  JBUF_SIGNAL_TIMER (priv);
+ }
+ 
+ /* get the extra delay to wait before sending RTX */
+@@ -2325,6 +2302,15 @@ get_rtx_delay (GstRtpJitterBufferPrivate * priv)
+   GstClockTime delay;
+ 
+   if (priv->rtx_delay == -1) {
++    /* the maximum delay for any RTX-packet is given by the latency, since
++       anything after that is considered lost. For various calulcations,
++       (given large avg_jitter and/or packet_spacing), the resuling delay
++       could exceed the configured latency, ending up issuing an RTX-request
++       that would never arrive in time. To help this we cap the delay
++       for any RTX with the last possible time it could still arrive in time. */
++    GstClockTime delay_max = (priv->latency_ns > priv->avg_rtx_rtt) ?
++        priv->latency_ns - priv->avg_rtx_rtt : priv->latency_ns;
++
+     if (priv->avg_jitter == 0 && priv->packet_spacing == 0) {
+       delay = DEFAULT_AUTO_RTX_DELAY;
+     } else {
+@@ -2332,6 +2318,8 @@ get_rtx_delay (GstRtpJitterBufferPrivate * priv)
+        * packet spacing is a good margin */
+       delay = MAX (priv->avg_jitter * 2, priv->packet_spacing / 2);
+     }
++
++    delay = MIN (delay_max, delay);
+   } else {
+     delay = priv->rtx_delay * GST_MSECOND;
+   }
+@@ -2504,8 +2492,7 @@ calculate_expected (GstRtpJitterBuffer * jitterbuffer, guint32 expected,
+     guint16 seqnum, GstClockTime pts, gint gap)
+ {
+   GstRtpJitterBufferPrivate *priv = jitterbuffer->priv;
+-  GstClockTime duration, expected_pts, delay;
+-  TimerType type;
++  GstClockTime duration, expected_pts;
+   gboolean equidistant = priv->equidistant > 0;
+ 
+   GST_DEBUG_OBJECT (jitterbuffer,
+@@ -2577,17 +2564,14 @@ calculate_expected (GstRtpJitterBuffer * jitterbuffer, guint32 expected,
+     expected_pts = pts;
+   }
+ 
+-  delay = 0;
+-
+   if (priv->do_retransmission) {
+     TimerData *timer = find_timer (jitterbuffer, expected);
+-
+-    type = TIMER_TYPE_EXPECTED;
+-    delay = get_rtx_delay (priv);
++    GstClockTime rtx_delay = get_rtx_delay (priv);
+ 
+     /* if we had a timer for the first missing packet, update it. */
+     if (timer && timer->type == TIMER_TYPE_EXPECTED) {
+       GstClockTime timeout = timer->timeout;
++      GstClockTime delay = MAX (rtx_delay, pts - expected_pts);
+ 
+       timer->duration = duration;
+       if (timeout > (expected_pts + delay) && timer->num_rtx_retry == 0) {
+@@ -2597,14 +2581,23 @@ calculate_expected (GstRtpJitterBuffer * jitterbuffer, guint32 expected,
+       expected++;
+       expected_pts += duration;
+     }
+-  } else {
+-    type = TIMER_TYPE_LOST;
+-  }
+ 
+-  while (gst_rtp_buffer_compare_seqnum (expected, seqnum) > 0) {
+-    add_timer (jitterbuffer, type, expected, 0, expected_pts, delay, duration);
+-    expected_pts += duration;
+-    expected++;
++    while (gst_rtp_buffer_compare_seqnum (expected, seqnum) > 0) {
++      /* minimum delay the expected-timer has "waited" is the elapsed time
++       * since expected arrival of the missing packet */
++      GstClockTime delay = MAX (rtx_delay, pts - expected_pts);
++      add_timer (jitterbuffer, TIMER_TYPE_EXPECTED, expected, 0, expected_pts,
++          delay, duration);
++      expected_pts += duration;
++      expected++;
++    }
++  } else {
++    while (gst_rtp_buffer_compare_seqnum (expected, seqnum) > 0) {
++      add_timer (jitterbuffer, TIMER_TYPE_LOST, expected, 0, expected_pts, 0,
++          duration);
++      expected_pts += duration;
++      expected++;
++    }
+   }
+ }
+ 
+@@ -2656,10 +2649,10 @@ calculate_jitter (GstRtpJitterBuffer * jitterbuffer, GstClockTime dts,
+   priv->avg_jitter = (diff + (15 * priv->avg_jitter)) >> 4;
+ 
+   GST_LOG_OBJECT (jitterbuffer,
+-      "dtsdiff %" GST_TIME_FORMAT " rtptime %" GST_TIME_FORMAT
+-      ", clock-rate %d, diff %" GST_TIME_FORMAT ", jitter: %" GST_TIME_FORMAT,
+-      GST_TIME_ARGS (dtsdiff), GST_TIME_ARGS (rtpdiffns), priv->clock_rate,
+-      GST_TIME_ARGS (diff), GST_TIME_ARGS (priv->avg_jitter));
++      "dtsdiff %" GST_STIME_FORMAT " rtptime %" GST_STIME_FORMAT
++      ", clock-rate %d, diff %" GST_STIME_FORMAT ", jitter: %" GST_TIME_FORMAT,
++      GST_STIME_ARGS (dtsdiff), GST_STIME_ARGS (rtpdiffns), priv->clock_rate,
++      GST_STIME_ARGS (diff), GST_TIME_ARGS (priv->avg_jitter));
+ 
+   return;
+ 
+@@ -3030,12 +3023,24 @@ gst_rtp_jitter_buffer_chain (GstPad * pad, GstObject * parent,
+ 
+   /* now check against our expected seqnum */
+   if (G_UNLIKELY (expected == -1)) {
++    if (G_UNLIKELY (GST_BUFFER_IS_RETRANSMISSION (buffer))) {
++      /* If the first buffer is an (old) rtx, e.g. from before a reset,
++       * ignore it. */
++      goto unsolicited_rtx;
++    }
++
+     GST_DEBUG_OBJECT (jitterbuffer, "First buffer #%d", seqnum);
+ 
+     /* calculate a pts based on rtptime and arrival time (dts) */
+     pts =
+         rtp_jitter_buffer_calculate_pts (priv->jbuf, dts, estimated_dts,
+-        rtptime, gst_element_get_base_time (GST_ELEMENT_CAST (jitterbuffer)));
++        rtptime, gst_element_get_base_time (GST_ELEMENT_CAST (jitterbuffer)),
++        0, FALSE);
++
++    if (G_UNLIKELY (!GST_CLOCK_TIME_IS_VALID (pts))) {
++      /* A valid timestamp cannot be calculated, discard packet */
++      goto discard_invalid;
++    }
+ 
+     /* we don't know what the next_in_seqnum should be, wait for the last
+      * possible moment to push this buffer, maybe we get an earlier seqnum
+@@ -3054,6 +3059,19 @@ gst_rtp_jitter_buffer_chain (GstPad * pad, GstObject * parent,
+     GST_DEBUG_OBJECT (jitterbuffer, "expected #%d, got #%d, gap of %d",
+         expected, seqnum, gap);
+ 
++    if (G_UNLIKELY (GST_BUFFER_IS_RETRANSMISSION (buffer))) {
++      if (G_UNLIKELY (!priv->do_retransmission))
++        goto unsolicited_rtx;
++
++      /* If this packet is a rtx that we may have actually requested,
++       * make sure we actually did, or whether we still need it. */
++      timer = find_timer (jitterbuffer, seqnum);
++      if (!timer)
++        timer = timer_queue_find (priv->rtx_stats_timers, seqnum);
++      if (!timer)
++        goto unsolicited_rtx;
++    }
++
+     if (G_UNLIKELY (gap > 0 && priv->timers->len >= max_dropout)) {
+       /* If we have timers for more than RTP_MAX_DROPOUT packets
+        * pending this means that we have a huge gap overall. We can
+@@ -3089,7 +3107,13 @@ gst_rtp_jitter_buffer_chain (GstPad * pad, GstObject * parent,
+     /* If we estimated the DTS, don't consider it in the clock skew calculations */
+     pts =
+         rtp_jitter_buffer_calculate_pts (priv->jbuf, dts, estimated_dts,
+-        rtptime, gst_element_get_base_time (GST_ELEMENT_CAST (jitterbuffer)));
++        rtptime, gst_element_get_base_time (GST_ELEMENT_CAST (jitterbuffer)),
++        gap, GST_BUFFER_IS_RETRANSMISSION (buffer));
++
++    if (G_UNLIKELY (!GST_CLOCK_TIME_IS_VALID (pts))) {
++      /* A valid timestamp cannot be calculated, discard packet */
++      goto discard_invalid;
++    }
+ 
+     if (G_LIKELY (gap == 0)) {
+       /* packet is expected */
+@@ -3127,6 +3151,18 @@ gst_rtp_jitter_buffer_chain (GstPad * pad, GstObject * parent,
+       timer->num_rtx_received++;
+   }
+ 
++  /* At 2^15, we would detect a seqnum rollover too early, therefore
++   * limit the queue size. But let's not limit it to a number that is
++   * too small to avoid emptying it needlessly if there is a spurious huge
++   * sequence number, let's allow at least 10k packets in any case. */
++  while (rtp_jitter_buffer_is_full (priv->jbuf) &&
++      priv->srcresult == GST_FLOW_OK) {
++    JBUF_SIGNAL_EVENT (priv);
++    JBUF_WAIT_QUEUE (priv);
++  }
++  if (priv->srcresult != GST_FLOW_OK)
++    goto out_flushing;
++
+   /* let's check if this buffer is too late, we can only accept packets with
+    * bigger seqnum than the one we last pushed. */
+   if (G_LIKELY (priv->last_popped_seqnum != -1)) {
+@@ -3301,6 +3337,21 @@ rtx_duplicate:
+     gst_buffer_unref (buffer);
+     goto finished;
+   }
++unsolicited_rtx:
++  {
++    GST_DEBUG_OBJECT (jitterbuffer,
++        "Unsolicited RTX packet #%d detected, dropping", seqnum);
++    gst_buffer_unref (buffer);
++    goto finished;
++  }
++discard_invalid:
++  {
++    GST_DEBUG_OBJECT (jitterbuffer,
++        "cannot calculate a valid pts for #%d (rtx: %d), discard",
++        seqnum, GST_BUFFER_IS_RETRANSMISSION (buffer));
++    gst_buffer_unref (buffer);
++    goto finished;
++  }
+ }
+ 
+ /* FIXME: hopefully we can do something more efficient here, especially when
+@@ -3500,6 +3551,17 @@ pop_and_push_next (GstRtpJitterBuffer * jitterbuffer, guint seqnum)
+     priv->next_seqnum = (seqnum + item->count) & 0xffff;
+   }
+   msg = check_buffering_percent (jitterbuffer, percent);
++
++  if (type == ITEM_TYPE_EVENT && outevent &&
++      GST_EVENT_TYPE (outevent) == GST_EVENT_EOS) {
++    g_assert (priv->eos);
++    while (priv->timers->len > 0) {
++      /* Stopping timers */
++      unschedule_current_timer (jitterbuffer);
++      JBUF_WAIT_TIMER (priv);
++    }
++  }
++
+   JBUF_UNLOCK (priv);
+ 
+   item->data = NULL;
+@@ -3516,6 +3578,7 @@ pop_and_push_next (GstRtpJitterBuffer * jitterbuffer, guint seqnum)
+           seqnum, GST_TIME_ARGS (GST_BUFFER_DTS (outbuf)),
+           GST_TIME_ARGS (GST_BUFFER_PTS (outbuf)));
+       priv->num_pushed++;
++      GST_BUFFER_DTS (outbuf) = GST_CLOCK_TIME_NONE;
+       result = gst_pad_push (priv->srcpad, outbuf);
+ 
+       JBUF_LOCK_CHECK (priv, out_flushing);
+@@ -3630,7 +3693,14 @@ handle_next_buffer (GstRtpJitterBuffer * jitterbuffer)
+       GST_DEBUG_OBJECT (jitterbuffer,
+           "Sequence number GAP detected: expected %d instead of %d (%d missing)",
+           next_seqnum, seqnum, gap);
+-      result = GST_FLOW_WAIT;
++      /* if we have reached EOS, just keep processing */
++      /* Also do the same if we block input because the JB is full */
++      if (priv->eos || rtp_jitter_buffer_is_full (priv->jbuf)) {
++        result = pop_and_push_next (jitterbuffer, seqnum);
++        result = GST_FLOW_OK;
++      } else {
++        result = GST_FLOW_WAIT;
++      }
+     }
+   }
+ 
+@@ -3925,8 +3995,13 @@ do_eos_timeout (GstRtpJitterBuffer * jitterbuffer, TimerData * timer,
+   GST_INFO_OBJECT (jitterbuffer, "got the NPT timeout");
+   remove_timer (jitterbuffer, timer);
+   if (!priv->eos) {
++    GstEvent *event;
++
+     /* there was no EOS in the buffer, put one in there now */
+-    queue_event (jitterbuffer, gst_event_new_eos ());
++    event = gst_event_new_eos ();
++    if (priv->segment_seqnum != GST_SEQNUM_INVALID)
++      gst_event_set_seqnum (event, priv->segment_seqnum);
++    queue_event (jitterbuffer, event);
+   }
+   JBUF_SIGNAL_EVENT (priv);
+ 
+@@ -4000,7 +4075,9 @@ wait_next_timeout (GstRtpJitterBuffer * jitterbuffer)
+      * otherwise always be 0
+      */
+     GST_OBJECT_LOCK (jitterbuffer);
+-    if (GST_ELEMENT_CLOCK (jitterbuffer)) {
++    if (priv->eos) {
++      now = GST_CLOCK_TIME_NONE;
++    } else if (GST_ELEMENT_CLOCK (jitterbuffer)) {
+       now =
+           gst_clock_get_time (GST_ELEMENT_CLOCK (jitterbuffer)) -
+           GST_ELEMENT_CAST (jitterbuffer)->base_time;
+@@ -4075,7 +4152,7 @@ wait_next_timeout (GstRtpJitterBuffer * jitterbuffer)
+       GstClockReturn ret;
+       GstClockTimeDiff clock_jitter;
+ 
+-      if (timer_timeout == -1 || timer_timeout <= now) {
++      if (timer_timeout == -1 || timer_timeout <= now || priv->eos) {
+         /* We have normally removed all lost timers in the loop above */
+         g_assert (timer->type != TIMER_TYPE_LOST);
+ 
+@@ -4162,6 +4239,7 @@ gst_rtp_jitter_buffer_loop (GstRtpJitterBuffer * jitterbuffer)
+   JBUF_LOCK_CHECK (priv, flushing);
+   do {
+     result = handle_next_buffer (jitterbuffer);
++    JBUF_SIGNAL_QUEUE (priv);
+     if (G_LIKELY (result == GST_FLOW_WAIT)) {
+       /* now wait for the next event */
+       JBUF_WAIT_EVENT (priv, flushing);
+@@ -4191,6 +4269,8 @@ pause:
+     gst_pad_pause_task (priv->srcpad);
+     if (result == GST_FLOW_EOS) {
+       event = gst_event_new_eos ();
++      if (priv->segment_seqnum != GST_SEQNUM_INVALID)
++        gst_event_set_seqnum (event, priv->segment_seqnum);
+       gst_pad_push_event (priv->srcpad, event);
+     }
+     return;
+diff --git a/gst/rtpmanager/gstrtpmanager.c b/gst/rtpmanager/gstrtpmanager.c
+index 426b0b79b..4ba624fba 100644
+--- a/gst/rtpmanager/gstrtpmanager.c
++++ b/gst/rtpmanager/gstrtpmanager.c
+@@ -31,6 +31,7 @@
+ #include "gstrtpssrcdemux.h"
+ #include "gstrtpdtmfmux.h"
+ #include "gstrtpmux.h"
++#include "gstrtpfunnel.h"
+ 
+ static gboolean
+ plugin_init (GstPlugin * plugin)
+@@ -69,6 +70,10 @@ plugin_init (GstPlugin * plugin)
+   if (!gst_rtp_dtmf_mux_plugin_init (plugin))
+     return FALSE;
+ 
++  if (!gst_element_register (plugin, "rtpfunnel", GST_RANK_NONE,
++          GST_TYPE_RTP_FUNNEL))
++    return FALSE;
++
+   return TRUE;
+ }
+ 
+diff --git a/gst/rtpmanager/gstrtpmux.c b/gst/rtpmanager/gstrtpmux.c
+index b96e570df..4d16d5d3c 100644
+--- a/gst/rtpmanager/gstrtpmux.c
++++ b/gst/rtpmanager/gstrtpmux.c
+@@ -27,13 +27,13 @@
+ 
+ /**
+  * SECTION:element-rtpmux
++ * @title: rtpmux
+  * @see_also: rtpdtmfmux
+  *
+  * The rtp muxer takes multiple RTP streams having the same clock-rate and
+  * muxes into a single stream with a single SSRC.
+  *
+- * <refsect2>
+- * <title>Example pipelines</title>
++ * ## Example pipelines
+  * |[
+  * gst-launch-1.0 rtpmux name=mux ! udpsink host=127.0.0.1 port=8888        \
+  *              alsasrc ! alawenc ! rtppcmapay !                        \
+@@ -45,7 +45,7 @@
+  * In this example, an audio stream is captured from ALSA and another is
+  * generated, both are encoded into different payload types and muxed together
+  * so they can be sent on the same port.
+- * </refsect2>
++ *
+  */
+ 
+ #ifdef HAVE_CONFIG_H
+@@ -213,7 +213,7 @@ gst_rtp_mux_src_event_real (GstRTPMux * rtp_mux, GstEvent * event)
+         if (!gst_structure_get_uint (s, "ssrc", &ssrc))
+           ssrc = -1;
+ 
+-        GST_DEBUG_OBJECT (rtp_mux, "collided ssrc: %" G_GUINT32_FORMAT, ssrc);
++        GST_DEBUG_OBJECT (rtp_mux, "collided ssrc: %x", ssrc);
+ 
+         /* choose another ssrc for our stream */
+         GST_OBJECT_LOCK (rtp_mux);
+@@ -229,6 +229,8 @@ gst_rtp_mux_src_event_real (GstRTPMux * rtp_mux, GstEvent * event)
+             rtp_mux->current_ssrc = g_random_int ();
+ 
+           new_ssrc = rtp_mux->current_ssrc;
++          GST_INFO_OBJECT (rtp_mux, "New ssrc after collision %x (was: %x)",
++              new_ssrc, ssrc);
+           GST_OBJECT_UNLOCK (rtp_mux);
+ 
+           caps = gst_pad_get_current_caps (rtp_mux->srcpad);
+@@ -265,7 +267,6 @@ gst_rtp_mux_init (GstRTPMux * rtp_mux)
+ 
+   rtp_mux->ssrc = DEFAULT_SSRC;
+   rtp_mux->current_ssrc = DEFAULT_SSRC;
+-  rtp_mux->ssrc_random = TRUE;
+   rtp_mux->ts_offset = DEFAULT_TIMESTAMP_OFFSET;
+   rtp_mux->seqnum_offset = DEFAULT_SEQNUM_OFFSET;
+ 
+@@ -372,9 +373,9 @@ process_buffer_locked (GstRTPMux * rtp_mux, GstRTPMuxPadPrivate * padpriv,
+   gst_rtp_buffer_set_ssrc (rtpbuffer, rtp_mux->current_ssrc);
+   gst_rtp_mux_readjust_rtp_timestamp_locked (rtp_mux, padpriv, rtpbuffer);
+   GST_LOG_OBJECT (rtp_mux,
+-      "Pushing packet size %" G_GSIZE_FORMAT ", seq=%d, ts=%u",
++      "Pushing packet size %" G_GSIZE_FORMAT ", seq=%d, ts=%u, ssrc=%x",
+       rtpbuffer->map[0].size, rtp_mux->seqnum,
+-      gst_rtp_buffer_get_timestamp (rtpbuffer));
++      gst_rtp_buffer_get_timestamp (rtpbuffer), rtp_mux->current_ssrc);
+ 
+   if (padpriv) {
+     if (padpriv->segment.format == GST_FORMAT_TIME) {
+@@ -603,6 +604,9 @@ gst_rtp_mux_setcaps (GstPad * pad, GstRTPMux * rtp_mux, GstCaps * caps)
+   GstRTPMuxPadPrivate *padpriv;
+   GstCaps *peercaps;
+ 
++  if (caps == NULL)
++    return FALSE;
++
+   if (!gst_caps_is_fixed (caps))
+     return FALSE;
+ 
+@@ -617,10 +621,14 @@ gst_rtp_mux_setcaps (GstPad * pad, GstRTPMux * rtp_mux, GstCaps * caps)
+       structure = gst_caps_get_structure (othercaps, 0);
+       GST_OBJECT_LOCK (rtp_mux);
+       if (gst_structure_get_uint (structure, "ssrc", &rtp_mux->current_ssrc)) {
+-        GST_DEBUG_OBJECT (pad, "Use downstream ssrc: %x",
+-            rtp_mux->current_ssrc);
++        GST_INFO_OBJECT (pad, "Use downstream ssrc: %x", rtp_mux->current_ssrc);
+         rtp_mux->have_ssrc = TRUE;
+       }
++      if (gst_structure_get_uint (structure,
++              "timestamp-offset", &rtp_mux->ts_base)) {
++        GST_INFO_OBJECT (pad, "Use downstream timestamp-offset: %u",
++            rtp_mux->ts_base);
++      }
+       GST_OBJECT_UNLOCK (rtp_mux);
+     }
+ 
+@@ -647,12 +655,16 @@ gst_rtp_mux_setcaps (GstPad * pad, GstRTPMux * rtp_mux, GstCaps * caps)
+ 
+   /* if we don't have a specified ssrc, first try to take one from the caps,
+      and if that fails, generate one */
+-  if (!rtp_mux->have_ssrc) {
+-    if (rtp_mux->ssrc_random) {
+-      if (!gst_structure_get_uint (structure, "ssrc", &rtp_mux->current_ssrc))
++  if (rtp_mux->ssrc == DEFAULT_SSRC) {
++    if (rtp_mux->current_ssrc == DEFAULT_SSRC) {
++      if (!gst_structure_get_uint (structure, "ssrc", &rtp_mux->current_ssrc)) {
+         rtp_mux->current_ssrc = g_random_int ();
+-      rtp_mux->have_ssrc = TRUE;
++        GST_INFO_OBJECT (rtp_mux, "Set random ssrc %x", rtp_mux->current_ssrc);
++      }
+     }
++  } else {
++    rtp_mux->current_ssrc = rtp_mux->ssrc;
++    GST_INFO_OBJECT (rtp_mux, "Set ssrc %x", rtp_mux->current_ssrc);
+   }
+ 
+   gst_caps_set_simple (caps,
+@@ -738,6 +750,7 @@ gst_rtp_mux_getcaps (GstPad * pad, GstRTPMux * mux, GstCaps * filter)
+   GstCaps *peercaps;
+   GstCaps *othercaps;
+   GstCaps *tcaps;
++  const GstStructure *structure;
+ 
+   peercaps = gst_pad_peer_query_caps (mux->srcpad, NULL);
+ 
+@@ -759,6 +772,12 @@ gst_rtp_mux_getcaps (GstPad * pad, GstRTPMux * mux, GstCaps * filter)
+   GST_LOG_OBJECT (pad, "Intersected srcpad-peercaps and template caps: %"
+       GST_PTR_FORMAT, othercaps);
+ 
++  structure = gst_caps_get_structure (othercaps, 0);
++  if (mux->ssrc == DEFAULT_SSRC) {
++    if (gst_structure_get_uint (structure, "ssrc", &mux->current_ssrc))
++      GST_DEBUG_OBJECT (pad, "Use downstream ssrc: %x", mux->current_ssrc);
++  }
++
+   clear_caps (othercaps, TRUE);
+ 
+   g_value_init (&v, GST_TYPE_CAPS);
+@@ -864,7 +883,7 @@ gst_rtp_mux_set_property (GObject * object,
+       rtp_mux->ssrc = g_value_get_uint (value);
+       rtp_mux->current_ssrc = rtp_mux->ssrc;
+       rtp_mux->have_ssrc = TRUE;
+-      rtp_mux->ssrc_random = FALSE;
++      GST_DEBUG_OBJECT (rtp_mux, "ssrc prop set to %x", rtp_mux->ssrc);
+       GST_OBJECT_UNLOCK (rtp_mux);
+       break;
+     default:
+@@ -957,12 +976,8 @@ gst_rtp_mux_ready_to_paused (GstRTPMux * rtp_mux)
+ 
+   rtp_mux->last_stop = GST_CLOCK_TIME_NONE;
+ 
+-  if (rtp_mux->ssrc_random) {
+-    rtp_mux->have_ssrc = FALSE;
+-  } else {
++  if (rtp_mux->have_ssrc)
+     rtp_mux->current_ssrc = rtp_mux->ssrc;
+-    rtp_mux->have_ssrc = TRUE;
+-  }
+ 
+   GST_DEBUG_OBJECT (rtp_mux, "set timestamp-offset to %u", rtp_mux->ts_base);
+ 
+diff --git a/gst/rtpmanager/gstrtpmux.h b/gst/rtpmanager/gstrtpmux.h
+index 3de9f4186..65343da3a 100644
+--- a/gst/rtpmanager/gstrtpmux.h
++++ b/gst/rtpmanager/gstrtpmux.h
+@@ -51,8 +51,7 @@ typedef struct
+ } GstRTPMuxPadPrivate;
+ 
+ 
+-/**
+- * GstRTPMux:
++/* GstRTPMux:
+  *
+  * The opaque #GstRTPMux structure.
+  */
+@@ -72,7 +71,6 @@ struct _GstRTPMux
+   guint ssrc;
+   guint current_ssrc;
+   gboolean have_ssrc;
+-  gboolean ssrc_random;
+ 
+   GstPad *last_pad; /* protected by object lock */
+ 
+diff --git a/gst/rtpmanager/gstrtpptdemux.c b/gst/rtpmanager/gstrtpptdemux.c
+index 5e7759443..992177798 100644
+--- a/gst/rtpmanager/gstrtpptdemux.c
++++ b/gst/rtpmanager/gstrtpptdemux.c
+@@ -1,4 +1,4 @@
+-/* 
++/*
+  * RTP Demux element
+  *
+  * Copyright (C) 2005 Nokia Corporation.
+@@ -25,27 +25,27 @@
+ 
+ /**
+  * SECTION:element-rtpptdemux
++ * @title: rtpptdemux
+  *
+  * rtpptdemux acts as a demuxer for RTP packets based on the payload type of
+  * the packets. Its main purpose is to allow an application to easily receive
+  * and decode an RTP stream with multiple payload types.
+- * 
++ *
+  * For each payload type that is detected, a new pad will be created and the
+  * #GstRtpPtDemux::new-payload-type signal will be emitted. When the payload for
+  * the RTP stream changes, the #GstRtpPtDemux::payload-type-change signal will be
+  * emitted.
+- * 
++ *
+  * The element will try to set complete and unique application/x-rtp caps
+  * on the output pads based on the result of the #GstRtpPtDemux::request-pt-map
+  * signal.
+- * 
+- * <refsect2>
+- * <title>Example pipelines</title>
++ *
++ * ## Example pipelines
+  * |[
+  * gst-launch-1.0 udpsrc caps="application/x-rtp" ! rtpptdemux ! fakesink
+  * ]| Takes an RTP stream and send the RTP packets with the first detected
+  * payload type to fakesink, discarding the other payload types.
+- * </refsect2>
++ *
+  */
+ 
+ /*
+@@ -99,8 +99,8 @@ GST_DEBUG_CATEGORY_STATIC (gst_rtp_pt_demux_debug);
+  */
+ struct _GstRtpPtDemuxPad
+ {
+-  GstPad *pad;        /**< pointer to the actual pad */
+-  gint pt;             /**< RTP payload-type attached to pad */
++  GstPad *pad;                  /*< pointer to the actual pad */
++  gint pt;                      /*< RTP payload-type attached to pad */
+   gboolean newcaps;
+ };
+ 
+@@ -281,6 +281,8 @@ gst_rtp_pt_demux_class_init (GstRtpPtDemuxClass * klass)
+ 
+   GST_DEBUG_CATEGORY_INIT (gst_rtp_pt_demux_debug,
+       "rtpptdemux", 0, "RTP codec demuxer");
++
++  GST_DEBUG_REGISTER_FUNCPTR (gst_rtp_pt_demux_chain);
+ }
+ 
+ static void
+diff --git a/gst/rtpmanager/gstrtpptdemux.h b/gst/rtpmanager/gstrtpptdemux.h
+index 578e489fa..95d374e60 100644
+--- a/gst/rtpmanager/gstrtpptdemux.h
++++ b/gst/rtpmanager/gstrtpptdemux.h
+@@ -34,12 +34,12 @@ typedef struct _GstRtpPtDemuxPad GstRtpPtDemuxPad;
+ 
+ struct _GstRtpPtDemux
+ {
+-  GstElement parent;  /**< parent class */
++  GstElement parent;  /*< parent class */
+ 
+-  GstPad *sink;       /**< the sink pad */
+-  guint16 last_pt;    /**< pt of the last packet 0xFFFF if none */
+-  GSList *srcpads;    /**< a linked list of GstRtpPtDemuxPad objects */
+-  GValue ignored_pts; /**< a GstValueArray of payload types that will not have pads created for */
++  GstPad *sink;       /*< the sink pad */
++  guint16 last_pt;    /*< pt of the last packet 0xFFFF if none */
++  GSList *srcpads;    /*< a linked list of GstRtpPtDemuxPad objects */
++  GValue ignored_pts; /*< a GstValueArray of payload types that will not have pads created for */
+ };
+ 
+ struct _GstRtpPtDemuxClass
+diff --git a/gst/rtpmanager/gstrtprtxqueue.c b/gst/rtpmanager/gstrtprtxqueue.c
+index a0d6cbe37..97678eb35 100644
+--- a/gst/rtpmanager/gstrtprtxqueue.c
++++ b/gst/rtpmanager/gstrtprtxqueue.c
+@@ -22,10 +22,11 @@
+ 
+ /**
+  * SECTION:element-rtprtxqueue
++ * @title: rtprtxqueue
+  *
+  * rtprtxqueue maintains a queue of transmitted RTP packets, up to a
+- * configurable limit (see #GstRTPRtxQueue::max-size-time,
+- * #GstRTPRtxQueue::max-size-packets), and retransmits them upon request
++ * configurable limit (see #GstRTPRtxQueue:max-size-time,
++ * #GstRTPRtxQueue:max-size-packets), and retransmits them upon request
+  * from the downstream rtpsession (GstRTPRetransmissionRequest event).
+  *
+  * This element is similar to rtprtxsend, but it has differences:
+@@ -45,13 +46,16 @@
+  * See also #GstRtpRtxSend, #GstRtpRtxReceive
+  *
+  * # Example pipelines
++ *
+  * |[
+  * gst-launch-1.0 rtpbin name=b rtp-profile=avpf \
+  *    audiotestsrc is-live=true ! opusenc ! rtpopuspay pt=96 ! rtprtxqueue ! b.send_rtp_sink_0 \
+  *    b.send_rtp_src_0 ! identity drop-probability=0.01 ! udpsink host="127.0.0.1" port=5000 \
+  *    udpsrc port=5001 ! b.recv_rtcp_sink_0 \
+  *    b.send_rtcp_src_0 ! udpsink host="127.0.0.1" port=5002 sync=false async=false
+- * ]| Sender pipeline
++ * ]|
++ * Sender pipeline
++ *
+  * |[
+  * gst-launch-1.0 rtpbin name=b rtp-profile=avpf do-retransmission=true \
+  *    udpsrc port=5000 caps="application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)96" ! \
+@@ -59,7 +63,8 @@
+  *    b. ! rtpopusdepay ! opusdec ! audioconvert ! audioresample ! autoaudiosink \
+  *    udpsrc port=5002 ! b.recv_rtcp_sink_0 \
+  *    b.send_rtcp_src_0 ! udpsink host="127.0.0.1" port=5001 sync=false async=false
+- * ]| Receiver pipeline
++ * ]|
++ * Receiver pipeline
+  */
+ 
+ #ifdef HAVE_CONFIG_H
+diff --git a/gst/rtpmanager/gstrtprtxreceive.c b/gst/rtpmanager/gstrtprtxreceive.c
+index 9a8a66697..4c97691cf 100644
+--- a/gst/rtpmanager/gstrtprtxreceive.c
++++ b/gst/rtpmanager/gstrtprtxreceive.c
+@@ -23,6 +23,7 @@
+ 
+ /**
+  * SECTION:element-rtprtxreceive
++ * @title: rtprtxreceive
+  * @see_also: rtprtxsend, rtpsession, rtpjitterbuffer
+  *
+  * rtprtxreceive listens to the retransmission events from the
+@@ -45,7 +46,8 @@
+  * rtpbin instead, with its #GstRtpBin::request-aux-sender and
+  * #GstRtpBin::request-aux-receiver signals. See #GstRtpBin.
+  *
+- * # Example pipelines
++ * ## Example pipelines
++ *
+  * |[
+  * gst-launch-1.0 rtpsession name=rtpsession rtp-profile=avpf \
+  *     audiotestsrc is-live=true ! opusenc ! rtpopuspay pt=96 ! \
+@@ -58,6 +60,7 @@
+  *         sync=false async=false
+  * ]| Send audio stream through port 5000 (5001 and 5002 are just the rtcp
+  * link with the receiver)
++ *
+  * |[
+  * gst-launch-1.0 rtpsession name=rtpsession rtp-profile=avpf \
+  *     udpsrc port=5000 caps="application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)96" ! \
+@@ -69,7 +72,8 @@
+  *     rtpsession.send_rtcp_src ! \
+  *         udpsink host="127.0.0.1" port=5001 sync=false async=false \
+  *     udpsrc port=5002 ! rtpsession.recv_rtcp_sink
+- * ]| Receive audio stream from port 5000 (5001 and 5002 are just the rtcp
++ * ]|
++ * Receive audio stream from port 5000 (5001 and 5002 are just the rtcp
+  * link with the sender)
+  *
+  * In this example we can see a simple streaming of an OPUS stream with some
+@@ -102,7 +106,8 @@
+  *     udpsrc port=5001 ! rtpsession.recv_rtcp_sink \
+  *     rtpsession.send_rtcp_src ! udpsink host="127.0.0.1" port=5002 \
+  *         sync=false async=false
+- * ]| Send two audio streams to port 5000.
++ * ]|
++ * Send two audio streams to port 5000.
+  * |[
+  * gst-launch-1.0 rtpsession name=rtpsession rtp-profile=avpf \
+  *     udpsrc port=5000 caps="application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)97" ! \
+@@ -117,7 +122,8 @@
+  *     udpsrc port=5002 ! rtpsession.recv_rtcp_sink \
+  *     rtpsession.send_rtcp_src ! udpsink host="127.0.0.1" port=5001 \
+  *         sync=false async=false
+- * ]| Receive two audio streams from port 5000.
++ * ]|
++ * Receive two audio streams from port 5000.
+  *
+  * In this example we are streaming two streams of the same type through the
+  * same port. They, however, are using a different SSRC (ssrc is randomly
+diff --git a/gst/rtpmanager/gstrtprtxsend.c b/gst/rtpmanager/gstrtprtxsend.c
+index 58892f3cf..bf35f257e 100644
+--- a/gst/rtpmanager/gstrtprtxsend.c
++++ b/gst/rtpmanager/gstrtprtxsend.c
+@@ -23,9 +23,10 @@
+ 
+ /**
+  * SECTION:element-rtprtxsend
++ * @title: rtprtxsend
+  *
+  * See #GstRtpRtxReceive for examples
+- * 
++ *
+  * The purpose of the sender RTX object is to keep a history of RTP packets up
+  * to a configurable limit (max-size-time or max-size-packets). It will listen
+  * for upstream custom retransmission events (GstRTPRetransmissionRequest) that
+@@ -494,6 +495,26 @@ gst_rtp_rtx_send_src_event (GstPad * pad, GstObject * parent, GstEvent * event)
+             GST_LOG_OBJECT (rtx, "found %u", item->seqnum);
+             rtx_buf = gst_rtp_rtx_buffer_new (rtx, item->buffer);
+           }
++#ifndef GST_DISABLE_DEBUG
++          else {
++            BufferQueueItem *item = NULL;
++
++            iter = g_sequence_get_begin_iter (data->queue);
++            if (!g_sequence_iter_is_end (iter))
++              item = g_sequence_get (iter);
++
++            if (item && seqnum < item->seqnum) {
++              GST_DEBUG_OBJECT (rtx, "requested seqnum %u has already been "
++                  "removed from the rtx queue; the first available is %u",
++                  seqnum, item->seqnum);
++            } else {
++              GST_WARNING_OBJECT (rtx, "requested seqnum %u has not been "
++                  "transmitted yet in the original stream; either the remote end "
++                  "is not configured correctly, or the source is too slow",
++                  seqnum);
++            }
++          }
++#endif
+         }
+         GST_OBJECT_UNLOCK (rtx);
+ 
+diff --git a/gst/rtpmanager/gstrtpsession.c b/gst/rtpmanager/gstrtpsession.c
+index 847522c5f..acfcf68e9 100644
+--- a/gst/rtpmanager/gstrtpsession.c
++++ b/gst/rtpmanager/gstrtpsession.c
+@@ -19,6 +19,7 @@
+ 
+ /**
+  * SECTION:element-rtpsession
++ * @title: rtpsession
+  * @see_also: rtpjitterbuffer, rtpbin, rtpptdemux, rtpssrcdemux
+  *
+  * The RTP session manager models participants with unique SSRC in an RTP
+@@ -27,26 +28,19 @@
+  * functionality can be activated.
+  *
+  * The session manager currently implements RFC 3550 including:
+- * <itemizedlist>
+- *   <listitem>
+- *     <para>RTP packet validation based on consecutive sequence numbers.</para>
+- *   </listitem>
+- *   <listitem>
+- *     <para>Maintainance of the SSRC participant database.</para>
+- *   </listitem>
+- *   <listitem>
+- *     <para>Keeping per participant statistics based on received RTCP packets.</para>
+- *   </listitem>
+- *   <listitem>
+- *     <para>Scheduling of RR/SR RTCP packets.</para>
+- *   </listitem>
+- *   <listitem>
+- *     <para>Support for multiple sender SSRC.</para>
+- *   </listitem>
+- * </itemizedlist>
++ *
++ *   * RTP packet validation based on consecutive sequence numbers.
++ *
++ *   * Maintainance of the SSRC participant database.
++ *
++ *   * Keeping per participant statistics based on received RTCP packets.
++ *
++ *   * Scheduling of RR/SR RTCP packets.
++ *
++ *   * Support for multiple sender SSRC.
+  *
+  * The rtpsession will not demux packets based on SSRC or payload type, nor will
+- * it correct for packet reordering and jitter. Use #GstRtpsSrcDemux,
++ * it correct for packet reordering and jitter. Use #GstRtpSsrcDemux,
+  * #GstRtpPtDemux and GstRtpJitterBuffer in addition to #GstRtpSession to
+  * perform these tasks. It is usually a good idea to use #GstRtpBin, which
+  * combines all these features in one element.
+@@ -75,8 +69,7 @@
+  * mapping. One can clear the cached values with the #GstRtpSession::clear-pt-map
+  * signal.
+  *
+- * <refsect2>
+- * <title>Example pipelines</title>
++ * ## Example pipelines
+  * |[
+  * gst-launch-1.0 udpsrc port=5000 caps="application/x-rtp, ..." ! .recv_rtp_sink rtpsession .recv_rtp_src ! rtptheoradepay ! theoradec ! xvimagesink
+  * ]| Receive theora RTP packets from port 5000 and send them to the depayloader,
+@@ -105,7 +98,7 @@
+  * correctly because the second udpsink will not preroll correctly (no RTCP
+  * packets are sent in the PAUSED state). Applications should manually set and
+  * keep (see gst_element_set_locked_state()) the RTCP udpsink to the PLAYING state.
+- * </refsect2>
++ *
+  */
+ 
+ #ifdef HAVE_CONFIG_H
+@@ -251,9 +244,6 @@ enum
+   PROP_RTCP_SYNC_SEND_TIME
+ };
+ 
+-#define GST_RTP_SESSION_GET_PRIVATE(obj)  \
+-	   (G_TYPE_INSTANCE_GET_PRIVATE ((obj), GST_TYPE_RTP_SESSION, GstRtpSessionPrivate))
+-
+ #define GST_RTP_SESSION_LOCK(sess)   g_mutex_lock (&(sess)->priv->lock)
+ #define GST_RTP_SESSION_UNLOCK(sess) g_mutex_unlock (&(sess)->priv->lock)
+ 
+@@ -284,7 +274,14 @@ struct _GstRtpSessionPrivate
+   GstRtpNtpTimeSource ntp_time_source;
+   gboolean rtcp_sync_send_time;
+ 
+-  guint rtx_count;
++  guint recv_rtx_req_count;
++  guint sent_rtx_req_count;
++
++  /*
++   * This is the list of processed packets in the receive path when upstream
++   * pushed a buffer list.
++   */
++  GstBufferList *processed_list;
+ };
+ 
+ /* callbacks to handle actions from the session manager */
+@@ -308,6 +305,16 @@ static void gst_rtp_session_notify_nack (RTPSession * sess,
+ static void gst_rtp_session_reconfigure (RTPSession * sess, gpointer user_data);
+ static void gst_rtp_session_notify_early_rtcp (RTPSession * sess,
+     gpointer user_data);
++static GstFlowReturn gst_rtp_session_chain_recv_rtp (GstPad * pad,
++    GstObject * parent, GstBuffer * buffer);
++static GstFlowReturn gst_rtp_session_chain_recv_rtp_list (GstPad * pad,
++    GstObject * parent, GstBufferList * list);
++static GstFlowReturn gst_rtp_session_chain_recv_rtcp (GstPad * pad,
++    GstObject * parent, GstBuffer * buffer);
++static GstFlowReturn gst_rtp_session_chain_send_rtp (GstPad * pad,
++    GstObject * parent, GstBuffer * buffer);
++static GstFlowReturn gst_rtp_session_chain_send_rtp_list (GstPad * pad,
++    GstObject * parent, GstBufferList * list);
+ 
+ static RTPSessionCallbacks callbacks = {
+   gst_rtp_session_process_rtp,
+@@ -476,7 +483,7 @@ on_notify_stats (RTPSession * session, GParamSpec * spec,
+ }
+ 
+ #define gst_rtp_session_parent_class parent_class
+-G_DEFINE_TYPE (GstRtpSession, gst_rtp_session, GST_TYPE_ELEMENT);
++G_DEFINE_TYPE_WITH_PRIVATE (GstRtpSession, gst_rtp_session, GST_TYPE_ELEMENT);
+ 
+ static void
+ gst_rtp_session_class_init (GstRtpSessionClass * klass)
+@@ -487,8 +494,6 @@ gst_rtp_session_class_init (GstRtpSessionClass * klass)
+   gobject_class = (GObjectClass *) klass;
+   gstelement_class = (GstElementClass *) klass;
+ 
+-  g_type_class_add_private (klass, sizeof (GstRtpSessionPrivate));
+-
+   gobject_class->finalize = gst_rtp_session_finalize;
+   gobject_class->set_property = gst_rtp_session_set_property;
+   gobject_class->get_property = gst_rtp_session_get_property;
+@@ -512,8 +517,9 @@ gst_rtp_session_class_init (GstRtpSessionClass * klass)
+    */
+   gst_rtp_session_signals[SIGNAL_CLEAR_PT_MAP] =
+       g_signal_new ("clear-pt-map", G_TYPE_FROM_CLASS (klass),
+-      G_SIGNAL_ACTION, G_STRUCT_OFFSET (GstRtpSessionClass, clear_pt_map),
+-      NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0, G_TYPE_NONE);
++      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
++      G_STRUCT_OFFSET (GstRtpSessionClass, clear_pt_map),
++      NULL, NULL, g_cclosure_marshal_generic, G_TYPE_NONE, 0, G_TYPE_NONE);
+ 
+   /**
+    * GstRtpSession::on-new-ssrc:
+@@ -732,13 +738,17 @@ gst_rtp_session_class_init (GstRtpSessionClass * klass)
+    * Various session statistics. This property returns a GstStructure
+    * with name application/x-rtp-session-stats with the following fields:
+    *
+-   *  "rtx-count"       G_TYPE_UINT   The number of retransmission events
+-   *      received from downstream (in receiver mode)
+-   *  "rtx-drop-count"  G_TYPE_UINT   The number of retransmission events
++   *  "recv-rtx-req-count  G_TYPE_UINT   The number of retransmission event
++   *      received from downstream (in receiver mode) (Since 1.16)
++   *  "sent-rtx-req-count" G_TYPE_UINT   The number of retransmission event
++   *      sent downstream (in sender mode) (Since 1.16)
++   *  "rtx-count"          G_TYPE_UINT   DEPRECATED Since 1.16, same as
++   *      "recv-rtx-req-count".
++   *  "rtx-drop-count"     G_TYPE_UINT   The number of retransmission events
+    *      dropped (due to bandwidth constraints)
+-   *  "sent-nack-count" G_TYPE_UINT   Number of NACKs sent
+-   *  "recv-nack-count" G_TYPE_UINT   Number of NACKs received
+-   *  "source-stats"    G_TYPE_BOXED  GValueArray of #RTPSource::stats for all
++   *  "sent-nack-count"    G_TYPE_UINT   Number of NACKs sent
++   *  "recv-nack-count"    G_TYPE_UINT   Number of NACKs received
++   *  "source-stats"       G_TYPE_BOXED  GValueArray of #RTPSource::stats for all
+    *      RTP sources (Since 1.8)
+    *
+    * Since: 1.4
+@@ -799,12 +809,19 @@ gst_rtp_session_class_init (GstRtpSessionClass * klass)
+ 
+   GST_DEBUG_CATEGORY_INIT (gst_rtp_session_debug,
+       "rtpsession", 0, "RTP Session");
++
++  GST_DEBUG_REGISTER_FUNCPTR (gst_rtp_session_chain_recv_rtp);
++  GST_DEBUG_REGISTER_FUNCPTR (gst_rtp_session_chain_recv_rtp_list);
++  GST_DEBUG_REGISTER_FUNCPTR (gst_rtp_session_chain_recv_rtcp);
++  GST_DEBUG_REGISTER_FUNCPTR (gst_rtp_session_chain_send_rtp);
++  GST_DEBUG_REGISTER_FUNCPTR (gst_rtp_session_chain_send_rtp_list);
++
+ }
+ 
+ static void
+ gst_rtp_session_init (GstRtpSession * rtpsession)
+ {
+-  rtpsession->priv = GST_RTP_SESSION_GET_PRIVATE (rtpsession);
++  rtpsession->priv = gst_rtp_session_get_instance_private (rtpsession);
+   g_mutex_init (&rtpsession->priv->lock);
+   g_cond_init (&rtpsession->priv->cond);
+   rtpsession->priv->sysclock = gst_system_clock_obtain ();
+@@ -842,12 +859,15 @@ gst_rtp_session_init (GstRtpSession * rtpsession)
+   rtpsession->priv->ptmap = g_hash_table_new_full (NULL, NULL, NULL,
+       (GDestroyNotify) gst_caps_unref);
+ 
++  rtpsession->recv_rtcp_segment_seqnum = GST_SEQNUM_INVALID;
++
+   gst_segment_init (&rtpsession->recv_rtp_seg, GST_FORMAT_UNDEFINED);
+   gst_segment_init (&rtpsession->send_rtp_seg, GST_FORMAT_UNDEFINED);
+ 
+   rtpsession->priv->thread_stopped = TRUE;
+ 
+-  rtpsession->priv->rtx_count = 0;
++  rtpsession->priv->recv_rtx_req_count = 0;
++  rtpsession->priv->sent_rtx_req_count = 0;
+ 
+   rtpsession->priv->ntp_time_source = DEFAULT_NTP_TIME_SOURCE;
+ }
+@@ -1009,8 +1029,10 @@ gst_rtp_session_create_stats (GstRtpSession * rtpsession)
+   GstStructure *s;
+ 
+   g_object_get (rtpsession->priv->session, "stats", &s, NULL);
+-  gst_structure_set (s, "rtx-count", G_TYPE_UINT, rtpsession->priv->rtx_count,
+-      NULL);
++  gst_structure_set (s, "rtx-count", G_TYPE_UINT,
++      rtpsession->priv->recv_rtx_req_count, "recv-rtx-req-count", G_TYPE_UINT,
++      rtpsession->priv->recv_rtx_req_count, "sent-rtx-req-count", G_TYPE_UINT,
++      rtpsession->priv->sent_rtx_req_count, NULL);
+ 
+   return s;
+ }
+@@ -1274,6 +1296,7 @@ gst_rtp_session_change_state (GstElement * element, GstStateChange transition)
+     case GST_STATE_CHANGE_PAUSED_TO_READY:
+       /* downstream is now releasing the dataflow and we can join. */
+       join_rtcp_thread (rtpsession);
++      rtp_session_reset (rtpsession->priv->session);
+       break;
+     case GST_STATE_CHANGE_READY_TO_NULL:
+       break;
+@@ -1301,8 +1324,7 @@ gst_rtp_session_clear_pt_map (GstRtpSession * rtpsession)
+   g_hash_table_foreach_remove (rtpsession->priv->ptmap, return_true, NULL);
+ }
+ 
+-/* called when the session manager has an RTP packet or a list of packets
+- * ready for further processing */
++/* called when the session manager has an RTP packet ready to be pushed */
+ static GstFlowReturn
+ gst_rtp_session_process_rtp (RTPSession * sess, RTPSource * src,
+     GstBuffer * buffer, gpointer user_data)
+@@ -1319,8 +1341,14 @@ gst_rtp_session_process_rtp (RTPSession * sess, RTPSource * src,
+   GST_RTP_SESSION_UNLOCK (rtpsession);
+ 
+   if (rtp_src) {
+-    GST_LOG_OBJECT (rtpsession, "pushing received RTP packet");
+-    result = gst_pad_push (rtp_src, buffer);
++    if (rtpsession->priv->processed_list) {
++      GST_LOG_OBJECT (rtpsession, "queueing received RTP packet");
++      gst_buffer_list_add (rtpsession->priv->processed_list, buffer);
++      result = GST_FLOW_OK;
++    } else {
++      GST_LOG_OBJECT (rtpsession, "pushing received RTP packet");
++      result = gst_pad_push (rtp_src, buffer);
++    }
+     gst_object_unref (rtp_src);
+   } else {
+     GST_DEBUG_OBJECT (rtpsession, "dropping received RTP packet");
+@@ -1400,6 +1428,8 @@ do_rtcp_events (GstRtpSession * rtpsession, GstPad * srcpad)
+   GST_RTP_SESSION_UNLOCK (rtpsession);
+ 
+   event = gst_event_new_stream_start (stream_id);
++  rtpsession->recv_rtcp_segment_seqnum = gst_event_get_seqnum (event);
++  gst_event_set_seqnum (event, rtpsession->recv_rtcp_segment_seqnum);
+   if (have_group_id)
+     gst_event_set_group_id (event, group_id);
+   gst_pad_push_event (srcpad, event);
+@@ -1411,6 +1441,7 @@ do_rtcp_events (GstRtpSession * rtpsession, GstPad * srcpad)
+ 
+   gst_segment_init (&seg, GST_FORMAT_TIME);
+   event = gst_event_new_segment (&seg);
++  gst_event_set_seqnum (event, rtpsession->recv_rtcp_segment_seqnum);
+   gst_pad_push_event (srcpad, event);
+ }
+ 
+@@ -1419,7 +1450,7 @@ do_rtcp_events (GstRtpSession * rtpsession, GstPad * srcpad)
+  * well. */
+ static GstFlowReturn
+ gst_rtp_session_send_rtcp (RTPSession * sess, RTPSource * src,
+-    GstBuffer * buffer, gboolean eos, gpointer user_data)
++    GstBuffer * buffer, gboolean all_sources_bye, gpointer user_data)
+ {
+   GstFlowReturn result;
+   GstRtpSession *rtpsession;
+@@ -1442,10 +1473,18 @@ gst_rtp_session_send_rtcp (RTPSession * sess, RTPSource * src,
+     GST_LOG_OBJECT (rtpsession, "sending RTCP");
+     result = gst_pad_push (rtcp_src, buffer);
+ 
+-    /* we have to send EOS after this packet */
+-    if (eos) {
++    /* Forward send an EOS on the RTCP sink if we received an EOS on the
++     * send_rtp_sink. We don't need to check the recv_rtp_sink since in this
++     * case the EOS event would already have been sent */
++    if (all_sources_bye && rtpsession->send_rtp_sink &&
++        GST_PAD_IS_EOS (rtpsession->send_rtp_sink)) {
++      GstEvent *event;
++
+       GST_LOG_OBJECT (rtpsession, "sending EOS");
+-      gst_pad_push_event (rtcp_src, gst_event_new_eos ());
++
++      event = gst_event_new_eos ();
++      gst_event_set_seqnum (event, rtpsession->recv_rtcp_segment_seqnum);
++      gst_pad_push_event (rtcp_src, event);
+     }
+     gst_object_unref (rtcp_src);
+   } else {
+@@ -1669,6 +1708,7 @@ gst_rtp_session_event_recv_rtp_sink (GstPad * pad, GstObject * parent,
+     }
+     case GST_EVENT_FLUSH_STOP:
+       gst_segment_init (&rtpsession->recv_rtp_seg, GST_FORMAT_UNDEFINED);
++      rtpsession->recv_rtcp_segment_seqnum = GST_SEQNUM_INVALID;
+       ret = gst_pad_push_event (rtpsession->recv_rtp_src, event);
+       break;
+     case GST_EVENT_SEGMENT:
+@@ -1703,11 +1743,15 @@ gst_rtp_session_event_recv_rtp_sink (GstPad * pad, GstObject * parent,
+         gst_object_ref (rtcp_src);
+       GST_RTP_SESSION_UNLOCK (rtpsession);
+ 
++      gst_event_unref (event);
++
+       if (rtcp_src) {
++        event = gst_event_new_eos ();
++        if (rtpsession->recv_rtcp_segment_seqnum != GST_SEQNUM_INVALID)
++          gst_event_set_seqnum (event, rtpsession->recv_rtcp_segment_seqnum);
+         ret = gst_pad_push_event (rtcp_src, event);
+         gst_object_unref (rtcp_src);
+       } else {
+-        gst_event_unref (event);
+         ret = TRUE;
+       }
+       break;
+@@ -1782,15 +1826,12 @@ gst_rtp_session_event_recv_rtp_src (GstPad * pad, GstObject * parent,
+                 all_headers, count))
+           forward = FALSE;
+       } else if (gst_structure_has_name (s, "GstRTPRetransmissionRequest")) {
+-        GstClockTime running_time;
+         guint seqnum, delay, deadline, max_delay, avg_rtt;
+ 
+         GST_RTP_SESSION_LOCK (rtpsession);
+-        rtpsession->priv->rtx_count++;
++        rtpsession->priv->recv_rtx_req_count++;
+         GST_RTP_SESSION_UNLOCK (rtpsession);
+ 
+-        if (!gst_structure_get_clock_time (s, "running-time", &running_time))
+-          running_time = -1;
+         if (!gst_structure_get_uint (s, "ssrc", &ssrc))
+           ssrc = -1;
+         if (!gst_structure_get_uint (s, "seqnum", &seqnum))
+@@ -1944,6 +1985,60 @@ push_error:
+ }
+ 
+ static gboolean
++process_received_buffer_in_list (GstBuffer ** buffer, guint idx, gpointer data)
++{
++  gint ret;
++
++  ret = gst_rtp_session_chain_recv_rtp (NULL, data, *buffer);
++  if (ret != GST_FLOW_OK)
++    GST_ERROR ("Processing individual buffer in a list failed");
++
++  /*
++   * The buffer has been processed, remove it from the original list, if it was
++   * a valid RTP buffer it has been added to the "processed" list in
++   * gst_rtp_session_process_rtp().
++   */
++  *buffer = NULL;
++  return TRUE;
++}
++
++static GstFlowReturn
++gst_rtp_session_chain_recv_rtp_list (GstPad * pad, GstObject * parent,
++    GstBufferList * list)
++{
++  GstRtpSession *rtpsession = GST_RTP_SESSION (parent);
++  GstBufferList *processed_list;
++
++  processed_list = gst_buffer_list_new ();
++
++  /* Set some private data to detect that a buffer list is being pushed. */
++  rtpsession->priv->processed_list = processed_list;
++
++  /*
++   * Individually process the buffers from the incoming buffer list as the
++   * incoming RTP packets in the list can be mixed in all sorts of ways:
++   *    - different frames,
++   *    - different sources,
++   *    - different types (RTP or RTCP)
++   */
++  gst_buffer_list_foreach (list,
++      (GstBufferListFunc) process_received_buffer_in_list, parent);
++
++  gst_buffer_list_unref (list);
++
++  /* Clean up private data in case the next push does not use a buffer list. */
++  rtpsession->priv->processed_list = NULL;
++
++  if (gst_buffer_list_length (processed_list) == 0 || !rtpsession->recv_rtp_src) {
++    gst_buffer_list_unref (processed_list);
++    return GST_FLOW_OK;
++  }
++
++  GST_LOG_OBJECT (rtpsession, "pushing received RTP list");
++  return gst_pad_push_list (rtpsession->recv_rtp_src, processed_list);
++}
++
++static gboolean
+ gst_rtp_session_event_recv_rtcp_sink (GstPad * pad, GstObject * parent,
+     GstEvent * event)
+ {
+@@ -1986,6 +2081,7 @@ gst_rtp_session_chain_recv_rtcp (GstPad * pad, GstObject * parent,
+   GstRtpSession *rtpsession;
+   GstRtpSessionPrivate *priv;
+   GstClockTime current_time;
++  GstClockTime running_time;
+   guint64 ntpnstime;
+ 
+   rtpsession = GST_RTP_SESSION (parent);
+@@ -1998,9 +2094,10 @@ gst_rtp_session_chain_recv_rtcp (GstPad * pad, GstObject * parent,
+   GST_RTP_SESSION_UNLOCK (rtpsession);
+ 
+   current_time = gst_clock_get_time (priv->sysclock);
+-  get_current_times (rtpsession, NULL, &ntpnstime);
++  get_current_times (rtpsession, &running_time, &ntpnstime);
+ 
+-  rtp_session_process_rtcp (priv->session, buffer, current_time, ntpnstime);
++  rtp_session_process_rtcp (priv->session, buffer, current_time, running_time,
++      ntpnstime);
+ 
+   return GST_FLOW_OK;           /* always return OK */
+ }
+@@ -2249,7 +2346,7 @@ gst_rtp_session_setcaps_send_rtp (GstPad * pad, GstRtpSession * rtpsession,
+   return TRUE;
+ }
+ 
+-/* Recieve an RTP packet or a list of packets to be send to the receivers,
++/* Receive an RTP packet or a list of packets to be sent to the receivers,
+  * send to RTP session manager and forward to send_rtp_src.
+  */
+ static GstFlowReturn
+@@ -2269,8 +2366,8 @@ gst_rtp_session_chain_send_rtp_common (GstRtpSession * rtpsession,
+   if (is_list) {
+     GstBuffer *buffer = NULL;
+ 
+-    /* All groups in an list have the same timestamp.
+-     * So, just take it from the first group. */
++    /* All buffers in a list have the same timestamp.
++     * So, just take it from the first buffer. */
+     buffer = gst_buffer_list_get (GST_BUFFER_LIST_CAST (data), 0);
+     if (buffer)
+       timestamp = GST_BUFFER_PTS (buffer);
+@@ -2342,6 +2439,8 @@ create_recv_rtp_sink (GstRtpSession * rtpsession)
+       "recv_rtp_sink");
+   gst_pad_set_chain_function (rtpsession->recv_rtp_sink,
+       gst_rtp_session_chain_recv_rtp);
++  gst_pad_set_chain_list_function (rtpsession->recv_rtp_sink,
++      gst_rtp_session_chain_recv_rtp_list);
+   gst_pad_set_event_function (rtpsession->recv_rtp_sink,
+       gst_rtp_session_event_recv_rtp_sink);
+   gst_pad_set_iterate_internal_links_function (rtpsession->recv_rtp_sink,
+@@ -2689,6 +2788,10 @@ gst_rtp_session_notify_nack (RTPSession * sess, guint16 seqnum,
+               "ssrc", G_TYPE_UINT, (guint) ssrc, NULL));
+       gst_pad_push_event (send_rtp_sink, event);
+ 
++      GST_RTP_SESSION_LOCK (rtpsession);
++      rtpsession->priv->sent_rtx_req_count++;
++      GST_RTP_SESSION_UNLOCK (rtpsession);
++
+       if (blp == 0)
+         break;
+ 
+diff --git a/gst/rtpmanager/gstrtpsession.h b/gst/rtpmanager/gstrtpsession.h
+index 1c1c1094b..599ec9a39 100644
+--- a/gst/rtpmanager/gstrtpsession.h
++++ b/gst/rtpmanager/gstrtpsession.h
+@@ -53,6 +53,8 @@ struct _GstRtpSession {
+   GstPad        *send_rtp_src;
+   GstPad        *send_rtcp_src;
+ 
++  guint32        recv_rtcp_segment_seqnum;
++
+   GstRtpSessionPrivate *priv;
+ };
+ 
+diff --git a/gst/rtpmanager/gstrtpssrcdemux.c b/gst/rtpmanager/gstrtpssrcdemux.c
+index c4a3c4301..6ed3f73c7 100644
+--- a/gst/rtpmanager/gstrtpssrcdemux.c
++++ b/gst/rtpmanager/gstrtpssrcdemux.c
+@@ -21,21 +21,21 @@
+ 
+ /**
+  * SECTION:element-rtpssrcdemux
++ * @title: rtpssrcdemux
+  *
+  * rtpssrcdemux acts as a demuxer for RTP packets based on the SSRC of the
+  * packets. Its main purpose is to allow an application to easily receive and
+  * decode an RTP stream with multiple SSRCs.
+- * 
++ *
+  * For each SSRC that is detected, a new pad will be created and the
+- * #GstRtpSsrcDemux::new-ssrc-pad signal will be emitted. 
+- * 
+- * <refsect2>
+- * <title>Example pipelines</title>
++ * #GstRtpSsrcDemux::new-ssrc-pad signal will be emitted.
++ *
++ * ## Example pipelines
+  * |[
+  * gst-launch-1.0 udpsrc caps="application/x-rtp" ! rtpssrcdemux ! fakesink
+  * ]| Takes an RTP stream and send the RTP packets with the first detected SSRC
+  * to fakesink, discarding the other SSRCs.
+- * </refsect2>
++ *
+  */
+ 
+ #ifdef HAVE_CONFIG_H
+@@ -80,8 +80,8 @@ GST_STATIC_PAD_TEMPLATE ("rtcp_src_%u",
+     GST_STATIC_CAPS ("application/x-rtcp")
+     );
+ 
+-#define GST_PAD_LOCK(obj)   (g_rec_mutex_lock (&(obj)->padlock))
+-#define GST_PAD_UNLOCK(obj) (g_rec_mutex_unlock (&(obj)->padlock))
++#define INTERNAL_STREAM_LOCK(obj)   (g_rec_mutex_lock (&(obj)->padlock))
++#define INTERNAL_STREAM_UNLOCK(obj) (g_rec_mutex_unlock (&(obj)->padlock))
+ 
+ typedef enum
+ {
+@@ -142,12 +142,10 @@ struct _GstRtpSsrcDemuxPad
+   GstPad *rtp_pad;
+   GstCaps *caps;
+   GstPad *rtcp_pad;
+-
+-  gboolean pushed_initial_rtp_events;
+-  gboolean pushed_initial_rtcp_events;
+ };
+ 
+ /* find a src pad for a given SSRC, returns NULL if the SSRC was not found
++ * MUST be called with object lock
+  */
+ static GstRtpSsrcDemuxPad *
+ find_demux_pad_for_ssrc (GstRtpSsrcDemux * demux, guint32 ssrc)
+@@ -163,6 +161,38 @@ find_demux_pad_for_ssrc (GstRtpSsrcDemux * demux, guint32 ssrc)
+   return NULL;
+ }
+ 
++/* returns a reference to the pad if found, %NULL otherwise */
++static GstPad *
++get_demux_pad_for_ssrc (GstRtpSsrcDemux * demux, guint32 ssrc, PadType padtype)
++{
++  GstRtpSsrcDemuxPad *demuxpad;
++  GstPad *retpad;
++
++  GST_OBJECT_LOCK (demux);
++
++  demuxpad = find_demux_pad_for_ssrc (demux, ssrc);
++  if (!demuxpad) {
++    GST_OBJECT_UNLOCK (demux);
++    return NULL;
++  }
++
++  switch (padtype) {
++    case RTP_PAD:
++      retpad = gst_object_ref (demuxpad->rtp_pad);
++      break;
++    case RTCP_PAD:
++      retpad = gst_object_ref (demuxpad->rtcp_pad);
++      break;
++    default:
++      retpad = NULL;
++      g_assert_not_reached ();
++  }
++
++  GST_OBJECT_UNLOCK (demux);
++
++  return retpad;
++}
++
+ static GstEvent *
+ add_ssrc_and_ref (GstEvent * event, guint32 ssrc)
+ {
+@@ -197,6 +227,7 @@ struct ForwardStickyEventData
+   guint32 ssrc;
+ };
+ 
++/* With internal stream lock held */
+ static gboolean
+ forward_sticky_events (GstPad * pad, GstEvent ** event, gpointer user_data)
+ {
+@@ -210,6 +241,7 @@ forward_sticky_events (GstPad * pad, GstEvent ** event, gpointer user_data)
+   return TRUE;
+ }
+ 
++/* With internal stream lock held */
+ static void
+ forward_initial_events (GstRtpSsrcDemux * demux, guint32 ssrc, GstPad * pad,
+     PadType padtype)
+@@ -230,6 +262,7 @@ forward_initial_events (GstRtpSsrcDemux * demux, guint32 ssrc, GstPad * pad,
+   gst_pad_sticky_events_foreach (sinkpad, forward_sticky_events, &fdata);
+ }
+ 
++/* MUST only be called from streaming thread */
+ static GstPad *
+ find_or_create_demux_pad_for_ssrc (GstRtpSsrcDemux * demux, guint32 ssrc,
+     PadType padtype)
+@@ -240,38 +273,12 @@ find_or_create_demux_pad_for_ssrc (GstRtpSsrcDemux * demux, guint32 ssrc,
+   gchar *padname;
+   GstRtpSsrcDemuxPad *demuxpad;
+   GstPad *retpad;
+-  gulong rtp_block, rtcp_block;
+ 
+-  GST_PAD_LOCK (demux);
++  INTERNAL_STREAM_LOCK (demux);
+ 
+-  demuxpad = find_demux_pad_for_ssrc (demux, ssrc);
+-  if (demuxpad != NULL) {
+-    gboolean forward = FALSE;
+-
+-    switch (padtype) {
+-      case RTP_PAD:
+-        retpad = gst_object_ref (demuxpad->rtp_pad);
+-        if (!demuxpad->pushed_initial_rtp_events) {
+-          forward = TRUE;
+-          demuxpad->pushed_initial_rtp_events = TRUE;
+-        }
+-        break;
+-      case RTCP_PAD:
+-        retpad = gst_object_ref (demuxpad->rtcp_pad);
+-        if (!demuxpad->pushed_initial_rtcp_events) {
+-          forward = TRUE;
+-          demuxpad->pushed_initial_rtcp_events = TRUE;
+-        }
+-        break;
+-      default:
+-        retpad = NULL;
+-        g_assert_not_reached ();
+-    }
+-
+-    GST_PAD_UNLOCK (demux);
+-
+-    if (forward)
+-      forward_initial_events (demux, ssrc, retpad, padtype);
++  retpad = get_demux_pad_for_ssrc (demux, ssrc, padtype);
++  if (retpad != NULL) {
++    INTERNAL_STREAM_UNLOCK (demux);
+     return retpad;
+   }
+ 
+@@ -297,7 +304,9 @@ find_or_create_demux_pad_for_ssrc (GstRtpSsrcDemux * demux, guint32 ssrc,
+   gst_pad_set_element_private (rtp_pad, demuxpad);
+   gst_pad_set_element_private (rtcp_pad, demuxpad);
+ 
++  GST_OBJECT_LOCK (demux);
+   demux->srcpads = g_slist_prepend (demux->srcpads, demuxpad);
++  GST_OBJECT_UNLOCK (demux);
+ 
+   gst_pad_set_query_function (rtp_pad, gst_rtp_ssrc_demux_src_query);
+   gst_pad_set_iterate_internal_links_function (rtp_pad,
+@@ -312,15 +321,8 @@ find_or_create_demux_pad_for_ssrc (GstRtpSsrcDemux * demux, guint32 ssrc,
+   gst_pad_use_fixed_caps (rtcp_pad);
+   gst_pad_set_active (rtcp_pad, TRUE);
+ 
+-  if (padtype == RTP_PAD) {
+-    demuxpad->pushed_initial_rtp_events = TRUE;
+-    forward_initial_events (demux, ssrc, rtp_pad, padtype);
+-  } else if (padtype == RTCP_PAD) {
+-    demuxpad->pushed_initial_rtcp_events = TRUE;
+-    forward_initial_events (demux, ssrc, rtcp_pad, padtype);
+-  } else {
+-    g_assert_not_reached ();
+-  }
++  forward_initial_events (demux, ssrc, rtp_pad, RTP_PAD);
++  forward_initial_events (demux, ssrc, rtcp_pad, RTCP_PAD);
+ 
+   gst_element_add_pad (GST_ELEMENT_CAST (demux), rtp_pad);
+   gst_element_add_pad (GST_ELEMENT_CAST (demux), rtcp_pad);
+@@ -337,24 +339,10 @@ find_or_create_demux_pad_for_ssrc (GstRtpSsrcDemux * demux, guint32 ssrc,
+       g_assert_not_reached ();
+   }
+ 
+-  gst_object_ref (rtp_pad);
+-  gst_object_ref (rtcp_pad);
+-
+-  rtp_block = gst_pad_add_probe (rtp_pad, GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM,
+-      NULL, NULL, NULL);
+-  rtcp_block = gst_pad_add_probe (rtcp_pad, GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM,
+-      NULL, NULL, NULL);
+-
+-  GST_PAD_UNLOCK (demux);
+-
+   g_signal_emit (G_OBJECT (demux),
+       gst_rtp_ssrc_demux_signals[SIGNAL_NEW_SSRC_PAD], 0, ssrc, rtp_pad);
+ 
+-  gst_pad_remove_probe (rtp_pad, rtp_block);
+-  gst_pad_remove_probe (rtcp_pad, rtcp_block);
+-
+-  gst_object_unref (rtp_pad);
+-  gst_object_unref (rtcp_pad);
++  INTERNAL_STREAM_UNLOCK (demux);
+ 
+   return retpad;
+ }
+@@ -437,6 +425,9 @@ gst_rtp_ssrc_demux_class_init (GstRtpSsrcDemuxClass * klass)
+ 
+   GST_DEBUG_CATEGORY_INIT (gst_rtp_ssrc_demux_debug,
+       "rtpssrcdemux", 0, "RTP SSRC demuxer");
++
++  GST_DEBUG_REGISTER_FUNCPTR (gst_rtp_ssrc_demux_chain);
++  GST_DEBUG_REGISTER_FUNCPTR (gst_rtp_ssrc_demux_rtcp_chain);
+ }
+ 
+ static void
+@@ -512,17 +503,17 @@ gst_rtp_ssrc_demux_clear_ssrc (GstRtpSsrcDemux * demux, guint32 ssrc)
+ {
+   GstRtpSsrcDemuxPad *dpad;
+ 
+-  GST_PAD_LOCK (demux);
++  GST_OBJECT_LOCK (demux);
+   dpad = find_demux_pad_for_ssrc (demux, ssrc);
+   if (dpad == NULL) {
+-    GST_PAD_UNLOCK (demux);
++    GST_OBJECT_UNLOCK (demux);
+     goto unknown_pad;
+   }
+ 
+   GST_DEBUG_OBJECT (demux, "clearing pad for SSRC %08x", ssrc);
+ 
+   demux->srcpads = g_slist_remove (demux->srcpads, dpad);
+-  GST_PAD_UNLOCK (demux);
++  GST_OBJECT_UNLOCK (demux);
+ 
+   gst_pad_set_active (dpad->rtp_pad, FALSE);
+   gst_pad_set_active (dpad->rtcp_pad, FALSE);
+@@ -561,25 +552,21 @@ forward_event (GstPad * pad, gpointer user_data)
+   GSList *walk = NULL;
+   GstEvent *newevent = NULL;
+ 
+-  GST_PAD_LOCK (fdata->demux);
++  GST_OBJECT_LOCK (fdata->demux);
+   for (walk = fdata->demux->srcpads; walk; walk = walk->next) {
+     GstRtpSsrcDemuxPad *dpad = (GstRtpSsrcDemuxPad *) walk->data;
+ 
+-    /* Only forward the event if the initial events have been through first,
+-     * the initial events should be forwarded before any other event
+-     * or buffer is pushed */
+-    if ((pad == dpad->rtp_pad && dpad->pushed_initial_rtp_events) ||
+-        (pad == dpad->rtcp_pad && dpad->pushed_initial_rtcp_events)) {
++    if (pad == dpad->rtp_pad || pad == dpad->rtcp_pad) {
+       newevent = add_ssrc_and_ref (fdata->event, dpad->ssrc);
+       break;
+     }
+   }
+-  GST_PAD_UNLOCK (fdata->demux);
++  GST_OBJECT_UNLOCK (fdata->demux);
+ 
+   if (newevent)
+     fdata->res &= gst_pad_push_event (pad, newevent);
+ 
+-  return TRUE;
++  return FALSE;
+ }
+ 
+ 
+@@ -612,7 +599,6 @@ gst_rtp_ssrc_demux_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
+   guint32 ssrc;
+   GstRTPBuffer rtp = { NULL };
+   GstPad *srcpad;
+-  GstRtpSsrcDemuxPad *dpad;
+ 
+   demux = GST_RTP_SSRC_DEMUX (parent);
+ 
+@@ -632,14 +618,17 @@ gst_rtp_ssrc_demux_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
+   ret = gst_pad_push (srcpad, buf);
+ 
+   if (ret != GST_FLOW_OK) {
++    GstPad *active_pad;
++
+     /* check if the ssrc still there, may have been removed */
+-    GST_PAD_LOCK (demux);
+-    dpad = find_demux_pad_for_ssrc (demux, ssrc);
+-    if (dpad == NULL || dpad->rtp_pad != srcpad) {
++    active_pad = get_demux_pad_for_ssrc (demux, ssrc, RTP_PAD);
++
++    if (active_pad == NULL || active_pad != srcpad) {
+       /* SSRC was removed during the push ... ignore the error */
+       ret = GST_FLOW_OK;
+     }
+-    GST_PAD_UNLOCK (demux);
++
++    g_clear_object (&active_pad);
+   }
+ 
+   gst_object_unref (srcpad);
+@@ -674,7 +663,6 @@ gst_rtp_ssrc_demux_rtcp_chain (GstPad * pad, GstObject * parent,
+   GstRTCPPacket packet;
+   GstRTCPBuffer rtcp = { NULL, };
+   GstPad *srcpad;
+-  GstRtpSsrcDemuxPad *dpad;
+ 
+   demux = GST_RTP_SSRC_DEMUX (parent);
+ 
+@@ -719,14 +707,16 @@ gst_rtp_ssrc_demux_rtcp_chain (GstPad * pad, GstObject * parent,
+   ret = gst_pad_push (srcpad, buf);
+ 
+   if (ret != GST_FLOW_OK) {
++    GstPad *active_pad;
++
+     /* check if the ssrc still there, may have been removed */
+-    GST_PAD_LOCK (demux);
+-    dpad = find_demux_pad_for_ssrc (demux, ssrc);
+-    if (dpad == NULL || dpad->rtcp_pad != srcpad) {
++    active_pad = get_demux_pad_for_ssrc (demux, ssrc, RTCP_PAD);
++    if (active_pad == NULL || active_pad != srcpad) {
+       /* SSRC was removed during the push ... ignore the error */
+       ret = GST_FLOW_OK;
+     }
+-    GST_PAD_UNLOCK (demux);
++
++    g_clear_object (&active_pad);
+   }
+ 
+   gst_object_unref (srcpad);
+@@ -816,7 +806,7 @@ gst_rtp_ssrc_demux_iterate_internal_links_src (GstPad * pad, GstObject * parent)
+ 
+   demux = GST_RTP_SSRC_DEMUX (parent);
+ 
+-  GST_PAD_LOCK (demux);
++  GST_OBJECT_LOCK (demux);
+   for (current = demux->srcpads; current; current = g_slist_next (current)) {
+     GstRtpSsrcDemuxPad *dpad = (GstRtpSsrcDemuxPad *) current->data;
+ 
+@@ -837,7 +827,7 @@ gst_rtp_ssrc_demux_iterate_internal_links_src (GstPad * pad, GstObject * parent)
+     g_value_unset (&val);
+ 
+   }
+-  GST_PAD_UNLOCK (demux);
++  GST_OBJECT_UNLOCK (demux);
+ 
+   return it;
+ }
+diff --git a/gst/rtpmanager/meson.build b/gst/rtpmanager/meson.build
+index 2a56f37ca..b800fecf9 100644
+--- a/gst/rtpmanager/meson.build
++++ b/gst/rtpmanager/meson.build
+@@ -14,6 +14,7 @@ rtpmanager_sources = [
+   'rtpsource.c',
+   'rtpstats.c',
+   'gstrtpsession.c',
++  'gstrtpfunnel.c',
+ ]
+ 
+ gstrtpmanager = library('gstrtpmanager',
+@@ -24,3 +25,5 @@ gstrtpmanager = library('gstrtpmanager',
+   install : true,
+   install_dir : plugins_install_dir,
+ )
++pkgconfig.generate(gstrtpmanager, install_dir : plugins_pkgconfig_install_dir)
++plugins += [gstrtpmanager]
+diff --git a/gst/rtpmanager/rtpjitterbuffer.c b/gst/rtpmanager/rtpjitterbuffer.c
+index f1187e2b6..defb2db3b 100644
+--- a/gst/rtpmanager/rtpjitterbuffer.c
++++ b/gst/rtpmanager/rtpjitterbuffer.c
+@@ -103,8 +103,11 @@ rtp_jitter_buffer_finalize (GObject * object)
+   if (jbuf->media_clock_synced_id)
+     g_signal_handler_disconnect (jbuf->media_clock,
+         jbuf->media_clock_synced_id);
+-  if (jbuf->media_clock)
++  if (jbuf->media_clock) {
++    /* Make sure to clear any clock master before releasing the clock */
++    gst_clock_set_master (jbuf->media_clock, NULL);
+     gst_object_unref (jbuf->media_clock);
++  }
+ 
+   if (jbuf->pipeline_clock)
+     gst_object_unref (jbuf->pipeline_clock);
+@@ -527,7 +530,7 @@ update_buffer_level (RTPJitterBuffer * jbuf, gint * percent)
+  */
+ static GstClockTime
+ calculate_skew (RTPJitterBuffer * jbuf, guint64 ext_rtptime,
+-    GstClockTime gstrtptime, GstClockTime time)
++    GstClockTime gstrtptime, GstClockTime time, gint gap, gboolean is_rtx)
+ {
+   guint64 send_diff, recv_diff;
+   gint64 delta;
+@@ -541,7 +544,7 @@ calculate_skew (RTPJitterBuffer * jbuf, guint64 ext_rtptime,
+ 
+   /* we don't have an arrival timestamp so we can't do skew detection. we
+    * should still apply a timestamp based on RTP timestamp and base_time */
+-  if (time == -1 || jbuf->base_time == -1)
++  if (time == -1 || jbuf->base_time == -1 || is_rtx)
+     goto no_skew;
+ 
+   /* elapsed time at receiver, includes the jitter */
+@@ -571,8 +574,14 @@ calculate_skew (RTPJitterBuffer * jbuf, guint64 ext_rtptime,
+     rtp_jitter_buffer_resync (jbuf, time, gstrtptime, ext_rtptime, TRUE);
+     send_diff = 0;
+     delta = 0;
++    gap = 0;
+   }
+ 
++  /* only do skew calculations if we didn't have a gap. if too much time
++   * has elapsed despite there being a gap, we resynced already. */
++  if (G_UNLIKELY (gap != 0))
++    goto no_skew;
++
+   pos = jbuf->window_pos;
+ 
+   if (G_UNLIKELY (jbuf->window_filling)) {
+@@ -690,7 +699,8 @@ queue_do_insert (RTPJitterBuffer * jbuf, GList * list, GList * item)
+ 
+ GstClockTime
+ rtp_jitter_buffer_calculate_pts (RTPJitterBuffer * jbuf, GstClockTime dts,
+-    gboolean estimated_dts, guint32 rtptime, GstClockTime base_time)
++    gboolean estimated_dts, guint32 rtptime, GstClockTime base_time,
++    gint gap, gboolean is_rtx)
+ {
+   guint64 ext_rtptime;
+   GstClockTime gstrtptime, pts;
+@@ -711,10 +721,18 @@ rtp_jitter_buffer_calculate_pts (RTPJitterBuffer * jbuf, GstClockTime dts,
+     ext_rtptime = gst_rtp_buffer_ext_timestamp (&ext_rtptime, rtptime);
+     if (ext_rtptime > jbuf->last_rtptime + 3 * jbuf->clock_rate ||
+         ext_rtptime + 3 * jbuf->clock_rate < jbuf->last_rtptime) {
+-      /* reset even if we don't have valid incoming time;
+-       * still better than producing possibly very bogus output timestamp */
+-      GST_WARNING ("rtp delta too big, reset skew");
+-      rtp_jitter_buffer_reset_skew (jbuf);
++      if (!is_rtx) {
++        /* reset even if we don't have valid incoming time;
++         * still better than producing possibly very bogus output timestamp */
++        GST_WARNING ("rtp delta too big, reset skew");
++        rtp_jitter_buffer_reset_skew (jbuf);
++      } else {
++        GST_WARNING ("rtp delta too big: ignore rtx packet");
++        media_clock = NULL;
++        pipeline_clock = NULL;
++        pts = GST_CLOCK_TIME_NONE;
++        goto done;
++      }
+     }
+   }
+ 
+@@ -740,11 +758,17 @@ rtp_jitter_buffer_calculate_pts (RTPJitterBuffer * jbuf, GstClockTime dts,
+   if (G_LIKELY (jbuf->base_rtptime != -1)) {
+     /* check elapsed time in RTP units */
+     if (gstrtptime < jbuf->base_rtptime) {
+-      /* elapsed time at sender, timestamps can go backwards and thus be
+-       * smaller than our base time, schedule to take a new base time in
+-       * that case. */
+-      GST_WARNING ("backward timestamps at server, schedule resync");
+-      jbuf->need_resync = TRUE;
++      if (!is_rtx) {
++        /* elapsed time at sender, timestamps can go backwards and thus be
++         * smaller than our base time, schedule to take a new base time in
++         * that case. */
++        GST_WARNING ("backward timestamps at server, schedule resync");
++        jbuf->need_resync = TRUE;
++      } else {
++        GST_WARNING ("backward timestamps: ignore rtx packet");
++        pts = GST_CLOCK_TIME_NONE;
++        goto done;
++      }
+     }
+   }
+ 
+@@ -774,6 +798,11 @@ rtp_jitter_buffer_calculate_pts (RTPJitterBuffer * jbuf, GstClockTime dts,
+   /* need resync, lock on to time and gstrtptime if we can, otherwise we
+    * do with the previous values */
+   if (G_UNLIKELY (jbuf->need_resync && dts != -1)) {
++    if (is_rtx) {
++      GST_DEBUG ("not resyncing on rtx packet, discard");
++      pts = GST_CLOCK_TIME_NONE;
++      goto done;
++    }
+     GST_INFO ("resync to time %" GST_TIME_FORMAT ", rtptime %"
+         GST_TIME_FORMAT, GST_TIME_ARGS (dts), GST_TIME_ARGS (gstrtptime));
+     rtp_jitter_buffer_resync (jbuf, dts, gstrtptime, ext_rtptime, FALSE);
+@@ -896,7 +925,7 @@ rtp_jitter_buffer_calculate_pts (RTPJitterBuffer * jbuf, GstClockTime dts,
+ 
+     /* do skew calculation by measuring the difference between rtptime and the
+      * receive dts, this function will return the skew corrected rtptime. */
+-    pts = calculate_skew (jbuf, ext_rtptime, gstrtptime, dts);
++    pts = calculate_skew (jbuf, ext_rtptime, gstrtptime, dts, gap, is_rtx);
+   }
+ 
+   /* check if timestamps are not going backwards, we can only check this if we
+@@ -918,20 +947,22 @@ rtp_jitter_buffer_calculate_pts (RTPJitterBuffer * jbuf, GstClockTime dts,
+     }
+   }
+ 
+-  if (dts != -1 && pts + jbuf->delay < dts) {
++  if (gap == 0 && dts != -1 && pts + jbuf->delay < dts) {
+     /* if we are going to produce a timestamp that is later than the input
+      * timestamp, we need to reset the jitterbuffer. Likely the server paused
+      * temporarily */
+     GST_DEBUG ("out %" GST_TIME_FORMAT " + %" G_GUINT64_FORMAT " < time %"
+-        GST_TIME_FORMAT ", reset jitterbuffer", GST_TIME_ARGS (pts),
++        GST_TIME_FORMAT ", reset jitterbuffer and discard", GST_TIME_ARGS (pts),
+         jbuf->delay, GST_TIME_ARGS (dts));
+-    rtp_jitter_buffer_resync (jbuf, dts, gstrtptime, ext_rtptime, TRUE);
+-    pts = dts;
++    rtp_jitter_buffer_reset_skew (jbuf);
++    pts = GST_CLOCK_TIME_NONE;
++    goto done;
+   }
+ 
+   jbuf->prev_out_time = pts;
+   jbuf->prev_send_diff = gstrtptime - jbuf->base_rtptime;
+ 
++done:
+   if (media_clock)
+     gst_object_unref (media_clock);
+   if (pipeline_clock)
+@@ -1046,7 +1077,7 @@ duplicate:
+  * @percent: the buffering percent
+  *
+  * Pops the oldest buffer from the packet queue of @jbuf. The popped buffer will
+- * have its timestamp adjusted with the incomming running_time and the detected
++ * have its timestamp adjusted with the incoming running_time and the detected
+  * clock skew.
+  *
+  * Returns: a #GstBuffer or %NULL when there was no packet in the queue.
+@@ -1227,6 +1258,49 @@ rtp_jitter_buffer_get_ts_diff (RTPJitterBuffer * jbuf)
+   return result;
+ }
+ 
++
++/*
++ * rtp_jitter_buffer_get_seqnum_diff:
++ * @jbuf: an #RTPJitterBuffer
++ *
++ * Get the difference between the seqnum of first and last packet in the
++ * jitterbuffer.
++ *
++ * Returns: The difference expressed in seqnum.
++ */
++static guint16
++rtp_jitter_buffer_get_seqnum_diff (RTPJitterBuffer * jbuf)
++{
++  guint32 high_seqnum, low_seqnum;
++  RTPJitterBufferItem *high_buf, *low_buf;
++  guint16 result;
++
++  g_return_val_if_fail (jbuf != NULL, 0);
++
++  high_buf = (RTPJitterBufferItem *) g_queue_peek_tail_link (jbuf->packets);
++  low_buf = (RTPJitterBufferItem *) g_queue_peek_head_link (jbuf->packets);
++
++  while (high_buf && high_buf->seqnum == -1)
++    high_buf = (RTPJitterBufferItem *) high_buf->prev;
++
++  while (low_buf && low_buf->seqnum == -1)
++    low_buf = (RTPJitterBufferItem *) low_buf->next;
++
++  if (!high_buf || !low_buf || high_buf == low_buf)
++    return 0;
++
++  high_seqnum = high_buf->seqnum;
++  low_seqnum = low_buf->seqnum;
++
++  /* it needs to work if ts wraps */
++  if (high_seqnum >= low_seqnum) {
++    result = (guint32) (high_seqnum - low_seqnum);
++  } else {
++    result = (guint32) (high_seqnum + G_MAXUINT16 + 1 - low_seqnum);
++  }
++  return result;
++}
++
+ /**
+  * rtp_jitter_buffer_get_sync:
+  * @jbuf: an #RTPJitterBuffer
+@@ -1295,3 +1369,10 @@ rtp_jitter_buffer_can_fast_start (RTPJitterBuffer * jbuf, gint num_packet)
+ 
+   return ret;
+ }
++
++gboolean
++rtp_jitter_buffer_is_full (RTPJitterBuffer * jbuf)
++{
++  return rtp_jitter_buffer_get_seqnum_diff (jbuf) >= 32765 &&
++      rtp_jitter_buffer_num_packets (jbuf) > 10000;
++}
+diff --git a/gst/rtpmanager/rtpjitterbuffer.h b/gst/rtpmanager/rtpjitterbuffer.h
+index 16db64472..820e73d94 100644
+--- a/gst/rtpmanager/rtpjitterbuffer.h
++++ b/gst/rtpmanager/rtpjitterbuffer.h
+@@ -190,8 +190,12 @@ void                  rtp_jitter_buffer_get_sync         (RTPJitterBuffer *jbuf,
+                                                           guint64 *last_rtptime);
+ 
+ GstClockTime          rtp_jitter_buffer_calculate_pts    (RTPJitterBuffer * jbuf, GstClockTime dts, gboolean estimated_dts,
+-                                                          guint32 rtptime, GstClockTime base_time);
++                                                          guint32 rtptime, GstClockTime base_time, gint gap,
++                                                          gboolean is_rtx);
+ 
+ gboolean              rtp_jitter_buffer_can_fast_start   (RTPJitterBuffer * jbuf, gint num_packet);
+ 
++gboolean              rtp_jitter_buffer_is_full          (RTPJitterBuffer * jbuf);
++
++
+ #endif /* __RTP_JITTER_BUFFER_H__ */
+diff --git a/gst/rtpmanager/rtpsession.c b/gst/rtpmanager/rtpsession.c
+index 3b8bd77fd..c194c7787 100644
+--- a/gst/rtpmanager/rtpsession.c
++++ b/gst/rtpmanager/rtpsession.c
+@@ -54,6 +54,7 @@ enum
+   SIGNAL_ON_RECEIVING_RTCP,
+   SIGNAL_ON_NEW_SENDER_SSRC,
+   SIGNAL_ON_SENDER_SSRC_ACTIVE,
++  SIGNAL_ON_SENDING_NACKS,
+   LAST_SIGNAL
+ };
+ 
+@@ -75,6 +76,7 @@ enum
+ #define DEFAULT_MAX_MISORDER_TIME    2000
+ #define DEFAULT_RTP_PROFILE          GST_RTP_PROFILE_AVP
+ #define DEFAULT_RTCP_REDUCED_SIZE    FALSE
++#define DEFAULT_RTCP_DISABLE_SR_TIMESTAMP FALSE
+ 
+ enum
+ {
+@@ -99,7 +101,8 @@ enum
+   PROP_MAX_MISORDER_TIME,
+   PROP_STATS,
+   PROP_RTP_PROFILE,
+-  PROP_RTCP_REDUCED_SIZE
++  PROP_RTCP_REDUCED_SIZE,
++  PROP_RTCP_DISABLE_SR_TIMESTAMP
+ };
+ 
+ /* update average packet size */
+@@ -121,6 +124,8 @@ static void rtp_session_get_property (GObject * object, guint prop_id,
+ 
+ static gboolean rtp_session_send_rtcp (RTPSession * sess,
+     GstClockTime max_delay);
++static gboolean rtp_session_send_rtcp_with_deadline (RTPSession * sess,
++    GstClockTime deadline);
+ 
+ static guint rtp_session_signals[LAST_SIGNAL] = { 0 };
+ 
+@@ -418,6 +423,39 @@ rtp_session_class_init (RTPSessionClass * klass)
+           on_sender_ssrc_active), NULL, NULL, g_cclosure_marshal_VOID__OBJECT,
+       G_TYPE_NONE, 1, RTP_TYPE_SOURCE);
+ 
++  /**
++   * RTPSession::on-sending-nack
++   * @session: the object which received the signal
++   * @sender_ssrc: the sender ssrc
++   * @media_ssrc: the media ssrc
++   * @nacks: (element-type guint16): the list of seqnum to be nacked
++   * @buffer: the #GstBuffer containing the RTCP packet about to be sent
++   *
++   * This signal is emitted before NACK packets are added into the RTCP
++   * packet. This signal can be used to override the conversion of the NACK
++   * seqnum array into packets. This can be used if your protocol uses
++   * different type of NACK (e.g. based on RTCP APP).
++   *
++   * The handler should transform the seqnum from @nacks array into packets.
++   * @nacks seqnum must be consumed from the start. The remaining will be
++   * rescheduled for later base on bandwidth. Only one handler will be
++   * signalled.
++   *
++   * A handler may return 0 to signal that generic NACKs should be created
++   * for this set. This can be useful if the signal is used for other purpose
++   * or if the other type of NACK would use more space.
++   *
++   * Returns: the number of NACK seqnum that was consumed from @nacks.
++   *
++   * Since: 1.16
++   */
++  rtp_session_signals[SIGNAL_ON_SENDING_NACKS] =
++      g_signal_new ("on-sending-nacks", G_TYPE_FROM_CLASS (klass),
++      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (RTPSessionClass, on_sending_nacks),
++      g_signal_accumulator_first_wins, NULL, g_cclosure_marshal_generic,
++      G_TYPE_UINT, 4, G_TYPE_UINT, G_TYPE_UINT, G_TYPE_ARRAY,
++      GST_TYPE_BUFFER | G_SIGNAL_TYPE_STATIC_SCOPE);
++
+   g_object_class_install_property (gobject_class, PROP_INTERNAL_SSRC,
+       g_param_spec_uint ("internal-ssrc", "Internal SSRC",
+           "The internal SSRC used for the session (deprecated)",
+@@ -478,9 +516,8 @@ rtp_session_class_init (RTPSessionClass * klass)
+    *
+    * Get a GValue Array of all sources in the session.
+    *
+-   * <example>
+-   * <title>Getting the #RTPSources of a session
+-   * <programlisting>
++   * ## Getting the #RTPSources of a session
++   * |[
+    * {
+    *   GValueArray *arr;
+    *   GValue *val;
+@@ -496,8 +533,7 @@ rtp_session_class_init (RTPSessionClass * klass)
+    *   }
+    *   g_value_array_free (arr);
+    * }
+-   * </programlisting>
+-   * </example>
++   * ]|
+    */
+   g_object_class_install_property (gobject_class, PROP_SOURCES,
+       g_param_spec_boxed ("sources", "Sources",
+@@ -581,6 +617,21 @@ rtp_session_class_init (RTPSessionClass * klass)
+           DEFAULT_RTCP_REDUCED_SIZE,
+           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
++  /**
++   * RTPSession::disable-sr-timestamp:
++   *
++   * Whether sender reports should be timestamped.
++   *
++   * Since: 1.16
++   */
++  g_object_class_install_property (gobject_class,
++      PROP_RTCP_DISABLE_SR_TIMESTAMP,
++      g_param_spec_boolean ("disable-sr-timestamp",
++          "Disable Sender Report Timestamp",
++          "Whether sender reports should be timestamped",
++          DEFAULT_RTCP_DISABLE_SR_TIMESTAMP,
++          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++
+   klass->get_source_by_ssrc =
+       GST_DEBUG_FUNCPTR (rtp_session_get_source_by_ssrc);
+   klass->send_rtcp = GST_DEBUG_FUNCPTR (rtp_session_send_rtcp);
+@@ -621,7 +672,7 @@ rtp_session_init (RTPSession * sess)
+   sess->rtcp_rs_bandwidth = DEFAULT_RTCP_RS_BANDWIDTH;
+ 
+   /* default UDP header length */
+-  sess->header_len = 28;
++  sess->header_len = UDP_IP_HEADER_OVERHEAD;
+   sess->mtu = DEFAULT_RTCP_MTU;
+ 
+   sess->probation = DEFAULT_PROBATION;
+@@ -661,6 +712,7 @@ rtp_session_init (RTPSession * sess)
+       DEFAULT_RTCP_IMMEDIATE_FEEDBACK_THRESHOLD;
+   sess->rtp_profile = DEFAULT_RTP_PROFILE;
+   sess->reduced_size_rtcp = DEFAULT_RTCP_REDUCED_SIZE;
++  sess->timestamp_sender_reports = !DEFAULT_RTCP_DISABLE_SR_TIMESTAMP;
+ 
+   sess->is_doing_ptp = TRUE;
+ }
+@@ -722,16 +774,15 @@ rtp_session_create_sources (RTPSession * sess)
+ static void
+ create_source_stats (gpointer key, RTPSource * source, GValueArray * arr)
+ {
+-  GValue value = G_VALUE_INIT;
++  GValue *value;
+   GstStructure *s;
+ 
+   g_object_get (source, "stats", &s, NULL);
+ 
+-  g_value_init (&value, GST_TYPE_STRUCTURE);
+-  gst_value_set_structure (&value, s);
+-  g_value_array_append (arr, &value);
+-  gst_structure_free (s);
+-  g_value_unset (&value);
++  g_value_array_append (arr, NULL);
++  value = g_value_array_get_nth (arr, arr->n_values - 1);
++  g_value_init (value, GST_TYPE_STRUCTURE);
++  g_value_take_boxed (value, s);
+ }
+ 
+ static GstStructure *
+@@ -822,6 +873,9 @@ rtp_session_set_property (GObject * object, guint prop_id,
+       if (sess->callbacks.reconsider)
+         sess->callbacks.reconsider (sess, sess->reconsider_user_data);
+       break;
++    case PROP_RTCP_FEEDBACK_RETENTION_WINDOW:
++      sess->rtcp_feedback_retention_window = g_value_get_uint64 (value);
++      break;
+     case PROP_RTCP_IMMEDIATE_FEEDBACK_THRESHOLD:
+       sess->rtcp_immediate_feedback_threshold = g_value_get_uint (value);
+       break;
+@@ -846,6 +900,9 @@ rtp_session_set_property (GObject * object, guint prop_id,
+     case PROP_RTCP_REDUCED_SIZE:
+       sess->reduced_size_rtcp = g_value_get_boolean (value);
+       break;
++    case PROP_RTCP_DISABLE_SR_TIMESTAMP:
++      sess->timestamp_sender_reports = !g_value_get_boolean (value);
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+       break;
+@@ -901,6 +958,9 @@ rtp_session_get_property (GObject * object, guint prop_id,
+     case PROP_RTCP_MIN_INTERVAL:
+       g_value_set_uint64 (value, sess->stats.min_interval * GST_SECOND);
+       break;
++    case PROP_RTCP_FEEDBACK_RETENTION_WINDOW:
++      g_value_set_uint64 (value, sess->rtcp_feedback_retention_window);
++      break;
+     case PROP_RTCP_IMMEDIATE_FEEDBACK_THRESHOLD:
+       g_value_set_uint (value, sess->rtcp_immediate_feedback_threshold);
+       break;
+@@ -922,6 +982,9 @@ rtp_session_get_property (GObject * object, guint prop_id,
+     case PROP_RTCP_REDUCED_SIZE:
+       g_value_set_boolean (value, sess->reduced_size_rtcp);
+       break;
++    case PROP_RTCP_DISABLE_SR_TIMESTAMP:
++      g_value_set_boolean (value, !sess->timestamp_sender_reports);
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+       break;
+@@ -1062,6 +1125,47 @@ rtp_session_new (void)
+ }
+ 
+ /**
++ * rtp_session_reset:
++ * @sess: an #RTPSession
++ *
++ * Reset the sources of @sess.
++ */
++void
++rtp_session_reset (RTPSession * sess)
++{
++  g_return_if_fail (RTP_IS_SESSION (sess));
++
++  /* remove all sources */
++  g_hash_table_remove_all (sess->ssrcs[sess->mask_idx]);
++  sess->total_sources = 0;
++  sess->stats.sender_sources = 0;
++  sess->stats.internal_sender_sources = 0;
++  sess->stats.internal_sources = 0;
++  sess->stats.active_sources = 0;
++
++  sess->generation = 0;
++  sess->first_rtcp = TRUE;
++  sess->next_rtcp_check_time = GST_CLOCK_TIME_NONE;
++  sess->last_rtcp_check_time = GST_CLOCK_TIME_NONE;
++  sess->last_rtcp_send_time = GST_CLOCK_TIME_NONE;
++  sess->last_rtcp_interval = GST_CLOCK_TIME_NONE;
++  sess->next_early_rtcp_time = GST_CLOCK_TIME_NONE;
++  sess->scheduled_bye = FALSE;
++
++  /* reset session stats */
++  sess->stats.bye_members = 0;
++  sess->stats.nacks_dropped = 0;
++  sess->stats.nacks_sent = 0;
++  sess->stats.nacks_received = 0;
++
++  sess->is_doing_ptp = TRUE;
++
++  g_list_free_full (sess->conflicting_addresses,
++      (GDestroyNotify) rtp_conflicting_address_free);
++  sess->conflicting_addresses = NULL;
++}
++
++/**
+  * rtp_session_set_callbacks:
+  * @sess: an #RTPSession
+  * @callbacks: callbacks to configure
+@@ -1350,6 +1454,12 @@ rtp_session_get_sdes_struct (RTPSession * sess)
+   return result;
+ }
+ 
++static void
++source_set_sdes (const gchar * key, RTPSource * source, GstStructure * sdes)
++{
++  rtp_source_set_sdes_struct (source, gst_structure_copy (sdes));
++}
++
+ /**
+  * rtp_session_set_sdes_struct:
+  * @sess: an #RTSPSession
+@@ -1367,6 +1477,9 @@ rtp_session_set_sdes_struct (RTPSession * sess, const GstStructure * sdes)
+   if (sess->sdes)
+     gst_structure_free (sess->sdes);
+   sess->sdes = gst_structure_copy (sdes);
++
++  g_hash_table_foreach (sess->ssrcs[sess->mask_idx],
++      (GHFunc) source_set_sdes, sess->sdes);
+   RTP_SESSION_UNLOCK (sess);
+ }
+ 
+@@ -1465,6 +1578,27 @@ rtp_session_add_conflicting_address (RTPSession * sess,
+       add_conflicting_address (sess->conflicting_addresses, address, time);
+ }
+ 
++static void
++rtp_session_have_conflict (RTPSession * sess, RTPSource * source,
++    GSocketAddress * address, GstClockTime current_time)
++{
++  guint32 ssrc = rtp_source_get_ssrc (source);
++
++  /* Its a new collision, lets change our SSRC */
++  rtp_session_add_conflicting_address (sess, address, current_time);
++
++  /* mark the source BYE */
++  rtp_source_mark_bye (source, "SSRC Collision");
++  /* if we were suggesting this SSRC, change to something else */
++  if (sess->suggested_ssrc == ssrc) {
++    sess->suggested_ssrc = rtp_session_create_new_ssrc (sess);
++    sess->internal_ssrc_set = TRUE;
++  }
++
++  on_ssrc_collision (sess, source);
++
++  rtp_session_schedule_bye_locked (sess, current_time);
++}
+ 
+ static gboolean
+ check_collision (RTPSession * sess, RTPSource * source,
+@@ -1558,22 +1692,11 @@ check_collision (RTPSession * sess, RTPSource * source,
+        */
+       GST_DEBUG ("Our packets are being looped back to us, dropping");
+     } else {
+-      /* Its a new collision, lets change our SSRC */
+-      rtp_session_add_conflicting_address (sess, pinfo->address,
+-          pinfo->current_time);
+-
+-      GST_DEBUG ("Collision for SSRC %x", ssrc);
+-      /* mark the source BYE */
+-      rtp_source_mark_bye (source, "SSRC Collision");
+-      /* if we were suggesting this SSRC, change to something else */
+-      if (sess->suggested_ssrc == ssrc) {
+-        sess->suggested_ssrc = rtp_session_create_new_ssrc (sess);
+-        sess->internal_ssrc_set = TRUE;
+-      }
+-
+-      on_ssrc_collision (sess, source);
++      GST_DEBUG ("Collision for SSRC %x from new incoming packet,"
++          " change our sender ssrc", ssrc);
+ 
+-      rtp_session_schedule_bye_locked (sess, pinfo->current_time);
++      rtp_session_have_conflict (sess, source, pinfo->address,
++          pinfo->current_time);
+     }
+   }
+ 
+@@ -1929,34 +2052,6 @@ rtp_session_create_new_ssrc (RTPSession * sess)
+   return ssrc;
+ }
+ 
+-
+-/**
+- * rtp_session_create_source:
+- * @sess: an #RTPSession
+- *
+- * Create an #RTPSource for use in @sess. This function will create a source
+- * with an ssrc that is currently not used by any participants in the session.
+- *
+- * Returns: an #RTPSource.
+- */
+-RTPSource *
+-rtp_session_create_source (RTPSession * sess)
+-{
+-  guint32 ssrc;
+-  RTPSource *source;
+-
+-  RTP_SESSION_LOCK (sess);
+-  ssrc = rtp_session_create_new_ssrc (sess);
+-  source = rtp_source_new (ssrc);
+-  rtp_source_set_callbacks (source, &callbacks, sess);
+-  /* we need an additional ref for the source in the hashtable */
+-  g_object_ref (source);
+-  add_source (sess, source);
+-  RTP_SESSION_UNLOCK (sess);
+-
+-  return source;
+-}
+-
+ static gboolean
+ update_packet (GstBuffer ** buffer, guint idx, RTPPacketInfo * pinfo)
+ {
+@@ -2013,7 +2108,7 @@ invalid_packet:
+ /* update the RTPPacketInfo structure with the current time and other bits
+  * about the current buffer we are handling.
+  * This function is typically called when a validated packet is received.
+- * This function should be called with the SESSION_LOCK
++ * This function should be called with the RTP_SESSION_LOCK
+  */
+ static gboolean
+ update_packet_info (RTPSession * sess, RTPPacketInfo * pinfo,
+@@ -2139,7 +2234,8 @@ rtp_session_process_rtp (RTPSession * sess, GstBuffer * buffer,
+           current_time, running_time, ntpnstime)) {
+     GST_DEBUG ("invalid RTP packet received");
+     RTP_SESSION_UNLOCK (sess);
+-    return rtp_session_process_rtcp (sess, buffer, current_time, ntpnstime);
++    return rtp_session_process_rtcp (sess, buffer, current_time, running_time,
++        ntpnstime);
+   }
+ 
+   ssrc = pinfo.ssrc;
+@@ -2152,6 +2248,9 @@ rtp_session_process_rtp (RTPSession * sess, GstBuffer * buffer,
+   prevactive = RTP_SOURCE_IS_ACTIVE (source);
+   oldrate = source->bitrate;
+ 
++  if (created)
++    on_new_ssrc (sess, source);
++
+   /* let source process the packet */
+   result = rtp_source_process_rtp (source, &pinfo);
+ 
+@@ -2164,8 +2263,6 @@ rtp_session_process_rtp (RTPSession * sess, GstBuffer * buffer,
+   if (oldrate != source->bitrate)
+     sess->recalc_bandwidth = TRUE;
+ 
+-  if (created)
+-    on_new_ssrc (sess, source);
+ 
+   if (source->validated) {
+     gboolean created;
+@@ -2616,8 +2713,12 @@ rtp_session_process_pli (RTPSession * sess, guint32 sender_ssrc,
+     return;
+ 
+   src = find_source (sess, sender_ssrc);
+-  if (src == NULL)
+-    return;
++  if (src == NULL) {
++    /* try to find a src with media_ssrc instead */
++    src = find_source (sess, media_ssrc);
++    if (src == NULL)
++      return;
++  }
+ 
+   rtp_session_request_local_key_unit (sess, src, media_ssrc, FALSE,
+       current_time);
+@@ -2764,7 +2865,7 @@ rtp_session_process_feedback (RTPSession * sess, GstRTCPPacket * packet,
+       gst_buffer_unref (fci_buffer);
+   }
+ 
+-  if (src && sess->rtcp_feedback_retention_window) {
++  if (src && sess->rtcp_feedback_retention_window != GST_CLOCK_TIME_NONE) {
+     rtp_source_retain_rtcp_packet (src, packet, pinfo->running_time);
+   }
+ 
+@@ -2824,7 +2925,7 @@ rtp_session_process_feedback (RTPSession * sess, GstRTCPPacket * packet,
+  */
+ GstFlowReturn
+ rtp_session_process_rtcp (RTPSession * sess, GstBuffer * buffer,
+-    GstClockTime current_time, guint64 ntpnstime)
++    GstClockTime current_time, GstClockTime running_time, guint64 ntpnstime)
+ {
+   GstRTCPPacket packet;
+   gboolean more, is_bye = FALSE, do_sync = FALSE;
+@@ -2846,7 +2947,7 @@ rtp_session_process_rtcp (RTPSession * sess, GstBuffer * buffer,
+   RTP_SESSION_LOCK (sess);
+   /* update pinfo stats */
+   update_packet_info (sess, &pinfo, FALSE, FALSE, FALSE, buffer, current_time,
+-      -1, ntpnstime);
++      running_time, ntpnstime);
+ 
+   /* start processing the compound packet */
+   gst_rtcp_buffer_map (buffer, GST_MAP_READ, &rtcp);
+@@ -2972,6 +3073,10 @@ rtp_session_update_send_caps (RTPSession * sess, GstCaps * caps)
+           obtain_internal_source (sess, ssrc, &created, GST_CLOCK_TIME_NONE);
+       if (source) {
+         rtp_source_update_caps (source, caps);
++
++        if (created)
++          on_new_sender_ssrc (sess, source);
++
+         g_object_unref (source);
+       }
+     }
+@@ -2989,8 +3094,8 @@ rtp_session_update_send_caps (RTPSession * sess, GstCaps * caps)
+  * @current_time: the current system time
+  * @running_time: the running time of @data
+  *
+- * Send the RTP buffer in the session manager. This function takes ownership of
+- * @buffer.
++ * Send the RTP data (a buffer or buffer list) in the session manager. This
++ * function takes ownership of @data.
+  *
+  * Returns: a #GstFlowReturn.
+  */
+@@ -3019,6 +3124,32 @@ rtp_session_send_rtp (RTPSession * sess, gpointer data, gboolean is_list,
+   if (created)
+     on_new_sender_ssrc (sess, source);
+ 
++  if (!source->internal) {
++    GSocketAddress *from;
++
++    if (source->rtp_from)
++      from = source->rtp_from;
++    else
++      from = source->rtcp_from;
++    if (from) {
++      if (rtp_session_find_conflicting_address (sess, from, current_time)) {
++        /* Its a known conflict, its probably a loop, not a collision
++         * lets just drop the incoming packet
++         */
++        GST_LOG ("Our packets are being looped back to us, ignoring collision");
++      } else {
++        GST_DEBUG ("Collision for SSRC %x, change our sender ssrc", pinfo.ssrc);
++
++        rtp_session_have_conflict (sess, source, from, current_time);
++
++        goto collision;
++      }
++    } else {
++      GST_LOG ("Ignoring collision on sent SSRC %x because remote source"
++          " doesn't have an address", pinfo.ssrc);
++    }
++  }
++
+   prevsender = RTP_SOURCE_IS_SENDER (source);
+   oldrate = source->bitrate;
+ 
+@@ -3043,6 +3174,15 @@ invalid_packet:
+     GST_DEBUG ("invalid RTP packet received");
+     return GST_FLOW_OK;
+   }
++collision:
++  {
++    g_object_unref (source);
++    gst_mini_object_unref (GST_MINI_OBJECT_CAST (data));
++    RTP_SESSION_UNLOCK (sess);
++    GST_WARNING ("non-internal source with same ssrc %08x, drop packet",
++        pinfo.ssrc);
++    return GST_FLOW_OK;
++  }
+ }
+ 
+ static void
+@@ -3352,7 +3492,9 @@ session_start_rtcp (RTPSession * sess, ReportData * data)
+ 
+     /* fill in sender report info */
+     gst_rtcp_packet_sr_set_sender_info (packet, own->ssrc,
+-        ntptime, rtptime, packet_count, octet_count);
++        sess->timestamp_sender_reports ? ntptime : 0,
++        sess->timestamp_sender_reports ? rtptime : 0,
++        packet_count, octet_count);
+   } else {
+     /* we are only receiver, create RR */
+     GST_DEBUG ("create RR for SSRC %08x", own->ssrc);
+@@ -3390,8 +3532,8 @@ session_report_blocks (const gchar * key, RTPSource * source, ReportData * data)
+     return;
+   }
+ 
+-  /* only report about other sender */
+-  if (source == data->source)
++  /* only report about remote sources */
++  if (source->internal)
+     goto reported;
+ 
+   if (!RTP_SOURCE_IS_SENDER (source)) {
+@@ -3399,6 +3541,11 @@ session_report_blocks (const gchar * key, RTPSource * source, ReportData * data)
+     goto reported;
+   }
+ 
++  if (source->disable_rtcp) {
++    GST_DEBUG ("source %08x has RTCP disabled", source->ssrc);
++    goto reported;
++  }
++
+   GST_DEBUG ("create RB for SSRC %08x", source->ssrc);
+ 
+   /* get new stats */
+@@ -3525,15 +3672,64 @@ session_pli (const gchar * key, RTPSource * source, ReportData * data)
+ static void
+ session_nack (const gchar * key, RTPSource * source, ReportData * data)
+ {
++  RTPSession *sess = data->sess;
+   GstRTCPBuffer *rtcp = &data->rtcpbuf;
+   GstRTCPPacket *packet = &data->packet;
+-  guint32 *nacks;
+-  guint n_nacks, i;
++  guint16 *nacks;
++  GstClockTime *nack_deadlines;
++  guint n_nacks, i = 0;
++  guint nacked_seqnums = 0;
++  guint16 n_fb_nacks = 0;
+   guint8 *fci_data;
+ 
+   if (!source->send_nack)
+     return;
+ 
++  nacks = rtp_source_get_nacks (source, &n_nacks);
++  nack_deadlines = rtp_source_get_nack_deadlines (source, NULL);
++  GST_DEBUG ("%u NACKs current time %" GST_TIME_FORMAT, n_nacks,
++      GST_TIME_ARGS (data->current_time));
++
++  /* cleanup expired nacks */
++  for (i = 0; i < n_nacks; i++) {
++    GST_DEBUG ("#%u deadline %" GST_TIME_FORMAT, nacks[i],
++        GST_TIME_ARGS (nack_deadlines[i]));
++    if (nack_deadlines[i] >= data->current_time)
++      break;
++  }
++
++  if (data->is_early) {
++    /* don't remove them all if this is an early RTCP packet. It may happen
++     * that the NACKs are late due to high RTT, not sending NACKs at all would
++     * keep the RTX RTT stats high and maintain a dropping state. */
++    i = MIN (n_nacks - 1, i);
++  }
++
++  if (i) {
++    GST_WARNING ("Removing %u expired NACKS", i);
++    rtp_source_clear_nacks (source, i);
++    n_nacks -= i;
++    if (n_nacks == 0)
++      return;
++  }
++
++  /* allow overriding NACK to packet conversion */
++  if (g_signal_has_handler_pending (sess,
++          rtp_session_signals[SIGNAL_ON_SENDING_NACKS], 0, TRUE)) {
++    /* this is needed as it will actually resize the buffer */
++    gst_rtcp_buffer_unmap (rtcp);
++
++    g_signal_emit (sess, rtp_session_signals[SIGNAL_ON_SENDING_NACKS], 0,
++        data->source->ssrc, source->ssrc, source->nacks, data->rtcp,
++        &nacked_seqnums);
++
++    /* and now remap for the remaining work */
++    gst_rtcp_buffer_map (data->rtcp, GST_MAP_READWRITE, rtcp);
++
++    if (nacked_seqnums > 0)
++      goto done;
++  }
++
+   if (!gst_rtcp_buffer_add_packet (rtcp, GST_RTCP_TYPE_RTPFB, packet))
+     /* exit because the packet is full, will put next request in a
+      * further packet */
+@@ -3543,21 +3739,47 @@ session_nack (const gchar * key, RTPSource * source, ReportData * data)
+   gst_rtcp_packet_fb_set_sender_ssrc (packet, data->source->ssrc);
+   gst_rtcp_packet_fb_set_media_ssrc (packet, source->ssrc);
+ 
+-  nacks = rtp_source_get_nacks (source, &n_nacks);
+-  GST_DEBUG ("%u NACKs", n_nacks);
+-  if (!gst_rtcp_packet_fb_set_fci_length (packet, n_nacks))
++  if (!gst_rtcp_packet_fb_set_fci_length (packet, 1)) {
++    gst_rtcp_packet_remove (packet);
++    GST_WARNING ("no nacks fit in the packet");
+     return;
++  }
+ 
+   fci_data = gst_rtcp_packet_fb_get_fci (packet);
+-  for (i = 0; i < n_nacks; i++) {
+-    GST_WRITE_UINT32_BE (fci_data, nacks[i]);
++  for (i = 0; i < n_nacks; i = nacked_seqnums) {
++    guint16 seqnum = nacks[i];
++    guint16 blp = 0;
++    guint j;
++
++    if (!gst_rtcp_packet_fb_set_fci_length (packet, n_fb_nacks + 1))
++      break;
++
++    n_fb_nacks++;
++    nacked_seqnums++;
++
++    for (j = i + 1; j < n_nacks; j++) {
++      gint diff;
++
++      diff = gst_rtp_buffer_compare_seqnum (seqnum, nacks[j]);
++      GST_TRACE ("[%u][%u] %u %u diff %i", i, j, seqnum, nacks[j], diff);
++      if (diff > 16)
++        break;
++
++      blp |= 1 << (diff - 1);
++      nacked_seqnums++;
++    }
++
++    GST_WRITE_UINT32_BE (fci_data, seqnum << 16 | blp);
+     fci_data += 4;
+-    data->nacked_seqnums++;
+   }
+ 
+-  rtp_source_clear_nacks (source);
++  GST_DEBUG ("Sent %u seqnums into %u FB NACKs", nacked_seqnums, n_fb_nacks);
++  source->stats.sent_nack_count += n_fb_nacks;
++
++done:
++  data->nacked_seqnums += nacked_seqnums;
++  rtp_source_clear_nacks (source, nacked_seqnums);
+   data->may_suppress = FALSE;
+-  source->stats.sent_nack_count += n_nacks;
+ }
+ 
+ /* perform cleanup of sources that timed out */
+@@ -3577,8 +3799,8 @@ session_cleanup (const gchar * key, RTPSource * source, ReportData * data)
+   /* check for outdated collisions */
+   if (source->internal) {
+     GST_DEBUG ("Timing out collisions for %x", source->ssrc);
+-    rtp_source_timeout (source, data->current_time,
+-        data->running_time - sess->rtcp_feedback_retention_window);
++    rtp_source_timeout (source, data->current_time, data->running_time,
++        sess->rtcp_feedback_retention_window);
+   }
+ 
+   /* nothing else to do when without RTCP */
+@@ -3800,8 +4022,8 @@ is_rtcp_time (RTPSession * sess, GstClockTime current_time, ReportData * data)
+   else
+     data->is_early = FALSE;
+ 
+-  if (data->is_early && sess->next_early_rtcp_time < current_time) {
+-    GST_DEBUG ("early feedback %" GST_TIME_FORMAT " < now %"
++  if (data->is_early && sess->next_early_rtcp_time <= current_time) {
++    GST_DEBUG ("early feedback %" GST_TIME_FORMAT " <= now %"
+         GST_TIME_FORMAT, GST_TIME_ARGS (sess->next_early_rtcp_time),
+         GST_TIME_ARGS (current_time));
+   } else if (sess->next_rtcp_check_time == GST_CLOCK_TIME_NONE ||
+@@ -3916,6 +4138,12 @@ generate_rtcp (const gchar * key, RTPSource * source, ReportData * data)
+   if (sess->scheduled_bye && !source->marked_bye)
+     return;
+ 
++  /* skip if RTCP is disabled */
++  if (source->disable_rtcp) {
++    GST_DEBUG ("source %08x has RTCP disabled", source->ssrc);
++    return;
++  }
++
+   data->source = source;
+ 
+   /* open packet */
+@@ -3977,6 +4205,28 @@ update_generation (const gchar * key, RTPSource * source, ReportData * data)
+   }
+ }
+ 
++static void
++schedule_remaining_nacks (const gchar * key, RTPSource * source,
++    ReportData * data)
++{
++  RTPSession *sess = data->sess;
++  GstClockTime *nack_deadlines;
++  GstClockTime deadline;
++  guint n_nacks;
++
++  if (!source->send_nack)
++    return;
++
++  /* the scheduling is entirely based on available bandwidth, just take the
++   * biggest seqnum, which will have the largest deadline to request early
++   * RTCP. */
++  nack_deadlines = rtp_source_get_nack_deadlines (source, &n_nacks);
++  deadline = nack_deadlines[n_nacks - 1];
++  RTP_SESSION_UNLOCK (sess);
++  rtp_session_send_rtcp_with_deadline (sess, deadline);
++  RTP_SESSION_LOCK (sess);
++}
++
+ static gboolean
+ rtp_session_are_all_sources_bye (RTPSession * sess)
+ {
+@@ -4178,6 +4428,12 @@ done:
+   if (all_empty)
+     GST_ERROR ("generated empty RTCP messages for all the sources");
+ 
++  /* schedule remaining nacks */
++  RTP_SESSION_LOCK (sess);
++  g_hash_table_foreach (sess->ssrcs[sess->mask_idx],
++      (GHFunc) schedule_remaining_nacks, &data);
++  RTP_SESSION_UNLOCK (sess);
++
+   return result;
+ }
+ 
+@@ -4350,6 +4606,35 @@ end:
+ }
+ 
+ static gboolean
++rtp_session_send_rtcp_internal (RTPSession * sess, GstClockTime now,
++    GstClockTime max_delay)
++{
++  /* notify the application that we intend to send early RTCP */
++  if (sess->callbacks.notify_early_rtcp)
++    sess->callbacks.notify_early_rtcp (sess, sess->notify_early_rtcp_user_data);
++
++  return rtp_session_request_early_rtcp (sess, now, max_delay);
++}
++
++static gboolean
++rtp_session_send_rtcp_with_deadline (RTPSession * sess, GstClockTime deadline)
++{
++  GstClockTime now, max_delay;
++
++  if (!sess->callbacks.send_rtcp)
++    return FALSE;
++
++  now = sess->callbacks.request_time (sess, sess->request_time_user_data);
++
++  if (deadline < now)
++    return FALSE;
++
++  max_delay = deadline - now;
++
++  return rtp_session_send_rtcp_internal (sess, now, max_delay);
++}
++
++static gboolean
+ rtp_session_send_rtcp (RTPSession * sess, GstClockTime max_delay)
+ {
+   GstClockTime now;
+@@ -4359,11 +4644,7 @@ rtp_session_send_rtcp (RTPSession * sess, GstClockTime max_delay)
+ 
+   now = sess->callbacks.request_time (sess, sess->request_time_user_data);
+ 
+-  /* notify the application that we intend to send early RTCP */
+-  if (sess->callbacks.notify_early_rtcp)
+-    sess->callbacks.notify_early_rtcp (sess, sess->notify_early_rtcp_user_data);
+-
+-  return rtp_session_request_early_rtcp (sess, now, max_delay);
++  return rtp_session_send_rtcp_internal (sess, now, max_delay);
+ }
+ 
+ gboolean
+@@ -4372,11 +4653,6 @@ rtp_session_request_key_unit (RTPSession * sess, guint32 ssrc,
+ {
+   RTPSource *src;
+ 
+-  if (!rtp_session_send_rtcp (sess, 5 * GST_SECOND)) {
+-    GST_DEBUG ("FIR/PLI not sent");
+-    return FALSE;
+-  }
+-
+   RTP_SESSION_LOCK (sess);
+   src = find_source (sess, ssrc);
+   if (src == NULL)
+@@ -4394,6 +4670,10 @@ rtp_session_request_key_unit (RTPSession * sess, guint32 ssrc,
+   }
+   RTP_SESSION_UNLOCK (sess);
+ 
++  if (!rtp_session_send_rtcp (sess, 5 * GST_SECOND)) {
++    GST_DEBUG ("FIR/PLI not sent early, sending with next regular RTCP");
++  }
++
+   return TRUE;
+ 
+   /* ERRORS */
+@@ -4420,21 +4700,27 @@ rtp_session_request_nack (RTPSession * sess, guint32 ssrc, guint16 seqnum,
+     GstClockTime max_delay)
+ {
+   RTPSource *source;
++  GstClockTime now;
+ 
+-  if (!rtp_session_send_rtcp (sess, max_delay)) {
+-    GST_DEBUG ("NACK not sent");
++  if (!sess->callbacks.send_rtcp)
+     return FALSE;
+-  }
++
++  now = sess->callbacks.request_time (sess, sess->request_time_user_data);
+ 
+   RTP_SESSION_LOCK (sess);
+   source = find_source (sess, ssrc);
+   if (source == NULL)
+     goto no_source;
+ 
+-  GST_DEBUG ("request NACK for %08x, #%u", ssrc, seqnum);
+-  rtp_source_register_nack (source, seqnum);
++  GST_DEBUG ("request NACK for SSRC %08x, #%u, deadline %" GST_TIME_FORMAT,
++      ssrc, seqnum, GST_TIME_ARGS (now + max_delay));
++  rtp_source_register_nack (source, seqnum, now + max_delay);
+   RTP_SESSION_UNLOCK (sess);
+ 
++  if (!rtp_session_send_rtcp_internal (sess, now, max_delay)) {
++    GST_DEBUG ("NACK not sent early, sending with next regular RTCP");
++  }
++
+   return TRUE;
+ 
+   /* ERRORS */
+diff --git a/gst/rtpmanager/rtpsession.h b/gst/rtpmanager/rtpsession.h
+index a378e8d26..7ab229ad5 100644
+--- a/gst/rtpmanager/rtpsession.h
++++ b/gst/rtpmanager/rtpsession.h
+@@ -56,11 +56,11 @@ typedef GstFlowReturn (*RTPSessionProcessRTP) (RTPSession *sess, RTPSource *src,
+  * RTPSessionSendRTP:
+  * @sess: an #RTPSession
+  * @src: the #RTPSource
+- * @buffer: the RTP buffer ready for sending
++ * @data: the RTP buffer or buffer list ready for sending
+  * @user_data: user data specified when registering
+  *
+- * This callback will be called when @sess has @buffer ready for sending to
+- * all listening participants in this session.
++ * This callback will be called when @sess has @data (a buffer or buffer list)
++ * ready for sending to all listening participants in this session.
+  *
+  * Returns: a #GstFlowReturn.
+  */
+@@ -293,12 +293,14 @@ struct _RTPSession {
+   gboolean      is_doing_ptp;
+ 
+   GList         *conflicting_addresses;
++
++  gboolean timestamp_sender_reports;
+ };
+ 
+ /**
+  * RTPSessionClass:
+- * @on_new_ssrc: emited when a new source is found
+- * @on_bye_ssrc: emited when a source is gone
++ * @on_new_ssrc: emitted when a new source is found
++ * @on_bye_ssrc: emitted when a source is gone
+  *
+  * The session class.
+  */
+@@ -328,12 +330,15 @@ struct _RTPSessionClass {
+   void (*on_receiving_rtcp) (RTPSession *sess, GstBuffer *buffer);
+   void (*on_new_sender_ssrc)     (RTPSession *sess, RTPSource *source);
+   void (*on_sender_ssrc_active)  (RTPSession *sess, RTPSource *source);
++  guint (*on_sending_nacks) (RTPSession *sess, guint sender_ssrc,
++      guint media_ssrc, GArray *nacks, GstBuffer *buffer);
+ };
+ 
+ GType rtp_session_get_type (void);
+ 
+ /* create and configure */
+ RTPSession*     rtp_session_new           (void);
++void            rtp_session_reset                  (RTPSession *sess);
+ void            rtp_session_set_callbacks          (RTPSession *sess,
+ 		                                    RTPSessionCallbacks *callbacks,
+                                                     gpointer user_data);
+@@ -374,7 +379,6 @@ gboolean        rtp_session_add_source             (RTPSession *sess, RTPSource
+ guint           rtp_session_get_num_sources        (RTPSession *sess);
+ guint           rtp_session_get_num_active_sources (RTPSession *sess);
+ RTPSource*      rtp_session_get_source_by_ssrc     (RTPSession *sess, guint32 ssrc);
+-RTPSource*      rtp_session_create_source          (RTPSession *sess);
+ 
+ /* processing packets from receivers */
+ GstFlowReturn   rtp_session_process_rtp            (RTPSession *sess, GstBuffer *buffer,
+@@ -383,6 +387,7 @@ GstFlowReturn   rtp_session_process_rtp            (RTPSession *sess, GstBuffer
+                                                     guint64 ntpnstime);
+ GstFlowReturn   rtp_session_process_rtcp           (RTPSession *sess, GstBuffer *buffer,
+                                                     GstClockTime current_time,
++                                                    GstClockTime running_time,
+                                                     guint64 ntpnstime);
+ 
+ /* processing packets for sending */
+diff --git a/gst/rtpmanager/rtpsource.c b/gst/rtpmanager/rtpsource.c
+index d726408c6..1f9ffb102 100644
+--- a/gst/rtpmanager/rtpsource.c
++++ b/gst/rtpmanager/rtpsource.c
+@@ -44,6 +44,7 @@ enum
+ #define DEFAULT_PROBATION            RTP_DEFAULT_PROBATION
+ #define DEFAULT_MAX_DROPOUT_TIME     60000
+ #define DEFAULT_MAX_MISORDER_TIME    2000
++#define DEFAULT_DISABLE_RTCP         FALSE
+ 
+ enum
+ {
+@@ -56,7 +57,8 @@ enum
+   PROP_STATS,
+   PROP_PROBATION,
+   PROP_MAX_DROPOUT_TIME,
+-  PROP_MAX_MISORDER_TIME
++  PROP_MAX_MISORDER_TIME,
++  PROP_DISABLE_RTCP
+ };
+ 
+ /* GObject vmethods */
+@@ -159,14 +161,15 @@ rtp_source_class_init (RTPSourceClass * klass)
+    * The following fields make sense for internal sources and will only increase
+    * when "is-sender" is TRUE.
+    *
+-   *  "octets-sent"  G_TYPE_UINT64   number of bytes we sent
++   *  "octets-sent"  G_TYPE_UINT64   number of payload bytes we sent
+    *  "packets-sent" G_TYPE_UINT64   number of packets we sent
+    *
+    * The following fields make sense for non-internal sources and will only
+    * increase when "is-sender" is TRUE.
+    *
+-   *  "octets-received"  G_TYPE_UINT64  total number of bytes received
++   *  "octets-received"  G_TYPE_UINT64  total number of payload bytes received
+    *  "packets-received" G_TYPE_UINT64  total number of packets received
++   *  "bytes-received"   G_TYPE_UINT64  total number of bytes received including lower level headers overhead
+    *
+    * Following fields are updated when "is-sender" is TRUE.
+    *
+@@ -237,6 +240,16 @@ rtp_source_class_init (RTPSourceClass * klass)
+           0, G_MAXUINT, DEFAULT_MAX_MISORDER_TIME,
+           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
++  /**
++   * RTPSession::disable-rtcp:
++   *
++   * Allow disabling the sending of RTCP packets for this source.
++   */
++  g_object_class_install_property (gobject_class, PROP_DISABLE_RTCP,
++      g_param_spec_boolean ("disable-rtcp", "Disable RTCP",
++          "Disable sending RTCP packets for this source",
++          DEFAULT_DISABLE_RTCP, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++
+   GST_DEBUG_CATEGORY_INIT (rtp_source_debug, "rtpsource", 0, "RTP Source");
+ }
+ 
+@@ -255,6 +268,9 @@ rtp_source_reset (RTPSource * src)
+   src->bye_reason = NULL;
+   src->sent_bye = FALSE;
+   g_hash_table_remove_all (src->reported_in_sr_of);
++  g_queue_foreach (src->retained_feedback, (GFunc) gst_buffer_unref, NULL);
++  g_queue_clear (src->retained_feedback);
++  src->last_rtptime = -1;
+ 
+   src->stats.cycles = -1;
+   src->stats.jitter = 0;
+@@ -278,7 +294,7 @@ rtp_source_reset (RTPSource * src)
+ static void
+ rtp_source_init (RTPSource * src)
+ {
+-  /* sources are initialy on probation until we receive enough valid RTP
++  /* sources are initially on probation until we receive enough valid RTP
+    * packets or a valid RTCP packet */
+   src->validated = FALSE;
+   src->internal = FALSE;
+@@ -294,10 +310,10 @@ rtp_source_init (RTPSource * src)
+   src->clock_rate = -1;
+   src->packets = g_queue_new ();
+   src->seqnum_offset = -1;
+-  src->last_rtptime = -1;
+ 
+   src->retained_feedback = g_queue_new ();
+-  src->nacks = g_array_new (FALSE, FALSE, sizeof (guint32));
++  src->nacks = g_array_new (FALSE, FALSE, sizeof (guint16));
++  src->nack_deadlines = g_array_new (FALSE, FALSE, sizeof (GstClockTime));
+ 
+   src->reported_in_sr_of = g_hash_table_new (g_direct_hash, g_direct_equal);
+ 
+@@ -337,6 +353,7 @@ rtp_source_finalize (GObject * object)
+   g_queue_free (src->retained_feedback);
+ 
+   g_array_free (src->nacks, TRUE);
++  g_array_free (src->nack_deadlines, TRUE);
+ 
+   if (src->rtp_from)
+     g_object_unref (src->rtp_from);
+@@ -399,6 +416,7 @@ rtp_source_create_stats (RTPSource * src)
+       "packets-sent", G_TYPE_UINT64, src->stats.packets_sent,
+       "octets-received", G_TYPE_UINT64, src->stats.octets_received,
+       "packets-received", G_TYPE_UINT64, src->stats.packets_received,
++      "bytes-received", G_TYPE_UINT64, src->stats.bytes_received,
+       "bitrate", G_TYPE_UINT64, src->bitrate,
+       "packets-lost", G_TYPE_INT,
+       (gint) rtp_stats_get_packets_lost (&src->stats), "jitter", G_TYPE_UINT,
+@@ -539,6 +557,9 @@ rtp_source_set_property (GObject * object, guint prop_id,
+     case PROP_MAX_MISORDER_TIME:
+       src->max_misorder_time = g_value_get_uint (value);
+       break;
++    case PROP_DISABLE_RTCP:
++      src->disable_rtcp = g_value_get_boolean (value);
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+       break;
+@@ -581,6 +602,9 @@ rtp_source_get_property (GObject * object, guint prop_id,
+     case PROP_MAX_MISORDER_TIME:
+       g_value_set_uint (value, src->max_misorder_time);
+       break;
++    case PROP_DISABLE_RTCP:
++      g_value_set_boolean (value, src->disable_rtcp);
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+       break;
+@@ -994,6 +1018,28 @@ no_clock_rate:
+ }
+ 
+ static void
++update_queued_stats (GstBuffer * buffer, RTPSource * src)
++{
++  GstRTPBuffer rtp = { NULL };
++  guint payload_len;
++  guint64 bytes;
++
++  /* no need to check the return value, a queued packet is a valid RTP one */
++  gst_rtp_buffer_map (buffer, GST_MAP_READ, &rtp);
++  payload_len = gst_rtp_buffer_get_payload_len (&rtp);
++
++  bytes = gst_buffer_get_size (buffer) + UDP_IP_HEADER_OVERHEAD;
++
++  src->stats.octets_received += payload_len;
++  src->stats.bytes_received += bytes;
++  src->stats.packets_received++;
++  /* for the bitrate estimation consider all lower level headers */
++  src->bytes_received += bytes;
++
++  gst_rtp_buffer_unmap (&rtp);
++}
++
++static void
+ init_seq (RTPSource * src, guint16 seq)
+ {
+   src->stats.base_seq = seq;
+@@ -1008,6 +1054,9 @@ init_seq (RTPSource * src, guint16 seq)
+   src->stats.recv_pli_count = 0;
+   src->stats.recv_fir_count = 0;
+ 
++  /* if there are queued packets, consider them too in the stats */
++  g_queue_foreach (src->packets, (GFunc) update_queued_stats, src);
++
+   GST_DEBUG ("base_seq %d", seq);
+ }
+ 
+@@ -1113,7 +1162,14 @@ update_receiver_stats (RTPSource * src, RTPPacketInfo * pinfo,
+           goto done;
+         }
+       } else {
+-        /* unexpected seqnum in probation */
++        /* unexpected seqnum in probation
++         *
++         * There is no need to clean the queue at this point because the
++         * invalid packets in the queue are not going to be pushed as we are
++         * still in probation, and some cleanup will be performed at future
++         * probation attempts anyway if there are too many old packets in the
++         * queue.
++         */
+         goto probation_seqnum;
+       }
+     } else if (delta >= 0 && delta < max_dropout) {
+@@ -1158,9 +1214,9 @@ update_receiver_stats (RTPSource * src, RTPPacketInfo * pinfo,
+ 
+   src->stats.octets_received += pinfo->payload_len;
+   src->stats.bytes_received += pinfo->bytes;
+-  src->stats.packets_received++;
+-  /* for the bitrate estimation */
+-  src->bytes_received += pinfo->payload_len;
++  src->stats.packets_received += pinfo->packets;
++  /* for the bitrate estimation consider all lower level headers */
++  src->bytes_received += pinfo->bytes;
+ 
+   GST_LOG ("seq %u, PC: %" G_GUINT64_FORMAT ", OC: %" G_GUINT64_FORMAT,
+       seqnr, src->stats.packets_received, src->stats.octets_received);
+@@ -1181,7 +1237,9 @@ bad_sequence:
+   }
+ probation_seqnum:
+   {
+-    GST_WARNING ("probation: seqnr %d != expected %d", seqnr, expected);
++    GST_WARNING ("probation: seqnr %d != expected %d "
++        "(SSRC %u curr_probation %i probation %i)", seqnr, expected, src->ssrc,
++        src->curr_probation, src->probation);
+     src->curr_probation = src->probation;
+     src->stats.max_seq = seqnr;
+     return FALSE;
+@@ -1193,7 +1251,7 @@ probation_seqnum:
+  * @src: an #RTPSource
+  * @pinfo: an #RTPPacketInfo
+  *
+- * Let @src handle the incomming RTP packet described in @pinfo.
++ * Let @src handle the incoming RTP packet described in @pinfo.
+  *
+  * Returns: a #GstFlowReturn.
+  */
+@@ -1251,12 +1309,10 @@ rtp_source_mark_bye (RTPSource * src, const gchar * reason)
+ /**
+  * rtp_source_send_rtp:
+  * @src: an #RTPSource
+- * @data: an RTP buffer or a list of RTP buffers
+- * @is_list: if @data is a buffer or list
+- * @running_time: the running time of @data
++ * @pinfo: an #RTPPacketInfo
+  *
+- * Send @data (an RTP buffer or list of buffers) originating from @src.
+- * This will make @src a sender. This function takes ownership of @data and
++ * Send data (an RTP buffer or buffer list from @pinfo) originating from @src.
++ * This will make @src a sender. This function takes ownership of the data and
+  * modifies the SSRC in the RTP packet to that of @src when needed.
+  *
+  * Returns: a #GstFlowReturn.
+@@ -1290,7 +1346,7 @@ rtp_source_send_rtp (RTPSource * src, RTPPacketInfo * pinfo)
+   /* update stats for the SR */
+   src->stats.packets_sent += pinfo->packets;
+   src->stats.octets_sent += pinfo->payload_len;
+-  src->bytes_sent += pinfo->payload_len;
++  src->bytes_sent += pinfo->bytes;
+ 
+   running_time = pinfo->running_time;
+ 
+@@ -1829,17 +1885,33 @@ rtp_source_add_conflicting_address (RTPSource * src,
+  */
+ void
+ rtp_source_timeout (RTPSource * src, GstClockTime current_time,
+-    GstClockTime feedback_retention_window)
++    GstClockTime running_time, GstClockTime feedback_retention_window)
+ {
+   GstRTCPPacket *pkt;
++  GstClockTime max_pts_window;
++  guint pruned = 0;
+ 
+   src->conflicting_addresses =
+       timeout_conflicting_addresses (src->conflicting_addresses, current_time);
+ 
++  if (feedback_retention_window == GST_CLOCK_TIME_NONE ||
++      running_time < feedback_retention_window) {
++    return;
++  }
++
++  max_pts_window = running_time - feedback_retention_window;
++
+   /* Time out AVPF packets that are older than the desired length */
+-  while ((pkt = g_queue_peek_tail (src->retained_feedback)) &&
+-      GST_BUFFER_PTS (pkt) < feedback_retention_window)
+-    gst_buffer_unref (g_queue_pop_tail (src->retained_feedback));
++  while ((pkt = g_queue_peek_head (src->retained_feedback)) &&
++      GST_BUFFER_PTS (pkt) < max_pts_window) {
++    gst_buffer_unref (g_queue_pop_head (src->retained_feedback));
++    pruned++;
++  }
++
++  GST_LOG_OBJECT (src,
++      "%u RTCP packets pruned with PTS less than %" GST_TIME_FORMAT
++      ", queue len: %u", pruned, GST_TIME_ARGS (max_pts_window),
++      g_queue_get_length (src->retained_feedback));
+ }
+ 
+ static gint
+@@ -1848,7 +1920,16 @@ compare_buffers (gconstpointer a, gconstpointer b, gpointer user_data)
+   const GstBuffer *bufa = a;
+   const GstBuffer *bufb = b;
+ 
+-  return GST_BUFFER_PTS (bufa) - GST_BUFFER_PTS (bufb);
++  g_return_val_if_fail (GST_BUFFER_PTS (bufa) != GST_CLOCK_TIME_NONE, -1);
++  g_return_val_if_fail (GST_BUFFER_PTS (bufb) != GST_CLOCK_TIME_NONE, 1);
++
++  if (GST_BUFFER_PTS (bufa) < GST_BUFFER_PTS (bufb)) {
++    return -1;
++  } else if (GST_BUFFER_PTS (bufa) > GST_BUFFER_PTS (bufb)) {
++    return 1;
++  }
++
++  return 0;
+ }
+ 
+ void
+@@ -1857,12 +1938,17 @@ rtp_source_retain_rtcp_packet (RTPSource * src, GstRTCPPacket * packet,
+ {
+   GstBuffer *buffer;
+ 
++  g_return_if_fail (running_time != GST_CLOCK_TIME_NONE);
++
+   buffer = gst_buffer_copy_region (packet->rtcp->buffer, GST_BUFFER_COPY_MEMORY,
+       packet->offset, (gst_rtcp_packet_get_length (packet) + 1) * 4);
+ 
+   GST_BUFFER_PTS (buffer) = running_time;
+ 
+   g_queue_insert_sorted (src->retained_feedback, buffer, compare_buffers, NULL);
++
++  GST_LOG_OBJECT (src, "RTCP packet retained with PTS: %" GST_TIME_FORMAT,
++      GST_TIME_ARGS (running_time));
+ }
+ 
+ gboolean
+@@ -1878,47 +1964,46 @@ rtp_source_has_retained (RTPSource * src, GCompareFunc func, gconstpointer data)
+  * rtp_source_register_nack:
+  * @src: The #RTPSource
+  * @seqnum: a seqnum
++ * @deadline: the deadline before which RTX is still possible
+  *
+  * Register that @seqnum has not been received from @src.
+  */
+ void
+-rtp_source_register_nack (RTPSource * src, guint16 seqnum)
++rtp_source_register_nack (RTPSource * src, guint16 seqnum,
++    GstClockTime deadline)
+ {
+-  guint i, len;
+-  guint32 dword = seqnum << 16;
+-  gint diff = 16;
++  gint i;
++  guint len;
++  gint diff = -1;
++  guint16 tseq;
+ 
+   len = src->nacks->len;
+-  for (i = 0; i < len; i++) {
+-    guint32 tdword;
+-    guint16 tseq;
++  for (i = len - 1; i >= 0; i--) {
++    tseq = g_array_index (src->nacks, guint16, i);
++    diff = gst_rtp_buffer_compare_seqnum (tseq, seqnum);
+ 
+-    tdword = g_array_index (src->nacks, guint32, i);
+-    tseq = tdword >> 16;
++    GST_TRACE ("[%u] %u %u diff %i len %u", i, tseq, seqnum, diff, len);
+ 
+-    diff = gst_rtp_buffer_compare_seqnum (tseq, seqnum);
+-    if (diff < 16)
++    if (diff >= 0)
+       break;
+   }
+-  /* we already have this seqnum */
+-  if (diff == 0)
+-    return;
+-  /* it comes before the recorded seqnum, FIXME, we could merge it
+-   * if not to far away */
+-  if (diff < 0) {
+-    GST_DEBUG ("insert NACK #%u at %u", seqnum, i);
+-    g_array_insert_val (src->nacks, i, dword);
+-  } else if (diff < 16) {
+-    /* we can merge it */
+-    dword = g_array_index (src->nacks, guint32, i);
+-    dword |= 1 << (diff - 1);
+-    GST_DEBUG ("merge NACK #%u at %u with NACK #%u -> 0x%08x", seqnum, i,
+-        dword >> 16, dword);
+-    g_array_index (src->nacks, guint32, i) = dword;
++
++  if (diff == 0) {
++    GST_DEBUG ("update NACK #%u deadline to %" GST_TIME_FORMAT, seqnum,
++        GST_TIME_ARGS (deadline));
++    g_array_index (src->nack_deadlines, GstClockTime, i) = deadline;
++  } else if (i == len - 1) {
++    GST_DEBUG ("append NACK #%u with deadline %" GST_TIME_FORMAT, seqnum,
++        GST_TIME_ARGS (deadline));
++    g_array_append_val (src->nacks, seqnum);
++    g_array_append_val (src->nack_deadlines, deadline);
+   } else {
+-    GST_DEBUG ("append NACK #%u", seqnum);
+-    g_array_append_val (src->nacks, dword);
++    GST_DEBUG ("insert NACK #%u with deadline %" GST_TIME_FORMAT, seqnum,
++        GST_TIME_ARGS (deadline));
++    g_array_insert_val (src->nacks, i + 1, seqnum);
++    g_array_insert_val (src->nack_deadlines, i + 1, deadline);
+   }
++
+   src->send_nack = TRUE;
+ }
+ 
+@@ -1931,18 +2016,51 @@ rtp_source_register_nack (RTPSource * src, guint16 seqnum)
+  *
+  * Returns: an array of @n_nacks seqnum values.
+  */
+-guint32 *
++guint16 *
+ rtp_source_get_nacks (RTPSource * src, guint * n_nacks)
+ {
+   if (n_nacks)
+     *n_nacks = src->nacks->len;
+ 
+-  return (guint32 *) src->nacks->data;
++  return (guint16 *) src->nacks->data;
++}
++
++/**
++ * rtp_source_get_nacks:
++ * @src: The #RTPSource
++ * @n_nacks: result number of nacks
++ *
++ * Get the registered NACKS deadlines.
++ *
++ * Returns: an array of @n_nacks deadline values.
++ */
++GstClockTime *
++rtp_source_get_nack_deadlines (RTPSource * src, guint * n_nacks)
++{
++  if (n_nacks)
++    *n_nacks = src->nack_deadlines->len;
++
++  return (GstClockTime *) src->nack_deadlines->data;
+ }
+ 
++/**
++ * rtp_source_clear_nacks:
++ * @src: The #RTPSource
++ * @n_nacks: number of nacks
++ *
++ * Remove @n_nacks oldest NACKS form array.
++ */
+ void
+-rtp_source_clear_nacks (RTPSource * src)
++rtp_source_clear_nacks (RTPSource * src, guint n_nacks)
+ {
+-  g_array_set_size (src->nacks, 0);
+-  src->send_nack = FALSE;
++  g_return_if_fail (n_nacks <= src->nacks->len);
++
++  if (src->nacks->len == n_nacks) {
++    g_array_set_size (src->nacks, 0);
++    g_array_set_size (src->nack_deadlines, 0);
++    src->send_nack = FALSE;
++  } else {
++    g_array_remove_range (src->nacks, 0, n_nacks);
++    g_array_remove_range (src->nack_deadlines, 0, n_nacks);
++  }
+ }
+diff --git a/gst/rtpmanager/rtpsource.h b/gst/rtpmanager/rtpsource.h
+index 282267eda..dff7b313f 100644
+--- a/gst/rtpmanager/rtpsource.h
++++ b/gst/rtpmanager/rtpsource.h
+@@ -198,9 +198,12 @@ struct _RTPSource {
+ 
+   gboolean     send_nack;
+   GArray      *nacks;
++  GArray      *nack_deadlines;
+ 
+   gboolean      pt_set;
+   guint8        pt;
++
++  gboolean      disable_rtcp;
+ };
+ 
+ struct _RTPSourceClass {
+@@ -288,6 +291,7 @@ void            rtp_conflicting_address_free   (RTPConflictingAddress * addr);
+ 
+ void            rtp_source_timeout             (RTPSource * src,
+                                                 GstClockTime current_time,
++                                                GstClockTime running_time,
+                                                 GstClockTime feedback_retention_window);
+ 
+ void            rtp_source_retain_rtcp_packet  (RTPSource * src,
+@@ -298,8 +302,10 @@ gboolean        rtp_source_has_retained        (RTPSource * src,
+                                                 gconstpointer data);
+ 
+ void            rtp_source_register_nack       (RTPSource * src,
+-                                                guint16 seqnum);
+-guint32 *       rtp_source_get_nacks           (RTPSource * src, guint *n_nacks);
+-void            rtp_source_clear_nacks         (RTPSource * src);
++                                                guint16 seqnum,
++                                                GstClockTime deadline);
++guint16 *       rtp_source_get_nacks           (RTPSource * src, guint *n_nacks);
++GstClockTime *  rtp_source_get_nack_deadlines  (RTPSource * src, guint *n_nacks);
++void            rtp_source_clear_nacks         (RTPSource * src, guint n_nacks);
+ 
+ #endif /* __RTP_SOURCE_H__ */
+diff --git a/gst/rtpmanager/rtpstats.c b/gst/rtpmanager/rtpstats.c
+index 73bd189b7..27063ee9c 100644
+--- a/gst/rtpmanager/rtpstats.c
++++ b/gst/rtpmanager/rtpstats.c
+@@ -46,15 +46,13 @@ gst_rtp_packet_rate_ctx_update (RTPPacketRateCtx * ctx, guint16 seqnum,
+   gst_rtp_buffer_ext_timestamp (&new_ts, ts);
+ 
+   if (!ctx->probed) {
+-    ctx->last_seqnum = seqnum;
+-    ctx->last_ts = new_ts;
+     ctx->probed = TRUE;
+-    return ctx->avg_packet_rate;
++    goto done;
+   }
+ 
+   diff_seqnum = gst_rtp_buffer_compare_seqnum (ctx->last_seqnum, seqnum);
+-  if (diff_seqnum <= 0 || new_ts <= ctx->last_ts) {
+-    return ctx->avg_packet_rate;
++  if (diff_seqnum <= 0 || new_ts <= ctx->last_ts || diff_seqnum > 1) {
++    goto done;
+   }
+ 
+   diff_ts = new_ts - ctx->last_ts;
+@@ -74,6 +72,7 @@ gst_rtp_packet_rate_ctx_update (RTPPacketRateCtx * ctx, guint16 seqnum,
+     ctx->avg_packet_rate = (ctx->avg_packet_rate + new_packet_rate + 1) / 2;
+   }
+ 
++done:
+   ctx->last_seqnum = seqnum;
+   ctx->last_ts = new_ts;
+ 
+@@ -89,7 +88,7 @@ gst_rtp_packet_rate_ctx_get (RTPPacketRateCtx * ctx)
+ guint32
+ gst_rtp_packet_rate_ctx_get_max_dropout (RTPPacketRateCtx * ctx, gint32 time_ms)
+ {
+-  if (time_ms <= 0 || !ctx->probed) {
++  if (time_ms <= 0 || !ctx->probed || ctx->avg_packet_rate == -1) {
+     return RTP_DEF_DROPOUT;
+   }
+ 
+@@ -100,7 +99,7 @@ guint32
+ gst_rtp_packet_rate_ctx_get_max_misorder (RTPPacketRateCtx * ctx,
+     gint32 time_ms)
+ {
+-  if (time_ms <= 0 || !ctx->probed) {
++  if (time_ms <= 0 || !ctx->probed || ctx->avg_packet_rate == -1) {
+     return RTP_DEF_MISORDER;
+   }
+ 
+diff --git a/gst/rtpmanager/rtpstats.h b/gst/rtpmanager/rtpstats.h
+index b0fbddb48..bd3a54efe 100644
+--- a/gst/rtpmanager/rtpstats.h
++++ b/gst/rtpmanager/rtpstats.h
+@@ -27,6 +27,9 @@
+ #include <gst/rtp/rtp.h>
+ #include <gio/gio.h>
+ 
++/* UDP/IP is assumed for bandwidth calculation */
++#define UDP_IP_HEADER_OVERHEAD 28
++
+ /**
+  * RTPSenderReport:
+  *
+@@ -100,11 +103,11 @@ typedef struct {
+ 
+ /**
+  * RTPSourceStats:
+- * @packetsreceived: number of received packets in total
+- * @prevpacketsreceived: number of packets received in previous reporting
++ * @packets_received: number of received packets in total
++ * @prev_received: number of packets received in previous reporting
+  *                       interval
+- * @octetsreceived: number of payload bytes received
+- * @bytesreceived: number of total bytes received including headers and lower
++ * @octets_received: number of payload bytes received
++ * @bytes_received: number of total bytes received including headers and lower
+  *                 protocol level overhead
+  * @max_seqnr: highest sequence number received
+  * @transit: previous transit time used for calculating @jitter
+-- 
+2.11.0
+

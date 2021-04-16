@@ -1,0 +1,67 @@
+config BR2_PACKAGE_LIBMALI
+	bool "rockchip libmali"
+	depends on BR2_TOOLCHAIN_USES_GLIBC
+	depends on BR2_aarch64 || (BR2_ARM_EABIHF && BR2_arm)
+	select BR2_PACKAGE_LIBDRM
+	select BR2_PACKAGE_HAS_LIBEGL if !BR2_PACKAGE_LIBMALI_ONLY_CL
+	select BR2_PACKAGE_HAS_LIBGLES if !BR2_PACKAGE_LIBMALI_ONLY_CL
+	select BR2_PACKAGE_HAS_LIBOPENCL if !BR2_PACKAGE_LIBMALI_WITHOUT_CL
+	select BR2_PACKAGE_HAS_LIBEGL_WAYLAND if BR2_PACKAGE_LIBMALI_WAYLAND
+	help
+	  Install the binary user-space library for the ARM Mali GPU.
+	  This package requires a kernel with the ARM Mali GPU Kernel
+	  Drivers enabled.
+
+if BR2_PACKAGE_LIBMALI
+
+config BR2_PACKAGE_LIBMALI_WITHOUT_CL
+	bool "without OpenCL"
+
+choice
+	prompt "display platform"
+	default BR2_PACKAGE_LIBMALI_WAYLAND if BR2_PACKAGE_WAYLAND
+	default BR2_PACKAGE_LIBMALI_X11 if BR2_PACKAGE_XORG7
+
+config BR2_PACKAGE_LIBMALI_ONLY_CL
+	bool "OpenCL only"
+	depends on !BR2_PACKAGE_LIBMALI_WITHOUT_CL
+	help
+	  libmali for OpenCL only(no display platform).
+
+config BR2_PACKAGE_LIBMALI_DUMMY
+	bool "dummy"
+	help
+	  libmali for dummy platform.
+
+config BR2_PACKAGE_LIBMALI_WAYLAND
+	bool "wayland"
+	depends on BR2_PACKAGE_WAYLAND
+	help
+	  libmali for wayland platform.
+
+config BR2_PACKAGE_LIBMALI_X11
+	bool "X11"
+	depends on BR2_PACKAGE_XORG7
+	select BR2_PACKAGE_LIBXCB
+	select BR2_PACKAGE_XLIB_LIBX11
+	help
+	  libmali for X11 platform.
+
+config BR2_PACKAGE_LIBMALI_GBM
+	bool "GBM"
+	help
+	  libmali for GBM platform.
+
+endchoice
+
+config BR2_PACKAGE_PROVIDES_LIBEGL
+	default "libmali" if !BR2_PACKAGE_LIBMALI_ONLY_CL
+
+config BR2_PACKAGE_PROVIDES_LIBGLES
+	default "libmali" if !BR2_PACKAGE_LIBMALI_ONLY_CL
+
+# NOTE: utgard doesn't provide OpenCL
+config BR2_PACKAGE_PROVIDES_LIBOPENCL
+	default "libmali" if !BR2_PACKAGE_LIBMALI_WITHOUT_CL
+
+endif

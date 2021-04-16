@@ -1,0 +1,46 @@
+From 92ecca0fda4b0f8ac53bc7b9affb3d34c041e67a Mon Sep 17 00:00:00 2001
+From: Hertz Wang <wangh@rock-chips.com>
+Date: Fri, 12 Jul 2019 17:40:17 +0800
+Subject: [PATCH 1/1] enable compile libjhead
+
+Signed-off-by: Hertz Wang <wangh@rock-chips.com>
+---
+ makefile | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/makefile b/makefile
+index 7408f89..8a6f9a9 100644
+--- a/makefile
++++ b/makefile
+@@ -7,17 +7,26 @@ CFLAGS:= $(CFLAGS) -O3 -Wall
+ 
+ all: jhead
+ 
+-objs = $(OBJ)/jhead.o $(OBJ)/jpgfile.o $(OBJ)/jpgqguess.o $(OBJ)/paths.o \
++objs = $(OBJ)/jpgfile.o $(OBJ)/jpgqguess.o $(OBJ)/paths.o \
+ 	$(OBJ)/exif.o $(OBJ)/iptc.o $(OBJ)/gpsinfo.o $(OBJ)/makernote.o 
+ 
++libobjs := $(objs) $(OBJ)/libjhead.o
++
+ $(OBJ)/%.o:$(SRC)/%.c
+ 	${CC} $(CFLAGS) -c $< -o $@
+ 
++ifeq ($(LIBJHEAD),y)
++libjhead: $(libobjs) jhead.h
++	${CC} $(LDFLAGS) -shared -o libjhead.so $(libobjs) -lm
++jhead: libjhead
++endif
++
++objs += $(OBJ)/jhead.o
+ jhead: $(objs) jhead.h
+ 	${CC} $(LDFLAGS) -o jhead $(objs) -lm
+ 
+ clean:
+-	rm -f $(objs) jhead
++	rm -f $(objs) $(OBJ)/libjhead.o jhead
+ 
+ install:
+ 	cp jhead ${DESTDIR}/usr/local/bin/
+-- 
+2.7.4
+

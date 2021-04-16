@@ -1,0 +1,37 @@
+From 5c35e00c9fd14c92564b37b4b1f4ddad745a1df1 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Mon, 1 Feb 2021 07:36:23 +0800
+Subject: [PATCH] samples: Support disabling PCL
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ samples/CMakeLists.txt | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/samples/CMakeLists.txt b/samples/CMakeLists.txt
+index 5a47f76..39629b2 100755
+--- a/samples/CMakeLists.txt
++++ b/samples/CMakeLists.txt
+@@ -192,6 +192,12 @@ make_executable(auto_restart
+ )
+ 
+ find_package(PCL)
++
++option(WITH_PCL "Build with PCL" TRUE)
++if(NOT WITH_PCL)
++  set(PCL_FOUND OFF)
++endif()
++  
+ if(PCL_FOUND)
+   #list(REMOVE_ITEM PCL_LIBRARIES "vtkproj4")
+ 
+@@ -254,4 +260,4 @@ add_subdirectory(dataset)
+ 
+ # writer
+ 
+-add_subdirectory(writer)
+\ No newline at end of file
++add_subdirectory(writer)
+-- 
+2.20.1
+

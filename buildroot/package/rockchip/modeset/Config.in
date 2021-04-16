@@ -1,0 +1,8 @@
+config BR2_PACKAGE_MODESET
+	bool "modeset for Linux"
+	depends on BR2_PACKAGE_LIBDRM
+	select BR2_PACKAGE_JPEG
+config BR2_PACKAGE_MODESET_SWAP_RB
+	bool "swap rgb"
+	depends on BR2_PACKAGE_MODESET
+	default n

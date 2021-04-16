@@ -1,0 +1,66 @@
+--- a/src/gui/sdl_mapper.cpp	2020-08-03 06:33:31.000000000 +0200
++++ b/src/gui/sdl_mapper.cpp	2020-08-28 21:37:39.460659614 +0200
+@@ -73,6 +73,7 @@
+ #define MAX_VJOY_HATS           16
+ #define MAX_VJOY_AXES           8
+ 
++#define MOUSE_OFFSET            8
+ 
+ class CEvent;
+ class CKeyEvent;
+@@ -2428,6 +2429,21 @@
+ 	Bit8u button;
+ };
+ 
++class CMouseMoveEvent : public CContinuousEvent {
++public:
++   CMouseMoveEvent(char const * const _entry,float _xrel, float _yrel) : CContinuousEvent(_entry) {
++       xrel=_xrel;
++       yrel=_yrel;
++        }
++   void Active(bool /*moved*/) {
++       Mouse_CursorMoved((float)xrel*MOUSE_OFFSET*GetValue()/32767.0,
++           (float)yrel*MOUSE_OFFSET*GetValue()/32767.0,
++           0, 0, true);
++
++   }
++   float xrel, yrel;
++};
++
+ //! \brief Joystick axis event handling for the mapper
+ class CJAxisEvent : public CContinuousEvent {
+ public:
+@@ -3053,6 +3069,16 @@
+ 	return event;
+ }
+ 
++static CMouseMoveEvent * AddMouseMoveEvent(Bitu x,Bitu y,Bitu dx,Bitu dy,char const * const title,char const * const entry,float xrel,float yrel) {
++   char buf[64];
++   strcpy(buf,"maxis_");
++   strcat(buf,entry);
++   CMouseMoveEvent * event=new CMouseMoveEvent(buf,xrel,yrel);
++   new CEventButton(x,y,dx,dy,title,event);
++   return event;
++}
++
++ 
+ static CJAxisEvent * AddJAxisButton(Bitu x,Bitu y,Bitu dx,Bitu dy,char const * const title,Bitu stick,Bitu axis,bool positive,CJAxisEvent * opposite_axis) {
+     char buf[64];
+     sprintf(buf,"jaxis_%d_%d%s",(int)stick,(int)axis,positive ? "+" : "-");
+@@ -3179,6 +3205,16 @@
+ 	AddMouseButtonEvent(PX(XO+2),PY(YO),BW,BH,"R","right",1);
+ #undef XO
+ #undef YO
++#define XO 6
++#define YO 8
++   /* Mouse Buttons and Axis */
++   new CTextButton(PX(XO+0),PY(YO-1),2*BW,20,"Mouse axis");
++   AddMouseMoveEvent(PX(XO+1),PY(YO),BW,BH,"Y-","y-",0,-1);
++   AddMouseMoveEvent(PX(XO+0),PY(YO+1),BW,BH,"X-","x-",-1,0);
++   AddMouseMoveEvent(PX(XO+1),PY(YO+1),BW,BH,"Y+","y+",0,1);
++   AddMouseMoveEvent(PX(XO+2),PY(YO+1),BW,BH,"X+","x+",1,0);
++#undef XO
++#undef YO
+ #define XO 0
+ #define YO 7
+     /* Numeric KeyPad */

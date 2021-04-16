@@ -1,0 +1,25 @@
+From d849d74441c1e4f238e87c3600afa4f033e1af31 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sun, 16 Dec 2018 14:31:14 +0800
+Subject: [PATCH 3/3] Set default kernel addr to 0x10008000
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ abootimg.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/abootimg.c b/abootimg.c
+index b7b9b4b..813bb72 100644
+--- a/abootimg.c
++++ b/abootimg.c
+@@ -891,6 +891,7 @@ t_abootimg* new_bootimg()
+ 
+   memcpy(img->header.magic, BOOT_MAGIC, BOOT_MAGIC_SIZE);
+   img->header.page_size = 2048;  // a sensible default page size
++  img->header.kernel_addr = 0x10008000; // default kernel addr
+ 
+   return img;
+ }
+-- 
+2.11.0
+

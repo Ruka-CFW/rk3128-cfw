@@ -1,0 +1,45 @@
+From 3f7097b95f0bc233be80d204210185c9abd20082 Mon Sep 17 00:00:00 2001
+From: Daniel Stone <daniels@collabora.com>
+Date: Wed, 9 May 2018 13:16:15 +0100
+Subject: [PATCH 14/60] waylandsink: Don't create throwaway empty regions
+
+Instead of creating a region, adding nothing to it, setting that as the
+input region and destroying the region, you can instead just pass NULL
+to wl_surface_set_input_region for the same effect.
+
+Fixes #702
+---
+ ext/wayland/wlwindow.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
+
+diff --git a/ext/wayland/wlwindow.c b/ext/wayland/wlwindow.c
+index e1efb75ed..add15d9b6 100644
+--- a/ext/wayland/wlwindow.c
++++ b/ext/wayland/wlwindow.c
+@@ -114,7 +114,6 @@ static GstWlWindow *
+ gst_wl_window_new_internal (GstWlDisplay * display, GMutex * render_lock)
+ {
+   GstWlWindow *window;
+-  struct wl_region *region;
+ 
+   window = g_object_new (GST_TYPE_WL_WINDOW, NULL);
+   window->display = g_object_ref (display);
+@@ -146,13 +145,8 @@ gst_wl_window_new_internal (GstWlDisplay * display, GMutex * render_lock)
+   }
+ 
+   /* do not accept input */
+-  region = wl_compositor_create_region (display->compositor);
+-  wl_surface_set_input_region (window->area_surface, region);
+-  wl_region_destroy (region);
+-
+-  region = wl_compositor_create_region (display->compositor);
+-  wl_surface_set_input_region (window->video_surface, region);
+-  wl_region_destroy (region);
++  wl_surface_set_input_region (window->area_surface, NULL);
++  wl_surface_set_input_region (window->video_surface, NULL);
+ 
+   return window;
+ }
+-- 
+2.20.1
+

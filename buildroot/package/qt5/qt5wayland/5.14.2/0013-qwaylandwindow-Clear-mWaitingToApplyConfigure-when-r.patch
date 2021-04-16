@@ -1,0 +1,28 @@
+From d68f820e824a2ba48235d1d975249a37486f0aaa Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Tue, 13 Oct 2020 17:01:39 +0800
+Subject: [PATCH 13/15] qwaylandwindow: Clear mWaitingToApplyConfigure when
+ reset
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/client/qwaylandwindow.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/client/qwaylandwindow.cpp b/src/client/qwaylandwindow.cpp
+index 4e527046..53a91cda 100644
+--- a/src/client/qwaylandwindow.cpp
++++ b/src/client/qwaylandwindow.cpp
+@@ -241,6 +241,9 @@ void QWaylandWindow::reset(bool sendDestroyEvent)
+         QPlatformSurfaceEvent e(QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed);
+         QGuiApplication::sendEvent(window(), &e);
+     }
++
++    mWaitingToApplyConfigure = false;
++
+     delete mShellSurface;
+     mShellSurface = nullptr;
+     delete mSubSurfaceWindow;
+-- 
+2.20.1
+

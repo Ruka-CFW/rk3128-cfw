@@ -1,0 +1,26 @@
+From 5d9b381b4a4484a1c00f75fcee956a59a6ae16c7 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Wed, 1 Apr 2020 14:13:03 +0800
+Subject: [PATCH 11/14] qsurfaceformat: Set default major version to 3
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/gui/kernel/qsurfaceformat.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gui/kernel/qsurfaceformat.cpp b/src/gui/kernel/qsurfaceformat.cpp
+index 000d7273..3b37030a 100644
+--- a/src/gui/kernel/qsurfaceformat.cpp
++++ b/src/gui/kernel/qsurfaceformat.cpp
+@@ -70,7 +70,7 @@ public:
+         , numSamples(-1)
+         , renderableType(QSurfaceFormat::DefaultRenderableType)
+         , profile(QSurfaceFormat::NoProfile)
+-        , major(2)
++        , major(3)
+         , minor(0)
+         , swapInterval(1) // default to vsync
+     {
+-- 
+2.20.1
+

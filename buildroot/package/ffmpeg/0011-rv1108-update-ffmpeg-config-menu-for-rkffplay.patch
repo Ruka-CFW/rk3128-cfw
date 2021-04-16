@@ -1,0 +1,382 @@
+From 03582e4b7a73abe6556fb9786e48d0181a812e54 Mon Sep 17 00:00:00 2001
+From: Francis Fan <francis.fan@rock-chips.com>
+Date: Fri, 5 Jul 2019 16:24:56 +0800
+Subject: [PATCH 11/11] rv1108: update ffmpeg config menu for rkffplay
+
+Change-Id: If6bc9d6737f69c96c4fd44c56816e5c5aaf86513
+Signed-off-by: Francis Fan <francis.fan@rock-chips.com>
+---
+ Config.in   | 105 ++++++++++++++++++++++++++++++++++++++++++++++++---
+ configure   |   2 +-
+ ffmpeg.rvmk | 122 ++++++++++++++++++++++++++++++++++++++++++++++++++----------
+ 3 files changed, 203 insertions(+), 26 deletions(-)
+
+diff --git a/Config.in b/Config.in
+index fa5d564..8d07a08 100644
+--- a/Config.in
++++ b/Config.in
+@@ -35,14 +35,35 @@ config RV_TARGET_FFMPEG_NONFREE
+ 	  allow use of nonfree code, the resulting libs and binaries
+ 	  will be unredistributable
+ 
+-config RV_TARGET_FFMPEG_DISABLE_FFPLAY
+-	bool "Disable ffplay"
++config RV_TARGET_FFMPEG_ENABLE_ION
++	bool "Enable ion type for hwcontext table"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_VERSION3
++	bool "Enable version3"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_RKMPP
++	bool "Enable rkmpp"
++	default n
++
++config RV_TARGET_FFMPEG_DISABLE_FFMPEG
++	bool "Disable ffmpeg"
+ 	default n
+ 
+ config RV_TARGET_FFMPEG_DISABLE_FFPORBE
+ 	bool "Disable ffprobe"
+ 	default n
+ 
++config RV_TARGET_FFMPEG_DISABLE_FFPLAY
++	bool "Disable ffplay"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_SDL
++	bool "Enable sdl for ffplay"
++	depends on (!RV_TARGET_FFMPEG_DISABLE_FFPLAY)
++	default y if (!RV_TARGET_FFMPEG_DISABLE_FFPLAY)
++
+ config RV_TARGET_FFMPEG_DISABLE_COREIMAGE
+ 	bool "Disable core image"
+ 	default n
+@@ -59,24 +80,54 @@ config RV_TARGET_FFMPEG_DISABLE_BSFS
+ 	bool "Disable bsfs"
+ 	default n
+ 
++config RV_TARGET_FFMPEG_DISABLE_EVERYTHING
++	bool "Disable everything"
++	default y
++
+ config RV_TARGET_FFMPEG_DISABLE_MUXERS
+ 	bool "Disable all muxers"
++	depends on (!RV_TARGET_FFMPEG_DISABLE_EVERYTHING)
+ 	default n
+ 
+ config RV_TARGET_FFMPEG_DISABLE_DEMUXERS
+ 	bool "Disable all demuxers"
+-	default n
+-
+-config RV_TARGET_FFMPEG_DISABLE_FILTERS
+-	bool "Disable all filters"
++	depends on (!RV_TARGET_FFMPEG_DISABLE_EVERYTHING)
+ 	default n
+ 
+ config RV_TARGET_FFMPEG_DISABLE_ENCODERS
+ 	bool "Disable all encoders"
++	depends on (!RV_TARGET_FFMPEG_DISABLE_EVERYTHING)
+ 	default n
+ 
+ config RV_TARGET_FFMPEG_DISABLE_DECODERS
+ 	bool "Disable all decoders"
++	depends on (!RV_TARGET_FFMPEG_DISABLE_EVERYTHING)
++	default n
++
++config RV_TARGET_FFMPEG_DISABLE_DEVICES
++	bool "Disable all devices"
++	depends on (!RV_TARGET_FFMPEG_DISABLE_EVERYTHING)
++	default n
++
++config RV_TARGET_FFMPEG_DISABLE_FILTERS
++	bool "Disable all filters"
++	depends on (!RV_TARGET_FFMPEG_DISABLE_EVERYTHING)
++	default n
++
++config RV_TARGET_FFMPEG_DISABLE_AVDEVICES
++	bool "Disable all avdevices"
++	default n
++
++config RV_TARGET_FFMPEG_DISABLE_AVFILTERS
++	bool "Disable all avfilters"
++	default n
++
++config RV_TARGET_FFMPEG_DISABLE_SWSCALE
++	bool "Disable swscale"
++	default n
++
++config RV_TARGET_FFMPEG_DISABLE_SWRESAMPLE
++	bool "Disable swresample"
+ 	default n
+ 
+ config RV_TARGET_FFMPEG_DEMUXER_H264
+@@ -187,8 +238,29 @@ config RV_TARGET_FFMPEG_ENABLE_DECODER_AACLATM
+ 	bool "Enable decoder:aac_latm"
+ 	default n
+ 
++config RV_TARGET_FFMPEG_ENABLE_DECODER_AC3
++	bool "Enable decoder:ac3"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_DECODER_MPEG4
++	bool "Enable decoder:mpeg4"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_DECODER_H264
++	bool "Enable decoder:h264"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_DECODER_ASS
++	bool "Enable decoder:ass"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_DECODER_VORBIS
++	bool "Enable decoder:vorbis"
++	default n
++
+ config RV_TARGET_FFMPEG_ENABLE_DECODER_RKMPP
+ 	bool "Enable decoder:rk_mpp"
++	depends on RV_TARGET_FFMPEG_ENABLE_RKMPP
+ 	default n
+ 
+ 
+@@ -202,6 +274,7 @@ config RV_TARGET_FFMPEG_ENABLE_ENCODER_PCM32
+ 
+ config RV_TARGET_FFMPEG_ENABLE_ENCODER_RKMPP
+ 	bool "Enable encoder:rk_mpp"
++	depends on RV_TARGET_FFMPEG_ENABLE_RKMPP
+ 	default n
+ 
+ config RV_TARGET_FFMPEG_ENABLE_MUXER_PCM32
+@@ -292,8 +365,28 @@ config RV_TARGET_FFMPEG_ENABLE_DEMUXER_WAV
+ 	bool "Enable demuxer:wav"
+ 	default n
+ 
++config RV_TARGET_FFMPEG_ENABLE_DEMUXER_AC3
++	bool "Enable demuxer:ac3"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_DEMUXER_MPEGVIDEO
++	bool "Enable demuxer:mpegvideo"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_DEMUXER_MATROSKA
++	bool "Enable demuxer:matroska"
++	default n
++
++config RV_TARGET_FFMPEG_ENABLE_DEMUXER_ASS
++	bool "Enable demuxer:ass"
++	default n
++
+ config RV_TARGET_FFMPEG_ENABLE_PARSER_H264
+ 	bool "Enable parser:h264"
+ 	default n
+ 
++config RV_TARGET_FFMPEG_ENABLE_FILTER_ARESAMPLE
++	bool "Enable filter:aresample"
++	default n
++
+ endif
+diff --git a/configure b/configure
+index 66f2497..b0630f6 100755
+--- a/configure
++++ b/configure
+@@ -6237,7 +6237,7 @@ enabled openssl           && { check_pkg_config openssl openssl openssl/ssl.h OP
+ enabled rkmpp             && { require_pkg_config rkmpp rockchip_mpp  rockchip/rk_mpi.h mpp_create &&
+                                require_pkg_config rockchip_mpp "rockchip_mpp >= 1.3.7" rockchip/rk_mpi.h mpp_create &&
+                                { enabled libdrm ||
+-                                 die "ERROR: rkmpp requires --enable-libdrm"; }
++                                 warn "WARNING: rkmpp requires --enable-libdrm"; }
+                              }
+ enabled vapoursynth       && require_pkg_config vapoursynth "vapoursynth-script >= 42" VSScript.h vsscript_init
+ 
+diff --git a/ffmpeg.rvmk b/ffmpeg.rvmk
+index 9ffe027..bd2b729 100644
+--- a/ffmpeg.rvmk
++++ b/ffmpeg.rvmk
+@@ -18,28 +18,9 @@ FFMPEG_CONF_OPTS = \
+ 	--pkg-config=$(PKG_CONFIG_HOST_BINARY) \
+ 	--pkgconfigdir=$(TARGET_DIR)/lib/pkgconfig \
+ 	--enable-cross-compile \
+-	--disable-programs \
+ 	--disable-doc \
+-	--disable-avdevice \
+ 	--disable-postproc \
+-	--disable-swscale \
+-	--disable-avfilter \
+ 	--disable-w32threads --disable-os2threads \
+-	--disable-pixelutils \
+-	--disable-everything \
+-	--disable-hwaccels \
+-	--disable-audiotoolbox \
+-	--disable-iconv \
+-	--disable-libxcb \
+-	--disable-libxcb-shm \
+-	--disable-libxcb-xfixes \
+-	--disable-libxcb-shape \
+-	--disable-schannel \
+-	--disable-securetransport \
+-	--disable-videotoolbox \
+-	--disable-xlib \
+-	--disable-asm \
+-	--disable-zlib \
+ 	--cross-prefix=$(TARGET_CROSS) \
+ 	--target-os=linux \
+ 	--arch=armv7-a \
+@@ -76,6 +57,11 @@ FFMPEG_CONF_OPTS += --disable-ffprobe
+ endif
+ FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_DISABLE_FFPORBE
+ 
++ifeq ($(RV_TARGET_FFMPEG_DISABLE_FFMPEG),y)
++FFMPEG_CONF_OPTS += --disable-ffmpeg
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_DISABLE_FFMPEG
++
+ ifeq ($(RV_TARGET_FFMPEG_DISABLE_COREIMAGE),y)
+ FFMPEG_CONF_OPTS += --disable-coreimage
+ endif
+@@ -96,6 +82,11 @@ FFMPEG_CONF_OPTS += --disable-bsfs
+ endif
+ FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_DISABLE_BSFS
+ 
++ifeq ($(RV_TARGET_FFMPEG_DISABLE_EVERYTHING),y)
++FFMPEG_CONF_OPTS += --disable-everything
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_DISABLE_EVERYTHING
++
+ ifeq ($(RV_TARGET_FFMPEG_DISABLE_MUXERS),y)
+ FFMPEG_CONF_OPTS += --disable-muxers
+ endif
+@@ -111,6 +102,27 @@ FFMPEG_CONF_OPTS += --disable-filters
+ endif
+ FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_DISABLE_FILTERS
+ 
++ifeq ($(RV_TARGET_FFMPEG_DISABLE_DEVICES),y)
++FFMPEG_CONF_OPTS += --disable-devices
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_DISABLE_DEVICES
++
++ifeq ($(RV_TARGET_FFMPEG_DISABLE_AVDEVICES),y)
++FFMPEG_CONF_OPTS += --disable-avdevice
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_DISABLE_AVDEVICES
++
++ifeq ($(RV_TARGET_FFMPEG_DISABLE_AVFILTERS),y)
++FFMPEG_CONF_OPTS += --disable-avfilter
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_DISABLE_AVFILTERS
++
++ifeq ($(RV_TARGET_FFMPEG_DISABLE_SWSCALE),y)
++FFMPEG_CONF_OPTS += --disable-swscale
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_DISABLE_SWSCALE
++
++
+ ifeq ($(RV_TARGET_FFMPEG_DISABLE_ENCODERS),y)
+ FFMPEG_CONF_OPTS += --disable-encoders
+ endif
+@@ -277,6 +289,26 @@ FFMPEG_CONF_OPTS += --enable-small
+ endif
+ FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_SMALL
+ 
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_ION),y)
++FFMPEG_CONF_OPTS += --extra-cflags="-DCONFIG_ION"
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_ION
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_SDL),y)
++FFMPEG_CONF_OPTS += --enable-sdl
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_SDL
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_VERSION3),y)
++FFMPEG_CONF_OPTS += --enable-version3
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_VERSION3
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_RKMPP),y)
++FFMPEG_CONF_OPTS += --enable-rkmpp
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_RKMPP
++
+ ####################### DECODER ################################
+ 
+ ifeq ($(RV_TARGET_FFMPEG_ENABLE_DECODER_FDKAAC),y)
+@@ -309,6 +341,30 @@ FFMPEG_CONF_OPTS += --enable-decoder=h264_rkmpp
+ endif
+ FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DECODER_RKMPP
+ 
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_DECODER_AC3),y)
++FFMPEG_CONF_OPTS += --enable-decoder=ac3
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DECODER_AC3
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_DECODER_MPEG4),y)
++FFMPEG_CONF_OPTS += --enable-decoder=mpeg4
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DECODER_MPEG4
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_DECODER_H264),y)
++FFMPEG_CONF_OPTS += --enable-decoder=h264
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DECODER_H264
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_DECODER_ASS),y)
++FFMPEG_CONF_OPTS += --enable-decoder=ass
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DECODER_ASS
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_DECODER_VORBIS),y)
++FFMPEG_CONF_OPTS += --enable-decoder=vorbis
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DECODER_VORBIS
+ 
+ ##################### ENCODER #######################
+ 
+@@ -462,6 +518,26 @@ FFMPEG_CONF_OPTS += --enable-demuxer=wav
+ endif
+ FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DEMUXER_WAV
+ 
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_DEMUXER_AC3),y)
++FFMPEG_CONF_OPTS += --enable-demuxer=ac3
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DEMUXER_AC3
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_DEMUXER_MPEGVIDEO),y)
++FFMPEG_CONF_OPTS += --enable-demuxer=mpegvideo
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DEMUXER_MPEGVIDEO
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_DEMUXER_MATROSKA),y)
++FFMPEG_CONF_OPTS += --enable-demuxer=matroska
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DEMUXER_MATROSKA
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_DEMUXER_ASS),y)
++FFMPEG_CONF_OPTS += --enable-demuxer=ass
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_DEMUXER_ASS
++
+ ############# PARSER #######################
+ 
+ ifeq ($(RV_TARGET_FFMPEG_ENABLE_PARSER_H264),y)
+@@ -469,6 +545,14 @@ FFMPEG_CONF_OPTS += --enable-parser=h264
+ endif
+ FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_PARSER_H264
+ 
++############# FILTER #######################
++
++ifeq ($(RV_TARGET_FFMPEG_ENABLE_FILTER_ARESAMPLE),y)
++FFMPEG_CONF_OPTS += --enable-filter=aresample
++endif
++FFMPEG_CONFIGURE_DEP_CONFIGS += RV_TARGET_FFMPEG_ENABLE_FILTER_ARESAMPLE
++
++
+ FFMPEG_CONF_OPTS += --extra-cflags="$(FFMPEG_EXTRA_CFLAGS)"
+ 
+ $(eval $(rv-generic-configure))
+-- 
+2.7.4
+

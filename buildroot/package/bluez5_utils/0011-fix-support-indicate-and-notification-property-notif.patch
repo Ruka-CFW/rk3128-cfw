@@ -1,0 +1,56 @@
+From 672fc81b40ddae54867a05b0ae44bd379fc39112 Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Fri, 27 Dec 2019 15:18:22 +0800
+Subject: [PATCH] fix support indicate and notification property, notification
+ is not available
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ src/gatt-database.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/src/gatt-database.c b/src/gatt-database.c
+index 99c8ea2..af89dc3 100644
+--- a/src/gatt-database.c
++++ b/src/gatt-database.c
+@@ -1132,8 +1132,10 @@ static void send_notification_to_device(void *data, void *user_data)
+ 	if (!ccc)
+ 		return;
+ 
+-	if (!ccc->value[0] || (notify->conf && !(ccc->value[0] & 0x02)))
++	if (!ccc->value[0]) {
++		DBG("ccc->value[0]: 0x%2x", ccc->value[0]);
+ 		return;
++	}
+ 
+ 	device = btd_adapter_get_device(notify->database->adapter,
+ 						&device_state->bdaddr,
+@@ -1153,7 +1155,7 @@ static void send_notification_to_device(void *data, void *user_data)
+ 	 * TODO: If the device is not connected but bonded, send the
+ 	 * notification/indication when it becomes connected.
+ 	 */
+-	if (!notify->conf) {
++	if(ccc->value[0] & 0x01) {
+ 		DBG("GATT server sending notification");
+ 		bt_gatt_server_send_notification(server,
+ 					notify->handle, notify->value,
+@@ -1161,10 +1163,12 @@ static void send_notification_to_device(void *data, void *user_data)
+ 		return;
+ 	}
+ 
+-	DBG("GATT server sending indication");
+-	bt_gatt_server_send_indication(server, notify->handle, notify->value,
+-						notify->len, notify->conf,
+-						notify->user_data, NULL);
++	if(notify->conf && (ccc->value[0] & 0x02)) {
++		DBG("GATT server sending indication");
++		bt_gatt_server_send_indication(server, notify->handle, notify->value,
++							notify->len, notify->conf,
++							notify->user_data, NULL);
++	}
+ 
+ 	return;
+ 
+-- 
+2.7.4
+

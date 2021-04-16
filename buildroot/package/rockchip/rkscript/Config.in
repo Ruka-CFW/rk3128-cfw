@@ -1,0 +1,89 @@
+config BR2_PACKAGE_RKSCRIPT
+	bool "rockchip script"
+	help
+	  rockchip script for linux use.
+
+if BR2_PACKAGE_RKSCRIPT
+
+config BR2_PACKAGE_RKSCRIPT_USE_BUSYBOX_MOUNT
+	bool "use busybox mount"
+	default y
+	help
+	  use busybox mount
+endif
+
+config BR2_PACKAGE_USB_MODULE
+	bool "rockchip usb module"
+	help
+	  rockchip usb module support
+
+config BR2_PACKAGE_USB_MODULE_NAME
+	string "rockchip usb module name"
+	default "phy-rockchip-inno-usb2.ko"
+	depends on BR2_PACKAGE_USB_MODULE
+	help
+		rockchip usb module name
+config BR2_PACKAGE_USB_USER_CONFIG
+	bool "rockchip usb user config"
+	depends on BR2_PACKAGE_RKSCRIPT
+	help
+	  rockchip usb user config
+
+config BR2_PACKAGE_USB_USER_CONFIG_STRING
+	string "usb config"
+	depends on BR2_PACKAGE_USB_USER_CONFIG
+	help
+	  rockchip usb user config string,
+	  use \n to combine two functions like usb_adb_en\nusb_ums_en
+
+config BR2_PACKAGE_USB_MASS_STORAGE
+	bool "rockchip usb mass storage"
+	depends on BR2_PACKAGE_RKSCRIPT
+	depends on !BR2_PACKAGE_USB_USER_CONFIG
+	help
+	  rockchip usb mass storage (ums)
+
+config BR2_PACKAGE_USB_MASS_STORAGE_BLOCK
+	string "rockchip usb mass storage block"
+	default "/userdata/ums_shared.img"
+	depends on BR2_PACKAGE_USB_MASS_STORAGE
+	help
+	  Fill a block or image file to shared with ums
+
+config BR2_PACKAGE_USB_MASS_STORAGE_BLOCK_SIZE
+	string "rockchip usb mass storage block SIZE (uint M)"
+	default "8"
+	depends on BR2_PACKAGE_USB_MASS_STORAGE
+	help
+	  ums shared block size, not worked with exsit file or block
+
+config BR2_PACKAGE_USB_MASS_STORAGE_BLOCK_TYPE
+	string "rockchip usb mass storage block TYPE"
+	default "fat"
+	depends on BR2_PACKAGE_USB_MASS_STORAGE
+	help
+	  ums shared block type, not worked with exsit file or block
+
+config BR2_PACKAGE_USB_MASS_STORAGE_BLOCK_RO
+	bool "rockchip usb mass storage block read-only"
+	depends on BR2_PACKAGE_USB_MASS_STORAGE
+	help
+	  ums shared block is whether read-only
+
+config BR2_PACKAGE_USB_MASS_STORAGE_BLOCK_AUTO_MOUNT
+	bool "rockchip usb mass storage block auto mount"
+	depends on BR2_PACKAGE_USB_MASS_STORAGE
+	help
+	  Enable ums shared block auto mount
+	  mount when usb is disconnected, umount when usb is connected
+	  Warning that umount ums shared block may be failed, because
+	  usb is unabled to manage other applications which used ums
+	  shared block when usb was going to umount block.
+
+config BR2_PACKAGE_RKSCRIPT_DEFAULT_PCM
+	string "default PCM"
+	default "none"
+	depends on BR2_PACKAGE_RKSCRIPT
+
+	help
+	  Change alsa default PCM to you selected

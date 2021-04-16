@@ -1,0 +1,65 @@
+From 294ce786cba67f23ddc90c8aec9f928fb15655fc Mon Sep 17 00:00:00 2001
+From: Jinkun Hong <jinkun.hong@rock-chips.com>
+Date: Fri, 19 Jun 2020 14:30:34 +0800
+Subject: [PATCH] ObjectProxy add api
+
+Signed-off-by: Jinkun Hong <jinkun.hong@rock-chips.com>
+---
+ include/dbus-c++/object.h |  2 ++
+ src/object.cpp            | 12 +++++++++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+ mode change 100644 => 100755 include/dbus-c++/object.h
+ mode change 100644 => 100755 src/object.cpp
+
+diff --git a/include/dbus-c++/object.h b/include/dbus-c++/object.h
+old mode 100644
+new mode 100755
+index 3c68876..186b904
+--- a/include/dbus-c++/object.h
++++ b/include/dbus-c++/object.h
+@@ -204,6 +204,7 @@ class DXXAPI ObjectProxy : public Object, public virtual ProxyBase
+ public:
+ 
+   ObjectProxy(Connection &conn, const Path &path, const char *service = "");
++  ObjectProxy(int signal_en, Connection &conn, const Path &path, const char *service = "");
+ 
+   ~ObjectProxy();
+ 
+@@ -222,6 +223,7 @@ private:
+ 
+ private:
+ 
++  int _signal_en;
+   MessageSlot _filtered;
+ };
+ 
+diff --git a/src/object.cpp b/src/object.cpp
+old mode 100644
+new mode 100755
+index 96e20ba..1c75674
+--- a/src/object.cpp
++++ b/src/object.cpp
+@@ -293,9 +293,19 @@ ObjectProxy::ObjectProxy(Connection &conn, const Path &path, const char *service
+   register_obj();
+ }
+ 
++ObjectProxy::ObjectProxy(int signal_en, Connection &conn, const Path &path, const char *service)
++  : Object(conn, path, service)
++{
++  _signal_en = signal_en;
++  if (_signal_en)
++      register_obj();
++}
++
++
+ ObjectProxy::~ObjectProxy()
+ {
+-  unregister_obj(false);
++  if (_signal_en)
++    unregister_obj(false);
+ }
+ 
+ void ObjectProxy::register_obj()
+-- 
+2.7.4
+

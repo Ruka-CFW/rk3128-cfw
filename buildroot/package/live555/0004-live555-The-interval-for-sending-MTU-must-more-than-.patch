@@ -1,0 +1,91 @@
+From 6608abd684dee8fb0f9e5d998f30df995049640c Mon Sep 17 00:00:00 2001
+From: "jkand.huang" <jkand.huang@rock-chips.com>
+Date: Fri, 8 May 2020 17:48:22 +0800
+Subject: [PATCH] live555: The interval for sending MTU must more than 150us.
+
+Signed-off-by: jkand.huang <jkand.huang@rock-chips.com>
+---
+ liveMedia/MultiFramedRTPSink.cpp        | 17 ++++++++++++++++-
+ liveMedia/include/MultiFramedRTPSink.hh |  3 +++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/liveMedia/MultiFramedRTPSink.cpp b/liveMedia/MultiFramedRTPSink.cpp
+index 0554bf1..bf6f6af 100644
+--- a/liveMedia/MultiFramedRTPSink.cpp
++++ b/liveMedia/MultiFramedRTPSink.cpp
+@@ -53,6 +53,7 @@ MultiFramedRTPSink::MultiFramedRTPSink(UsageEnvironment& env,
+ 	    rtpPayloadFormatName, numChannels),
+     fOutBuf(NULL), fCurFragmentationOffset(0), fPreviousFrameEndedFragmentation(False),
+     fOnSendErrorFunc(NULL), fOnSendErrorData(NULL) {
++  clock_gettime(CLOCK_MONOTONIC, &fTimeLast);
+   setPacketSizes((RTP_PAYLOAD_PREFERRED_SIZE), (RTP_PAYLOAD_MAX_SIZE));
+ }
+ 
+@@ -242,6 +243,7 @@ void MultiFramedRTPSink
+   if (fIsFirstPacket) {
+     // Record the fact that we're starting to play now:
+     gettimeofday(&fNextSendTime, NULL);
++    clock_gettime(CLOCK_MONOTONIC, &fTimeLast);
+   }
+ 
+   fMostRecentPresentationTime = presentationTime;
+@@ -371,6 +373,7 @@ void MultiFramedRTPSink::sendPacketIfNecessary() {
+       if (!fRTPInterface.sendPacket(fOutBuf->packet(), fOutBuf->curPacketSize())) {
+ 	// if failure handler has been specified, call it
+ 	if (fOnSendErrorFunc != NULL) (*fOnSendErrorFunc)(fOnSendErrorData);
++    envir() << "=== sendPacketIfNecessary error ====.\n";
+       }
+     ++fPacketCount;
+     fTotalOctetCount += fOutBuf->curPacketSize();
+@@ -403,6 +406,7 @@ void MultiFramedRTPSink::sendPacketIfNecessary() {
+     // We have more frames left to send.  Figure out when the next frame
+     // is due to start playing, then make sure that we wait this long before
+     // sending the next packet.
++  #if 0
+     struct timeval timeNow;
+     gettimeofday(&timeNow, NULL);
+     int secsDiff = fNextSendTime.tv_sec - timeNow.tv_sec;
+@@ -410,7 +414,18 @@ void MultiFramedRTPSink::sendPacketIfNecessary() {
+     if (uSecondsToGo < 0 || secsDiff < 0) { // sanity check: Make sure that the time-to-delay is non-negative:
+       uSecondsToGo = 0;
+     }
+-
++  #else
++    // 100Mbit/s == 10MBit/s == 10KBit/ms == 10Bit/us
++    // MTU == 1500Bit == 150us
++    struct timespec timeNow = {0, 0};
++    clock_gettime(CLOCK_MONOTONIC, &timeNow);
++    int64_t time_diff = (timeNow.tv_sec - fTimeLast.tv_sec)*1000000 + (timeNow.tv_nsec - fTimeLast.tv_nsec)/1000;
++    fTimeLast = timeNow;
++    int64_t uSecondsToGo =  (150 - time_diff);
++
++    if(uSecondsToGo < 0)
++        uSecondsToGo = 0;
++  #endif
+     // Delay this amount of time:
+     nextTask() = envir().taskScheduler().scheduleDelayedTask(uSecondsToGo, (TaskFunc*)sendNext, this);
+   }
+diff --git a/liveMedia/include/MultiFramedRTPSink.hh b/liveMedia/include/MultiFramedRTPSink.hh
+index 63f1faa..ef8b7cc 100644
+--- a/liveMedia/include/MultiFramedRTPSink.hh
++++ b/liveMedia/include/MultiFramedRTPSink.hh
+@@ -26,6 +26,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
+ #include "RTPSink.hh"
+ #endif
+ 
++#include <time.h>
+ class MultiFramedRTPSink: public RTPSink {
+ public:
+   void setPacketSizes(unsigned preferredPacketSize, unsigned maxPacketSize);
+@@ -135,6 +136,8 @@ private:
+ 
+   onSendErrorFunc* fOnSendErrorFunc;
+   void* fOnSendErrorData;
++
++  struct timespec fTimeLast;
+ };
+ 
+ #endif
+-- 
+2.26.1
+

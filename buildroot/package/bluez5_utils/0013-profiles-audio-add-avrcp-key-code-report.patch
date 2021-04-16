@@ -1,0 +1,269 @@
+From 01f4a2711633226b0fa3a2b9833b6bb94efc08df Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Tue, 24 Mar 2020 19:42:23 +0800
+Subject: [PATCH] profiles audio add avrcp key code report
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ profiles/audio/avctp.c  | 59 +++++++++++++++++++++++++++++++++++++++++
+ profiles/audio/avctp.h  |  6 +++++
+ profiles/audio/avrcp.c  | 24 +++++++++++++++++
+ profiles/audio/player.c | 30 ++++++++++++++++++++-
+ profiles/audio/player.h |  1 +
+ 5 files changed, 119 insertions(+), 1 deletion(-)
+
+diff --git a/profiles/audio/avctp.c b/profiles/audio/avctp.c
+index 5f8625c..3d31d24 100644
+--- a/profiles/audio/avctp.c
++++ b/profiles/audio/avctp.c
+@@ -210,6 +210,7 @@ struct avctp {
+ 	struct avctp_channel *browsing;
+ 
+ 	struct avctp_passthrough_handler *handler;
++	struct avctp_keycode_handler *keycode_handler;
+ 
+ 	uint8_t key_quirks[256];
+ 	struct key_pressed key;
+@@ -229,6 +230,12 @@ struct avctp_pdu_handler {
+ 	unsigned int id;
+ };
+ 
++struct avctp_keycode_handler {
++	avctp_keycode_cb cb;
++	void *user_data;
++	unsigned int id;
++};
++
+ struct avctp_browsing_pdu_handler {
+ 	avctp_browsing_pdu_cb cb;
+ 	void *user_data;
+@@ -380,6 +387,7 @@ static size_t handle_panel_passthrough(struct avctp *session,
+ 					size_t operand_count, void *user_data)
+ {
+ 	struct avctp_passthrough_handler *handler = session->handler;
++	struct avctp_keycode_handler *keycode_handler = session->keycode_handler;
+ 	const char *status;
+ 	int pressed, i;
+ 
+@@ -399,6 +407,11 @@ static size_t handle_panel_passthrough(struct avctp *session,
+ 		pressed = 1;
+ 	}
+ 
++	if(pressed && keycode_handler != NULL) {
++		if(keycode_handler->cb)
++			keycode_handler->cb(session, operands[0] & 0x7F, keycode_handler->user_data);
++	}
++
+ 	if (session->key.timer == 0 && handler != NULL) {
+ 		if (handler->cb(session, operands[0] & 0x7F,
+ 						pressed, handler->user_data))
+@@ -1981,6 +1994,52 @@ bool avctp_unregister_passthrough_handler(unsigned int id)
+ 	return false;
+ }
+ 
++unsigned int avctp_register_keycode_handler(struct avctp *session,
++						avctp_keycode_cb cb,
++						void *user_data)
++{
++	struct avctp_channel *control = session->control;
++	struct avctp_keycode_handler *handler;
++	static unsigned int id = 0;
++
++	if (control == NULL || session->keycode_handler != NULL)
++		return 0;
++
++	handler = g_new(struct avctp_keycode_handler, 1);
++	handler->cb = cb;
++	handler->user_data = user_data;
++	handler->id = ++id;
++
++	session->keycode_handler = handler;
++
++	return handler->id;
++}
++
++bool avctp_unregister_keycode_handler(unsigned int id)
++{
++	GSList *l;
++
++	for (l = servers; l; l = l->next) {
++		struct avctp_server *server = l->data;
++		GSList *s;
++
++		for (s = server->sessions; s; s = s->next) {
++			struct avctp *session = s->data;
++
++			if (session->keycode_handler == NULL)
++				continue;
++
++			if (session->keycode_handler->id == id) {
++				g_free(session->keycode_handler);
++				session->keycode_handler = NULL;
++				return true;
++			}
++		}
++	}
++
++	return false;
++}
++
+ unsigned int avctp_register_pdu_handler(struct avctp *session, uint8_t opcode,
+ 						avctp_control_pdu_cb cb,
+ 						void *user_data)
+diff --git a/profiles/audio/avctp.h b/profiles/audio/avctp.h
+index 68a2735..0ce5ec6 100644
+--- a/profiles/audio/avctp.h
++++ b/profiles/audio/avctp.h
+@@ -127,6 +127,7 @@ typedef void (*avctp_state_cb) (struct btd_device *dev,
+ typedef bool (*avctp_passthrough_cb) (struct avctp *session,
+ 					uint8_t op, bool pressed,
+ 					void *user_data);
++typedef bool (*avctp_keycode_cb) (struct avctp *session, uint8_t op, void *user_data);
+ typedef size_t (*avctp_control_pdu_cb) (struct avctp *session,
+ 					uint8_t transaction, uint8_t *code,
+ 					uint8_t *subunit, uint8_t *operands,
+@@ -161,6 +162,11 @@ unsigned int avctp_register_passthrough_handler(struct avctp *session,
+ 						void *user_data);
+ bool avctp_unregister_passthrough_handler(unsigned int id);
+ 
++unsigned int avctp_register_keycode_handler(struct avctp *session,
++						avctp_keycode_cb cb,
++						void *user_data);
++bool avctp_unregister_keycode_handler(unsigned int id);
++
+ unsigned int avctp_register_pdu_handler(struct avctp *session, uint8_t opcode,
+ 						avctp_control_pdu_cb cb,
+ 						void *user_data);
+diff --git a/profiles/audio/avrcp.c b/profiles/audio/avrcp.c
+index 729f586..1242c47 100644
+--- a/profiles/audio/avrcp.c
++++ b/profiles/audio/avrcp.c
+@@ -270,6 +270,7 @@ struct avrcp {
+ 	const struct control_pdu_handler *control_handlers;
+ 
+ 	unsigned int passthrough_id;
++	unsigned int keycode_id;
+ 	unsigned int control_id;
+ 	unsigned int browsing_id;
+ 	unsigned int browsing_timer;
+@@ -1510,6 +1511,20 @@ static bool handle_passthrough(struct avctp *conn, uint8_t op, bool pressed,
+ 	return handler->func(session);
+ }
+ 
++static bool handle_keycode(struct avctp *conn, uint8_t op, void *user_data)
++{
++	struct avrcp *session = user_data;
++	struct avrcp_player *player = session->controller->player;
++	struct media_player *mp = player->user_data;
++
++	if(!session || !player || !mp) {
++		DBG("session or player or mp is null");
++		return;
++	}
++
++	media_player_set_key_code(mp, (uint32_t)op);
++}
++
+ static uint8_t avrcp_handle_register_notification(struct avrcp *session,
+ 						struct avrcp_header *pdu,
+ 						uint8_t transaction)
+@@ -4083,6 +4098,12 @@ static void session_init_control(struct avrcp *session)
+ 							handle_passthrough,
+ 							session);
+ 	session->passthrough_handlers = passthrough_handlers;
++
++	session->keycode_id = avctp_register_keycode_handler(
++							session->conn,
++							handle_keycode,
++							session);
++
+ 	session->control_id = avctp_register_pdu_handler(session->conn,
+ 							AVC_OP_VENDORDEP,
+ 							handle_vendordep_pdu,
+@@ -4157,6 +4178,9 @@ static void session_destroy(struct avrcp *session, int err)
+ 	if (session->passthrough_id > 0)
+ 		avctp_unregister_passthrough_handler(session->passthrough_id);
+ 
++	if(session->keycode_id > 0)
++		avctp_unregister_keycode_handler(session->keycode_id);
++
+ 	if (session->control_id > 0)
+ 		avctp_unregister_pdu_handler(session->control_id);
+ 
+diff --git a/profiles/audio/player.c b/profiles/audio/player.c
+index eaaa54c..74d9590 100644
+--- a/profiles/audio/player.c
++++ b/profiles/audio/player.c
+@@ -101,7 +101,8 @@ struct media_player {
+ 	struct player_callback	*cb;
+ 	GSList			*pending;
+ 	GSList			*folders;
+-	bool            pos_change;
++	bool			pos_change;
++	uint32_t		key_code;
+ };
+ 
+ static void append_track(void *key, void *value, void *user_data)
+@@ -464,6 +465,18 @@ static gboolean get_position_change(const GDBusPropertyTable *property,
+ 	return TRUE;
+ }
+ 
++static gboolean get_keycode(const GDBusPropertyTable *property,
++					DBusMessageIter *iter, void *data)
++{
++	struct media_player *mp = data;
++	uint32_t key_code;
++
++	key_code = mp->key_code;
++	dbus_message_iter_append_basic(iter, DBUS_TYPE_UINT32, &key_code);
++
++	return TRUE;
++}
++
+ static DBusMessage *media_player_getstatus(DBusConnection *conn, DBusMessage *msg,
+ 								void *data)
+ {
+@@ -758,6 +771,7 @@ static const GDBusPropertyTable media_player_properties[] = {
+ 	{ "Searchable", "b", get_searchable, NULL, searchable_exists },
+ 	{ "Playlist", "o", get_playlist, NULL, playlist_exists },
+ 	{ "PosChange", "b", get_position_change, NULL, NULL },
++	{ "KeyCode", "u", get_keycode, NULL, NULL },
+ 	{ }
+ };
+ 
+@@ -1563,6 +1577,20 @@ void media_player_set_poschange(struct media_player *mp, bool enabled)
+ 					"PosChange");
+ }
+ 
++void media_player_set_key_code(struct media_player *mp, uint32_t key_code)
++{
++	if(!mp) {
++		DBG("media_player == NULL");
++		return;
++	}
++
++	mp->key_code = key_code;
++
++	g_dbus_emit_property_changed(btd_get_dbus_connection(),
++					mp->path, MEDIA_PLAYER_INTERFACE,
++					"KeyCode");
++}
++
+ static DBusMessage *media_item_play(DBusConnection *conn, DBusMessage *msg,
+ 								void *data)
+ {
+diff --git a/profiles/audio/player.h b/profiles/audio/player.h
+index 70c89b6..bd260a2 100644
+--- a/profiles/audio/player.h
++++ b/profiles/audio/player.h
+@@ -92,6 +92,7 @@ void media_player_set_folder(struct media_player *mp, const char *path,
+ 								uint32_t items);
+ void media_player_set_playlist(struct media_player *mp, const char *name);
+ void media_player_set_poschange(struct media_player *mp, bool enabled);
++void media_player_set_key_code(struct media_player *mp, uint32_t key_code);
+ struct media_item *media_player_set_playlist_item(struct media_player *mp,
+ 								uint64_t uid);
+ 
+-- 
+2.25.0
+

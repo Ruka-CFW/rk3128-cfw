@@ -1,0 +1,148 @@
+From 39d1b5a22a2a69f56a8b81ef1dcd5e51703a48a2 Mon Sep 17 00:00:00 2001
+From: Giulio Camuffo <giulio.camuffo@kdab.com>
+Date: Sat, 1 Jul 2017 09:53:07 +0200
+Subject: [PATCH 05/18] Handle maximize/minimize/fullscreen in xdg_shell_v6
+
+Change-Id: I385eb3279d91f1c38d2f5d46bc63b324f0456ca4
+---
+ src/client/qwaylandwindow.cpp     |  6 ++-
+ src/client/qwaylandxdgshellv6.cpp | 61 +++++++++++++++++++++++++++++--
+ src/client/qwaylandxdgshellv6_p.h |  8 +++-
+ 3 files changed, 69 insertions(+), 6 deletions(-)
+
+diff --git a/src/client/qwaylandwindow.cpp b/src/client/qwaylandwindow.cpp
+index 43f85d57..3cb0e934 100644
+--- a/src/client/qwaylandwindow.cpp
++++ b/src/client/qwaylandwindow.cpp
+@@ -1001,7 +1001,11 @@ bool QWaylandWindow::setWindowStateInternal(Qt::WindowState state)
+     // As of february 2013 QWindow::setWindowState sets the new state value after
+     // QPlatformWindow::setWindowState returns, so we cannot rely on QWindow::windowState
+     // here. We use then this mState variable.
+-    mState = state;
++    // NOTE: The compositor does not tell us when the window is not minimized anymore,
++    // so we store the state except for the WindowMinimized value, to make sure that
++    // the equality check above does not return true when setWindowState(Qt::WindowMinimized)
++    // is called, even though the window is actually not minimized anymore.
++    mState = (Qt::WindowState)((int)state | (state & !Qt::WindowMinimized));
+ 
+     if (mShellSurface) {
+         createDecoration();
+diff --git a/src/client/qwaylandxdgshellv6.cpp b/src/client/qwaylandxdgshellv6.cpp
+index 63c79c9c..ac974536 100644
+--- a/src/client/qwaylandxdgshellv6.cpp
++++ b/src/client/qwaylandxdgshellv6.cpp
+@@ -56,6 +56,8 @@ QWaylandXdgSurfaceV6::Toplevel::Toplevel(QWaylandXdgSurfaceV6 *xdgSurface)
+     : QtWayland::zxdg_toplevel_v6(xdgSurface->get_toplevel())
+     , m_xdgSurface(xdgSurface)
+ {
++    m_configureState.fullscreen = false;
++    m_configureState.maximized = false;
+ }
+ 
+ QWaylandXdgSurfaceV6::Toplevel::~Toplevel()
+@@ -75,13 +77,35 @@ void QWaylandXdgSurfaceV6::Toplevel::zxdg_toplevel_v6_configure(int32_t width, i
+     m_configureState.width = width;
+     m_configureState.height = height;
+ 
++    bool wasMaximized = m_configureState.maximized;
++    bool wasFullscreen = m_configureState.fullscreen;
++
+     uint32_t *state = reinterpret_cast<uint32_t *>(states->data);
+     size_t numStates = states->size / sizeof(uint32_t);
+-    m_configureState.states.reserve(numStates);
+-    m_configureState.states.clear();
+ 
+-    for (size_t i = 0; i < numStates; i++)
+-        m_configureState.states << state[i];
++    m_configureState.fullscreen = false;
++    m_configureState.maximized = false;
++
++    for (size_t i = 0; i < numStates; i++) {
++        switch (state[i]) {
++            case ZXDG_TOPLEVEL_V6_STATE_MAXIMIZED:
++                m_configureState.maximized = true;
++                break;
++            case ZXDG_TOPLEVEL_V6_STATE_FULLSCREEN:
++                m_configureState.fullscreen = true;
++                break;
++            default:
++                break;
++        }
++    }
++
++    if ((!wasMaximized && m_configureState.maximized) || (!wasFullscreen && m_configureState.fullscreen))
++        m_normalSize = m_xdgSurface->m_window->window()->frameGeometry().size();
++
++    if ((width == 0 || height == 0) && !m_normalSize.isEmpty()) {
++        m_configureState.width = m_normalSize.width();
++        m_configureState.height = m_normalSize.height();
++    }
+ }
+ 
+ void QWaylandXdgSurfaceV6::Toplevel::zxdg_toplevel_v6_close()
+@@ -237,6 +261,35 @@ void QWaylandXdgSurfaceV6::zxdg_surface_v6_configure(uint32_t serial)
+     }
+ }
+ 
++void QWaylandXdgSurfaceV6::setMaximized()
++{
++    if (m_toplevel)
++        m_toplevel->set_maximized();
++}
++
++void QWaylandXdgSurfaceV6::setFullscreen()
++{
++    if (m_toplevel)
++        m_toplevel->set_fullscreen(nullptr);
++}
++
++void QWaylandXdgSurfaceV6::setNormal()
++{
++    if (!m_toplevel)
++        return;
++
++    if (m_toplevel->m_configureState.maximized)
++        m_toplevel->unset_maximized();
++    if (m_toplevel->m_configureState.fullscreen)
++        m_toplevel->unset_fullscreen();
++}
++
++void QWaylandXdgSurfaceV6::setMinimized()
++{
++    if (m_toplevel)
++        m_toplevel->set_minimized();
++}
++
+ 
+ 
+ QWaylandXdgShellV6::QWaylandXdgShellV6(struct ::wl_registry *registry, uint32_t id, uint32_t availableVersion)
+diff --git a/src/client/qwaylandxdgshellv6_p.h b/src/client/qwaylandxdgshellv6_p.h
+index e824f99d..fbcaafda 100644
+--- a/src/client/qwaylandxdgshellv6_p.h
++++ b/src/client/qwaylandxdgshellv6_p.h
+@@ -89,6 +89,10 @@ public:
+ 
+ protected:
+     void zxdg_surface_v6_configure(uint32_t serial) override;
++    void setMaximized() override;
++    void setFullscreen() override;
++    void setNormal() override;
++    void setMinimized() override;
+ 
+ private:
+     class Toplevel: public QtWayland::zxdg_toplevel_v6
+@@ -104,8 +108,10 @@ private:
+ 
+         struct {
+             int32_t width, height;
+-            QVarLengthArray<uint32_t> states;
++            bool maximized;
++            bool fullscreen;
+         } m_configureState;
++        QSize m_normalSize;
+ 
+         QWaylandXdgSurfaceV6 *m_xdgSurface;
+     };
+-- 
+2.20.1
+

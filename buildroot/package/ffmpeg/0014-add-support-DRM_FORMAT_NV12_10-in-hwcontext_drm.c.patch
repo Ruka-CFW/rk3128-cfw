@@ -1,0 +1,106 @@
+From d5fa99a52db9a974158e1c0ad305012d37c9cd92 Mon Sep 17 00:00:00 2001
+From: Hertz Wang <wangh@rock-chips.com>
+Date: Thu, 8 Aug 2019 01:27:57 +0000
+Subject: [PATCH 2/4] add support DRM_FORMAT_NV12_10 in hwcontext_drm.c
+
+Change-Id: Ic40eb163b672fa3b2686ff481f93d010da38a32b
+Signed-off-by: Hertz Wang <wangh@rock-chips.com>
+---
+ libavcodec/rkmppdec.c     |  2 +-
+ libavutil/hwcontext_drm.c | 30 ++++++++++++++++++++----------
+ libavutil/hwcontext_drm.h |  4 ++++
+ 3 files changed, 25 insertions(+), 11 deletions(-)
+
+diff --git a/libavcodec/rkmppdec.c b/libavcodec/rkmppdec.c
+index 5e13c7c..3584c9a 100644
+--- a/libavcodec/rkmppdec.c
++++ b/libavcodec/rkmppdec.c
+@@ -371,7 +371,7 @@ static int rkmpp_retrieve_frame(AVCodecContext *avctx, AVFrame *frame)
+             hwframes = (AVHWFramesContext*)decoder->frames_ref->data;
+             hwframes->format    = AV_PIX_FMT_DRM_PRIME;
+ #ifndef CONFIG_ION
+-            hwframes->sw_format = drmformat == DRM_FORMAT_NV12 ? AV_PIX_FMT_NV12 : AV_PIX_FMT_NONE;
++            hwframes->sw_format = av_drm_get_pixfmt(drmformat);
+ #else
+             hwframes->sw_format = AV_PIX_FMT_NONE;
+ #endif
+diff --git a/libavutil/hwcontext_drm.c b/libavutil/hwcontext_drm.c
+index 29cfaff..77b4059 100644
+--- a/libavutil/hwcontext_drm.c
++++ b/libavutil/hwcontext_drm.c
+@@ -28,7 +28,6 @@
+ #include "hwcontext.h"
+ #include "hwcontext_drm.h"
+ #include "hwcontext_internal.h"
+-#include "imgutils.h"
+ 
+ /**
+  * Copy from libdrm_macros.h while is not exposed by libdrm,
+@@ -91,6 +90,18 @@ static const struct {
+     enum AVPixelFormat pixfmt;
+     uint32_t drm_format;
+ } supported_formats[] = {
++    { AV_PIX_FMT_NV12,      DRM_FORMAT_NV12,        },
++#ifdef DRM_FORMAT_NV12_10
++    { AV_PIX_FMT_P010LE,    DRM_FORMAT_NV12_10,     },
++    { AV_PIX_FMT_P010BE,    DRM_FORMAT_NV12_10  | DRM_FORMAT_BIG_ENDIAN },
++#endif
++    { AV_PIX_FMT_NV21,      DRM_FORMAT_NV21,        },
++    { AV_PIX_FMT_YUV420P,   DRM_FORMAT_YUV420,      },
++    { AV_PIX_FMT_YUYV422,   DRM_FORMAT_YUYV,        },
++    { AV_PIX_FMT_YVYU422,   DRM_FORMAT_YVYU,        },
++    { AV_PIX_FMT_UYVY422,   DRM_FORMAT_UYVY,        },
++    { AV_PIX_FMT_NV16,      DRM_FORMAT_NV16,        },
++    { AV_PIX_FMT_YUV422P,   DRM_FORMAT_YUV422,      },
+ #ifdef DRM_FORMAT_R16
+     { AV_PIX_FMT_GRAY16LE,  DRM_FORMAT_R16,         },
+     { AV_PIX_FMT_GRAY16BE,  DRM_FORMAT_R16      | DRM_FORMAT_BIG_ENDIAN },
+@@ -114,17 +125,16 @@ static const struct {
+     { AV_PIX_FMT_ABGR,      DRM_FORMAT_RGBA8888,    },
+     { AV_PIX_FMT_RGBA,      DRM_FORMAT_ABGR8888,    },
+     { AV_PIX_FMT_BGRA,      DRM_FORMAT_ARGB8888,    },
+-    { AV_PIX_FMT_YUYV422,   DRM_FORMAT_YUYV,        },
+-    { AV_PIX_FMT_YVYU422,   DRM_FORMAT_YVYU,        },
+-    { AV_PIX_FMT_UYVY422,   DRM_FORMAT_UYVY,        },
+-    { AV_PIX_FMT_NV16,      DRM_FORMAT_NV16,        },
+-    { AV_PIX_FMT_YUV422P,   DRM_FORMAT_YUV422,      },
+-    { AV_PIX_FMT_NV21,      DRM_FORMAT_NV21,        },
+-    { AV_PIX_FMT_NV12,      DRM_FORMAT_NV12,        },
+-    { AV_PIX_FMT_P010,      DRM_FORMAT_NV12_10,     },
+-    { AV_PIX_FMT_YUV420P,   DRM_FORMAT_YUV420,      },
+ };
+ 
++enum AVPixelFormat av_drm_get_pixfmt(uint32_t drm_format) {
++    for (int i = 0; i < FF_ARRAY_ELEMS(supported_formats); i++) {
++        if (supported_formats[i].drm_format == drm_format)
++            return supported_formats[i].pixfmt;
++    }
++    return AV_PIX_FMT_NONE;
++}
++
+ static void drm_device_free(AVHWDeviceContext *hwdev)
+ {
+     AVDRMDeviceContext *hwctx = hwdev->hwctx;
+diff --git a/libavutil/hwcontext_drm.h b/libavutil/hwcontext_drm.h
+index fe64f97..1bc642b 100644
+--- a/libavutil/hwcontext_drm.h
++++ b/libavutil/hwcontext_drm.h
+@@ -22,6 +22,8 @@
+ #include <stddef.h>
+ #include <stdint.h>
+ 
++#include "imgutils.h"
++
+ /**
+  * @file
+  * API-specific header for AV_HWDEVICE_TYPE_DRM.
+@@ -172,4 +174,6 @@ typedef struct AVDRMDeviceContext {
+     int fd;
+ } AVDRMDeviceContext;
+ 
++enum AVPixelFormat av_drm_get_pixfmt(uint32_t drm_format);
++
+ #endif /* AVUTIL_HWCONTEXT_DRM_H */
+-- 
+2.7.4
+

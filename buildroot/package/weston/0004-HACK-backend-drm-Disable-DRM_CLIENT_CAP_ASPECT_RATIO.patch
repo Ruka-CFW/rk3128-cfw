@@ -1,0 +1,33 @@
+From c7ca326b4f61ed89127cf683eaaf18045e156931 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Tue, 23 Jun 2020 17:17:13 +0800
+Subject: [PATCH 04/41] HACK: backend-drm: Disable DRM_CLIENT_CAP_ASPECT_RATIO
+
+This conflicts with custom cap in Rockchip BSP 4.4 kernel.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ libweston/backend-drm/kms.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/libweston/backend-drm/kms.c b/libweston/backend-drm/kms.c
+index 054077c..94d190a 100644
+--- a/libweston/backend-drm/kms.c
++++ b/libweston/backend-drm/kms.c
+@@ -1481,10 +1481,13 @@ init_kms_caps(struct drm_backend *b)
+ 	if (!b->atomic_modeset || getenv("WESTON_FORCE_RENDERER"))
+ 		b->sprites_are_broken = true;
+ 
++	/* HACK: This conflicts with custom cap in Rockchip BSP 4.4 kernel */
++#if 0
+ 	ret = drmSetClientCap(b->drm.fd, DRM_CLIENT_CAP_ASPECT_RATIO, 1);
+ 	b->aspect_ratio_supported = (ret == 0);
+ 	weston_log("DRM: %s picture aspect ratio\n",
+ 		   b->aspect_ratio_supported ? "supports" : "does not support");
++#endif
+ 
+ 	return 0;
+ }
+-- 
+2.20.1
+

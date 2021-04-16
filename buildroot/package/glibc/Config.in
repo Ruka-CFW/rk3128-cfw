@@ -1,0 +1,27 @@
+if BR2_TOOLCHAIN_BUILDROOT_GLIBC
+
+config BR2_PACKAGE_GLIBC
+	bool
+	default y
+	select BR2_PACKAGE_LINUX_HEADERS
+	select BR2_TOOLCHAIN_HAS_SSP if BR2_PACKAGE_HOST_BINUTILS_SUPPORTS_CFI
+	help
+	  https://www.gnu.org/software/libc/
+
+if BR2_PACKAGE_GLIBC
+
+config BR2_PACKAGE_GLIBC_GEN_LD_CACHE
+	bool "glibc gen ld.so.cache"
+	default y
+	select BR2_PACKAGE_HOST_QEMU
+	select BR2_PACKAGE_HOST_QEMU_LINUX_USER_MODE
+
+config BR2_PACKAGE_GLIBC_2_22
+	bool "glibc 2.22"
+	default y if !BR2_TOOLCHAIN_HEADERS_AT_LEAST_3_2
+	# No support for pthread barriers on < v9 ISA
+	depends on !BR2_sparc
+
+endif
+
+endif

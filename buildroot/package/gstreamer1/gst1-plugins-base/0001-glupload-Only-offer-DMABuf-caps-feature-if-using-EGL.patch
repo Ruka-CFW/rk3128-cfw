@@ -1,0 +1,39 @@
+From 0f5cb1d469f781e028d0283678ebdccc87533bc9 Mon Sep 17 00:00:00 2001
+From: Nicolas Dufresne <nicolas.dufresne@collabora.com>
+Date: Tue, 17 Jul 2018 11:43:40 -0400
+Subject: [PATCH 01/45] glupload: Only offer DMABuf caps feature if using EGL
+
+This was miss-leading VAAPI which was not forcing linear back buffers,
+would still export DMABuf. That caused bad rendering as the buffers are
+tiled and most likely compressed.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=796822
+(cherry picked from commit 63cf6b42033aa8f3fb0b007517a6dd02a81690a4)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ gst-libs/gst/gl/gstglupload.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/gst-libs/gst/gl/gstglupload.c b/gst-libs/gst/gl/gstglupload.c
+index fa4884a322..1432cf7c1c 100644
+--- a/gst-libs/gst/gl/gstglupload.c
++++ b/gst-libs/gst/gl/gstglupload.c
+@@ -514,6 +514,15 @@ _dma_buf_upload_transform_caps (gpointer impl, GstGLContext * context,
+       (GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION);
+   GstCaps *ret;
+ 
++  if (context) {
++    /* Don't propose DMABuf caps feature unless it can be supported */
++    if (gst_gl_context_get_gl_platform (context) != GST_GL_PLATFORM_EGL)
++      return NULL;
++
++    if (!gst_gl_context_check_feature (context, "EGL_KHR_image_base"))
++      return NULL;
++  }
++
+   if (direction == GST_PAD_SINK) {
+     GstCaps *tmp;
+ 
+-- 
+2.11.0
+

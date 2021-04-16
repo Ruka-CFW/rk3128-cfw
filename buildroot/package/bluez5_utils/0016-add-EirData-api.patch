@@ -1,0 +1,117 @@
+From bc772a97b2f21609aa857ca509818ea9a3fb85ee Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Wed, 8 Jul 2020 14:55:07 +0800
+Subject: [PATCH] add EirData api
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ src/adapter.c |  1 +
+ src/device.c  | 39 +++++++++++++++++++++++++++++++++++++++
+ src/device.h  |  1 +
+ 3 files changed, 41 insertions(+)
+
+diff --git a/src/adapter.c b/src/adapter.c
+index 1472d81..cd54926 100644
+--- a/src/adapter.c
++++ b/src/adapter.c
+@@ -6014,6 +6014,7 @@ static void update_found_devices(struct btd_adapter *adapter,
+ 		return;
+ 	}
+ 
++	device_set_eri_data(dev, data, data_len);
+ 	device_update_last_seen(dev, bdaddr_type);
+ 
+ 	/*
+diff --git a/src/device.c b/src/device.c
+index c1da35c..61f3c41 100644
+--- a/src/device.c
++++ b/src/device.c
+@@ -92,6 +92,8 @@
+ #define GATT_INCLUDE_UUID_STR "2802"
+ #define GATT_CHARAC_UUID_STR "2803"
+ 
++#define GATT_EIR_DATA_LEN 240
++
+ static DBusConnection *dbus_conn = NULL;
+ static unsigned service_state_cb_id;
+ 
+@@ -262,6 +264,8 @@ struct btd_device {
+ 
+ 	GIOChannel	*att_io;
+ 	guint		store_id;
++
++	uint8_t		eir_data[GATT_EIR_DATA_LEN];
+ };
+ 
+ static const uint16_t uuid_list[] = {
+@@ -727,6 +731,22 @@ static gboolean dev_property_get_address(const GDBusPropertyTable *property,
+ 	return TRUE;
+ }
+ 
++static gboolean dev_property_get_eir_data(const GDBusPropertyTable *property,
++					DBusMessageIter *iter, void *user_data)
++{
++	struct btd_device *device = user_data;
++	const char *ptr = device->eir_data;
++	DBusMessageIter array;
++
++	dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY,
++					DBUS_TYPE_BYTE_AS_STRING, &array);
++	dbus_message_iter_append_fixed_array(&array, DBUS_TYPE_BYTE,
++					&ptr, sizeof(device->eir_data));
++	dbus_message_iter_close_container(iter, &array);
++
++	return TRUE;
++}
++
+ static gboolean property_get_address_type(const GDBusPropertyTable *property,
+ 					DBusMessageIter *iter, void *user_data)
+ {
+@@ -2755,6 +2775,7 @@ static const GDBusPropertyTable device_properties[] = {
+ 				NULL, dev_property_advertising_data_exist,
+ 				G_DBUS_PROPERTY_FLAG_EXPERIMENTAL },
+ 	{ "MTU", "q", dev_property_get_client_mtu },
++	{ "EirData", "ay", dev_property_get_eir_data },
+ 	{ }
+ };
+ 
+@@ -5597,6 +5618,24 @@ void device_set_flags(struct btd_device *device, uint8_t flags)
+ 					DEVICE_INTERFACE, "AdvertisingFlags");
+ }
+ 
++void device_set_eri_data(struct btd_device *device, const uint8_t *data, uint8_t data_len)
++{
++	int len;
++
++	if (!device)
++		return;
++
++	if(!data || data_len <= 0)
++		return;
++
++	if(!strcmp(device->eir_data, data))
++		return;
++
++	len = data_len > GATT_EIR_DATA_LEN ? GATT_EIR_DATA_LEN : data_len;
++	memset(device->eir_data, 0, GATT_EIR_DATA_LEN);
++	memcpy(device->eir_data, data, len);
++}
++
+ bool device_is_connectable(struct btd_device *device)
+ {
+ 	if (!device)
+diff --git a/src/device.h b/src/device.h
+index 06b1004..1f1d7fb 100644
+--- a/src/device.h
++++ b/src/device.h
+@@ -107,6 +107,7 @@ void device_set_rssi_with_delta(struct btd_device *device, int8_t rssi,
+ void device_set_rssi(struct btd_device *device, int8_t rssi);
+ void device_set_tx_power(struct btd_device *device, int8_t tx_power);
+ void device_set_flags(struct btd_device *device, uint8_t flags);
++void device_set_eri_data(struct btd_device *device, const uint8_t *data, uint8_t data_len);
+ bool btd_device_is_connected(struct btd_device *dev);
+ uint8_t btd_device_get_bdaddr_type(struct btd_device *dev);
+ bool device_is_retrying(struct btd_device *device);
+-- 
+2.26.1
+

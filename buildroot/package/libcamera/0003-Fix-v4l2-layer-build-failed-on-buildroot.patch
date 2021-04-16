@@ -1,0 +1,30 @@
+From 2da2df3e391ecd9c6aa266bec3dc0a76fbaf6ddf Mon Sep 17 00:00:00 2001
+From: Cody Xie <cody.xie@rock-chips.com>
+Date: Thu, 9 Apr 2020 21:31:47 +0800
+Subject: [PATCH 3/3] Fix v4l2 layer build failed on buildroot
+
+Signed-off-by: Cody Xie <cody.xie@rock-chips.com>
+---
+ src/v4l2/meson.build | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/v4l2/meson.build b/src/v4l2/meson.build
+index efab968..aa36a03 100644
+--- a/src/v4l2/meson.build
++++ b/src/v4l2/meson.build
+@@ -11,9 +11,9 @@ v4l2_compat_cpp_args = [
+     # renamed, for instance open() being renamed to open64(). As the V4L2
+     # adaptation wrapper needs to provide both 32-bit and 64-bit versions of
+     # file operations, disable transparent large file support.
+-    '-U_FILE_OFFSET_BITS',
+-    '-D_FILE_OFFSET_BITS=32',
+-    '-fvisibility=hidden',
++    #'-U_FILE_OFFSET_BITS',
++    #'-D_FILE_OFFSET_BITS=32',
++    #'-fvisibility=hidden',
+ ]
+ 
+ v4l2_compat = shared_library('v4l2-compat',
+-- 
+2.18.0
+

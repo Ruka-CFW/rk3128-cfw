@@ -1,0 +1,62 @@
+From 2d49cfc425c18e2e0cd868ad33e4bc14733b75a1 Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Tue, 7 Apr 2020 10:31:47 +0800
+Subject: [PATCH] ble server send notification when ccc value = 0x0003(enable
+ notifications and indications)
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ src/gatt-database.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/src/gatt-database.c b/src/gatt-database.c
+index af89dc3..7534b39 100644
+--- a/src/gatt-database.c
++++ b/src/gatt-database.c
+@@ -1163,7 +1163,7 @@ static void send_notification_to_device(void *data, void *user_data)
+ 		return;
+ 	}
+ 
+-	if(notify->conf && (ccc->value[0] & 0x02)) {
++	if(notify->conf && ((ccc->value[0] & 0x02) || (ccc->value[0] & 0x03))) {
+ 		DBG("GATT server sending indication");
+ 		bt_gatt_server_send_indication(server, notify->handle, notify->value,
+ 							notify->len, notify->conf,
+@@ -2382,11 +2382,34 @@ static uint8_t ccc_write_cb(struct pending_op *op, void *user_data)
+ 		/* Maximum number of per-device CCC descriptors configured */
+ 		return BT_ATT_ERROR_INSUFFICIENT_RESOURCES;
+ 
++	//or modify gatt-client.c -> notify_data_write_ccc
++#if 0
+ 	/* Don't support undefined CCC values yet */
+ 	if (value > 2 ||
+ 		(value == 1 && !(chrc->props & BT_GATT_CHRC_PROP_NOTIFY)) ||
+ 		(value == 2 && !(chrc->props & BT_GATT_CHRC_PROP_INDICATE)))
+ 		return BT_ERROR_CCC_IMPROPERLY_CONFIGURED;
++#else
++	switch(value) {
++		case 1:
++			if(!(chrc->props & BT_GATT_CHRC_PROP_NOTIFY))
++				return BT_ERROR_CCC_IMPROPERLY_CONFIGURED;
++			break;
++
++		case 2:
++			if(!(chrc->props & BT_GATT_CHRC_PROP_INDICATE))
++				return BT_ERROR_CCC_IMPROPERLY_CONFIGURED;
++			break;
++
++		case 3:
++			if(!(chrc->props & BT_GATT_CHRC_PROP_NOTIFY) || !(chrc->props & BT_GATT_CHRC_PROP_INDICATE))
++				return BT_ERROR_CCC_IMPROPERLY_CONFIGURED;
++			break;
++
++		default:
++			return BT_ERROR_CCC_IMPROPERLY_CONFIGURED;
++	}
++#endif
+ 
+ 	if (chrc->notify_io) {
+ 		__sync_fetch_and_add(&chrc->ntfy_cnt, 1);
+-- 
+2.25.0
+

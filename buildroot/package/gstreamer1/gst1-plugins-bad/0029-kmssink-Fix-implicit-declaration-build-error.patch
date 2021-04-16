@@ -1,0 +1,39 @@
+From 89cd410d1b97d46ae1187f14a6314926b958dd7c Mon Sep 17 00:00:00 2001
+From: Seungha Yang <seungha.yang@navercorp.com>
+Date: Wed, 17 Jul 2019 01:05:32 +0900
+Subject: [PATCH 29/60] kmssink: Fix implicit declaration build error
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+ffs() and strcmp() require string.h
+
+gstkmssink.c:255:28: error: implicit declaration of function ‘ffs’ [-Werror=implicit-function-declaration]
+       crtc_id = res->crtcs[ffs (crtcs_for_connector) - 1];
+                            ^~~
+
+gstkmssink.c:590:10: error: implicit declaration of function ‘strcmp’ [-Werror=implicit-function-declaration]
+     if (!strcmp (property->name, prop_name)) {
+          ^~~~~~
+
+(cherry picked from commit c64cdf2ff3f666e59600142b27788dd9fe88cf3e)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ sys/kms/gstkmssink.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/sys/kms/gstkmssink.c b/sys/kms/gstkmssink.c
+index 4386987f7..4095b35da 100644
+--- a/sys/kms/gstkmssink.c
++++ b/sys/kms/gstkmssink.c
+@@ -50,6 +50,7 @@
+ #include <xf86drm.h>
+ #include <xf86drmMode.h>
+ #include <drm_fourcc.h>
++#include <string.h>
+ 
+ #include "gstkmssink.h"
+ #include "gstkmsutils.h"
+-- 
+2.20.1
+

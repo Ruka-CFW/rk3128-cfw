@@ -1,0 +1,31 @@
+From 4de2fde3eae932430c3bc24e2eb3130cb9cc6c3d Mon Sep 17 00:00:00 2001
+From: Jonas Larsson <ljonas@google.com>
+Date: Wed, 28 Aug 2019 11:24:01 -0700
+Subject: [PATCH 32/45] eglimage: Fix memory leak
+
+Also free the GstEGLImage struct allocated by g_new0.
+
+Fixes #661
+
+(cherry picked from commit 94984e13a9208b0b6d69dea597f42b225ef1f784)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ gst-libs/gst/gl/egl/gsteglimage.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/gst-libs/gst/gl/egl/gsteglimage.c b/gst-libs/gst/gl/egl/gsteglimage.c
+index 7fad6b5d34..17afe044de 100644
+--- a/gst-libs/gst/gl/egl/gsteglimage.c
++++ b/gst-libs/gst/gl/egl/gsteglimage.c
+@@ -143,6 +143,8 @@ _gst_egl_image_free (GstMiniObject * object)
+         (GstGLContextThreadFunc) _gst_egl_image_free_thread, image);
+     gst_object_unref (image->context);
+   }
++
++  g_free (image);
+ }
+ 
+ static GstMiniObject *
+-- 
+2.11.0
+

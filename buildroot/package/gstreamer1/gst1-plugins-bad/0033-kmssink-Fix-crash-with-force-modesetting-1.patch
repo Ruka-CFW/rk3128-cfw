@@ -1,0 +1,59 @@
+From fe05a81e4d727406981be33b56297be11c87d9ed Mon Sep 17 00:00:00 2001
+From: Nicolas Dufresne <nicolas.dufresne@collabora.com>
+Date: Fri, 31 Jan 2020 09:47:59 -0500
+Subject: [PATCH 33/60] kmssink: Fix crash with force-modesetting=1
+
+This is a master regression, we would allocate a bo without having
+created the allocator yet. As of now, we lazily create the allocator.
+
+(cherry picked from commit 115b65d1abd9e7231d40bc31f5c9e75ff8262552)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ sys/kms/gstkmssink.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/sys/kms/gstkmssink.c b/sys/kms/gstkmssink.c
+index 69a8c3658..d2c82df04 100644
+--- a/sys/kms/gstkmssink.c
++++ b/sys/kms/gstkmssink.c
+@@ -410,6 +410,14 @@ get_drm_caps (GstKMSSink * self)
+   return TRUE;
+ }
+ 
++static void
++ensure_kms_allocator (GstKMSSink * self)
++{
++  if (self->allocator)
++    return;
++  self->allocator = gst_kms_allocator_new (self->fd);
++}
++
+ static gboolean
+ configure_mode_setting (GstKMSSink * self, GstVideoInfo * vinfo)
+ {
+@@ -431,6 +439,7 @@ configure_mode_setting (GstKMSSink * self, GstVideoInfo * vinfo)
+ 
+   GST_INFO_OBJECT (self, "configuring mode setting");
+ 
++  ensure_kms_allocator (self);
+   kmsmem = (GstKMSMemory *) gst_kms_allocator_bo_alloc (self->allocator, vinfo);
+   if (!kmsmem)
+     goto bo_failed;
+@@ -1003,14 +1012,6 @@ gst_kms_sink_get_caps (GstBaseSink * bsink, GstCaps * filter)
+   return out_caps;
+ }
+ 
+-static void
+-ensure_kms_allocator (GstKMSSink * self)
+-{
+-  if (self->allocator)
+-    return;
+-  self->allocator = gst_kms_allocator_new (self->fd);
+-}
+-
+ static GstBufferPool *
+ gst_kms_sink_create_pool (GstKMSSink * self, GstCaps * caps, gsize size,
+     gint min)
+-- 
+2.20.1
+

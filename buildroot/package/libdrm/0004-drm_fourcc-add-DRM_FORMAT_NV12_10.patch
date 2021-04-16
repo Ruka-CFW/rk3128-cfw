@@ -1,0 +1,25 @@
+From 300dd820b5ec19f4fb3490312c7aa46e1a14461f Mon Sep 17 00:00:00 2001
+From: Binyuan Lan <lby@rock-chips.com>
+Date: Tue, 21 Mar 2017 22:32:51 +0800
+Subject: [PATCH] drm_fourcc: add DRM_FORMAT_NV12_10
+
+Signed-off-by: Binyuan Lan <lby@rock-chips.com>
+---
+ include/drm/drm_fourcc.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/drm/drm_fourcc.h b/include/drm/drm_fourcc.h
+index 4d8da69..4cbfea0 100644
+--- a/include/drm/drm_fourcc.h
++++ b/include/drm/drm_fourcc.h
+@@ -115,6 +115,7 @@
+ #define DRM_FORMAT_NV61		fourcc_code('N', 'V', '6', '1') /* 2x1 subsampled Cb:Cr plane */
+ #define DRM_FORMAT_NV24		fourcc_code('N', 'V', '2', '4') /* non-subsampled Cr:Cb plane */
+ #define DRM_FORMAT_NV42		fourcc_code('N', 'V', '4', '2') /* non-subsampled Cb:Cr plane */
++#define DRM_FORMAT_NV12_10		fourcc_code('N', 'A', '1', '2')
+ 
+ /*
+  * 3 plane YCbCr
+-- 
+1.9.1
+

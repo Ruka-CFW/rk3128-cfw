@@ -1,0 +1,48 @@
+From 0c2f2ee48087c500816012403e878b9d26bb4f79 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Guillermo=20Rodr=C3=ADguez?= <guille.rodriguez@gmail.com>
+Date: Tue, 28 Jan 2020 13:06:59 +0100
+Subject: [PATCH 27/60] waylandsink: Clear window when pipeline is stopped
+
+When a pipeline is stopped (actually when the waylandsink element
+state changes from PAUSED to READY) the video surface is cleared, but
+the opaque black surface behind is not. Fix this by actually clearing
+both surfaces.
+
+(cherry picked from commit 62ac77e620bd1be28caa1618ae0dc4bc8aa4c7b2)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ ext/wayland/wlwindow.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/ext/wayland/wlwindow.c b/ext/wayland/wlwindow.c
+index 745d3c56d..4358a3573 100644
+--- a/ext/wayland/wlwindow.c
++++ b/ext/wayland/wlwindow.c
+@@ -454,14 +454,18 @@ gst_wl_window_render (GstWlWindow * window, GstWlBuffer * buffer,
+     gst_wl_window_set_opaque (window, info);
+   }
+ 
+-  if (G_LIKELY (buffer))
++  if (G_LIKELY (buffer)) {
+     gst_wl_buffer_attach (buffer, window->video_surface_wrapper);
+-  else
++    wl_surface_damage (window->video_surface_wrapper, 0, 0,
++        window->video_rectangle.w, window->video_rectangle.h);
++    wl_surface_commit (window->video_surface_wrapper);
++  } else {
++    /* clear both video and parent surfaces */
+     wl_surface_attach (window->video_surface_wrapper, NULL, 0, 0);
+-
+-  wl_surface_damage (window->video_surface_wrapper, 0, 0,
+-      window->video_rectangle.w, window->video_rectangle.h);
+-  wl_surface_commit (window->video_surface_wrapper);
++    wl_surface_commit (window->video_surface_wrapper);
++    wl_surface_attach (window->area_surface_wrapper, NULL, 0, 0);
++    wl_surface_commit (window->area_surface_wrapper);
++  }
+ 
+   if (G_UNLIKELY (info)) {
+     /* commit also the parent (area_surface) in order to change
+-- 
+2.20.1
+

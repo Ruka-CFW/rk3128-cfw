@@ -1,0 +1,37 @@
+From ebdf094a356c06e17cbbe79ae61fec1da455c117 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sat, 18 Apr 2020 13:03:06 +0800
+Subject: [PATCH 02/12] qwebenginedownloaditem: Compat to QT 5.12
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/webenginewidgets/api/qwebenginedownloaditem.h | 11 -----------
+ 1 file changed, 11 deletions(-)
+
+diff --git a/src/webenginewidgets/api/qwebenginedownloaditem.h b/src/webenginewidgets/api/qwebenginedownloaditem.h
+index 094054079..97e785a28 100644
+--- a/src/webenginewidgets/api/qwebenginedownloaditem.h
++++ b/src/webenginewidgets/api/qwebenginedownloaditem.h
+@@ -118,19 +118,8 @@ public:
+     qint64 receivedBytes() const;
+     QUrl url() const;
+     QString mimeType() const;
+-#if QT_DEPRECATED_SINCE(5, 14)
+-#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+-    QT_DEPRECATED_VERSION_X(5, 14, "Use downloadDirectory() and downloadFileName() instead")
+     QString path() const;
+-    QT_DEPRECATED_VERSION_X(5, 14, "Use setDownloadDirectory() and setDownloadFileName() instead")
+     void setPath(QString path);
+-#else
+-    QT_DEPRECATED_X("Use downloadDirectory() and downloadFileName() instead")
+-    QString path() const;
+-    QT_DEPRECATED_X("Use setDownloadDirectory() and setDownloadFileName() instead")
+-    void setPath(QString path);
+-#endif
+-#endif
+     bool isFinished() const;
+     bool isPaused() const;
+     SavePageFormat savePageFormat() const;
+-- 
+2.20.1
+

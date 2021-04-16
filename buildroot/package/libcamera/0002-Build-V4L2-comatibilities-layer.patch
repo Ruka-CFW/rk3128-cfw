@@ -1,0 +1,24 @@
+From 0bf72d8f9c67d6e99a0f9ddd7ef63eb85f4ff9b9 Mon Sep 17 00:00:00 2001
+From: Cody Xie <cody.xie@rock-chips.com>
+Date: Thu, 9 Apr 2020 21:10:03 +0800
+Subject: [PATCH 2/2] Build V4L2 comatibilities layer
+
+Signed-off-by: Cody Xie <cody.xie@rock-chips.com>
+---
+ meson_options.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/meson_options.txt b/meson_options.txt
+index 6464df8..10dae90 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -23,5 +23,5 @@ option('test',
+ 
+ option('v4l2',
+         type : 'boolean',
+-        value : false,
++        value : true,
+         description : 'Compile the V4L2 compatibility layer')
+-- 
+2.18.0
+

@@ -1,0 +1,54 @@
+From 86ae54cf13652d0b5bb1664780714f384228d4b9 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Mon, 19 Nov 2018 11:39:47 +0800
+Subject: [PATCH] cdriso: Fix conflicting with zlib
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ libpcsxcore/cdriso.c      | 2 ++
+ plugins/cdrcimg/cdrcimg.c | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/libpcsxcore/cdriso.c b/libpcsxcore/cdriso.c
+index 515370f..a63a921 100644
+--- a/libpcsxcore/cdriso.c
++++ b/libpcsxcore/cdriso.c
+@@ -1089,6 +1089,7 @@ static int cdread_sub_mixed(FILE *f, unsigned int base, void *dest, int sector)
+ 	return ret;
+ }
+ 
++#if ZLIB_VERNUM < 0x1290
+ static int uncompress2(void *out, unsigned long *out_size, void *in, unsigned long in_size)
+ {
+ 	static z_stream z;
+@@ -1119,6 +1120,7 @@ static int uncompress2(void *out, unsigned long *out_size, void *in, unsigned lo
+ 	*out_size -= z.avail_out;
+ 	return ret == 1 ? 0 : ret;
+ }
++#endif
+ 
+ static int cdread_compressed(FILE *f, unsigned int base, void *dest, int sector)
+ {
+diff --git a/plugins/cdrcimg/cdrcimg.c b/plugins/cdrcimg/cdrcimg.c
+index 76cdfba..6b1f1ef 100644
+--- a/plugins/cdrcimg/cdrcimg.c
++++ b/plugins/cdrcimg/cdrcimg.c
+@@ -98,6 +98,7 @@ static long CDRgetTD(unsigned char track, unsigned char *buffer)
+ 	return 0;
+ }
+ 
++#if ZLIB_VERNUM < 0x1290
+ int uncompress2(void *out, unsigned long *out_size, void *in, unsigned long in_size)
+ {
+ 	static z_stream z;
+@@ -128,6 +129,7 @@ int uncompress2(void *out, unsigned long *out_size, void *in, unsigned long in_s
+ 	*out_size -= z.avail_out;
+ 	return ret == 1 ? 0 : ret;
+ }
++#endif
+ 
+ // read track
+ // time: byte 0 - minute; byte 1 - second; byte 2 - frame
+-- 
+2.11.0
+

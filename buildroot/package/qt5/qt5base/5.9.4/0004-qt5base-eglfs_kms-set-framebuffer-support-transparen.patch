@@ -1,0 +1,45 @@
+From ab355300f9e0358c5310f8d09ecb5dd7164f07e6 Mon Sep 17 00:00:00 2001
+From: Binyuan Lan <lby@rock-chips.com>
+Date: Wed, 19 Jul 2017 17:43:15 +0800
+Subject: [PATCH 04/14] qt5base: eglfs_kms set framebuffer support transparent
+
+Signed-off-by: Binyuan Lan <lby@rock-chips.com>
+---
+ .../deviceintegration/eglfs_kms/qeglfskmsgbmscreen.cpp    | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms/qeglfskmsgbmscreen.cpp b/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms/qeglfskmsgbmscreen.cpp
+index 87fb3146..ca858084 100644
+--- a/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms/qeglfskmsgbmscreen.cpp
++++ b/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms/qeglfskmsgbmscreen.cpp
+@@ -82,13 +82,14 @@ QEglFSKmsGbmScreen::FrameBuffer *QEglFSKmsGbmScreen::framebufferForBufferObject(
+ 
+     QScopedPointer<FrameBuffer> fb(new FrameBuffer);
+ 
+-    int ret = drmModeAddFB(device()->fd(), width, height, 24, 32,
++    int ret = drmModeAddFB(device()->fd(), width, height, 32, 32,
+                            stride, handle, &fb->fb);
+ 
+     if (ret) {
+         qWarning("Failed to create KMS FB!");
+         return Q_NULLPTR;
+-    }
++    } else
++	qWarning("eglfs >> sucess to create KMS FB!");
+ 
+     gbm_bo_set_user_data(bo, fb.data(), bufferDestroyedHandler);
+     return fb.take();
+@@ -136,8 +137,9 @@ gbm_surface *QEglFSKmsGbmScreen::createSurface()
+         m_gbm_surface = gbm_surface_create(static_cast<QEglFSKmsGbmDevice *>(device())->gbmDevice(),
+                                            rawGeometry().width(),
+                                            rawGeometry().height(),
+-                                           GBM_FORMAT_XRGB8888,
++                                           GBM_FORMAT_ARGB8888,
+                                            GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
++	qWarning("eglfs >> createSurface GBM_FORMAT_ARGB8888");
+     }
+     return m_gbm_surface;
+ }
+-- 
+2.20.1
+

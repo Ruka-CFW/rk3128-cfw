@@ -1,0 +1,26 @@
+From 8662f0aa95f7cbe2757b4c5998340dc2ca38b4b1 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Mon, 24 Dec 2018 15:38:58 +0800
+Subject: [PATCH 06/14] gsttools: videowidget: Use transparent background
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/gsttools/qgstreamervideowidget.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gsttools/qgstreamervideowidget.cpp b/src/gsttools/qgstreamervideowidget.cpp
+index dcaa556..684fa24 100644
+--- a/src/gsttools/qgstreamervideowidget.cpp
++++ b/src/gsttools/qgstreamervideowidget.cpp
+@@ -55,7 +55,7 @@ public:
+     {
+         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+         QPalette palette;
+-        palette.setColor(QPalette::Window, Qt::black);
++        palette.setColor(QPalette::Window, Qt::transparent);
+         setPalette(palette);
+     }
+ 
+-- 
+2.20.1
+

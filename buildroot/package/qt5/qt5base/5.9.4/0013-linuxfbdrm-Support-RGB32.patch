@@ -1,0 +1,96 @@
+From d2aff0457d48bbd199d405bfb5a48775aa8cb010 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Tue, 16 Apr 2019 21:11:12 +0800
+Subject: [PATCH 13/14] linuxfbdrm: Support RGB32
+
+Use QT_FB_DRM_RGB565/QT_FB_DRM_RGB32/QT_FB_DRM_ARGB32 macro to set fb
+format.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ .../platforms/linuxfb/qlinuxfbdrmscreen.cpp   | 35 +++++++++++++++++--
+ 1 file changed, 33 insertions(+), 2 deletions(-)
+
+diff --git a/src/plugins/platforms/linuxfb/qlinuxfbdrmscreen.cpp b/src/plugins/platforms/linuxfb/qlinuxfbdrmscreen.cpp
+index 3f9142a8..9e9199fb 100644
+--- a/src/plugins/platforms/linuxfb/qlinuxfbdrmscreen.cpp
++++ b/src/plugins/platforms/linuxfb/qlinuxfbdrmscreen.cpp
+@@ -62,6 +62,10 @@ QT_BEGIN_NAMESPACE
+ 
+ Q_LOGGING_CATEGORY(qLcFbDrm, "qt.qpa.fb")
+ 
++#if !defined(QT_FB_DRM_ARGB32) && !defined(QT_FB_DRM_RGB32)
++#define QT_FB_DRM_RGB565
++#endif
++
+ #define TRIPLE_BUFFER
+ 
+ #ifdef TRIPLE_BUFFER
+@@ -201,10 +205,19 @@ bool QLinuxFbDevice::createFramebuffer(QLinuxFbDevice::Output *output, int buffe
+     const QSize size = output->currentRes();
+     const uint32_t w = size.width();
+     const uint32_t h = size.height();
++
++#ifdef QT_FB_DRM_RGB565
++    const int depth = 16;
++    const int bpp = 16;
++#else
++    const int depth = 24;
++    const int bpp = 32;
++#endif
++
+     drm_mode_create_dumb creq = {
+         h,
+         w,
+-        32,
++        bpp,
+         0, 0, 0, 0
+     };
+     if (drmIoctl(fd(), DRM_IOCTL_MODE_CREATE_DUMB, &creq) == -1) {
+@@ -219,7 +232,7 @@ bool QLinuxFbDevice::createFramebuffer(QLinuxFbDevice::Output *output, int buffe
+     qCDebug(qLcFbDrm, "Got a dumb buffer for size %dx%d, handle %u, pitch %u, size %u",
+             w, h, fb.handle, fb.pitch, (uint) fb.size);
+ 
+-    if (drmModeAddFB(fd(), w, h, 24, 32, fb.pitch, fb.handle, &fb.fb) == -1) {
++    if (drmModeAddFB(fd(), w, h, depth, bpp, fb.pitch, fb.handle, &fb.fb) == -1) {
+         qErrnoWarning(errno, "Failed to add FB");
+         return false;
+     }
+@@ -241,7 +254,15 @@ bool QLinuxFbDevice::createFramebuffer(QLinuxFbDevice::Output *output, int buffe
+     qCDebug(qLcFbDrm, "FB is %u, mapped at %p", fb.fb, fb.p);
+     memset(fb.p, 0, fb.size);
+ 
++#ifdef QT_FB_DRM_RGB565
++    fb.wrapper = QImage(static_cast<uchar *>(fb.p), w, h, fb.pitch, QImage::Format_RGB16);
++#elif defined(QT_FB_DRM_RGB32)
++    fb.wrapper = QImage(static_cast<uchar *>(fb.p), w, h, fb.pitch, QImage::Format_RGB32);
++#elif defined(QT_FB_DRM_ARGB32)
+     fb.wrapper = QImage(static_cast<uchar *>(fb.p), w, h, fb.pitch, QImage::Format_ARGB32);
++#else
++    return false;
++#endif
+ 
+     return true;
+ }
+@@ -400,8 +421,18 @@ bool QLinuxFbDrmScreen::initialize()
+         mGeometry.setHeight(tmp);
+     }
+ 
++#ifdef QT_FB_DRM_RGB565
++    mDepth = 16;
++    mFormat = QImage::Format_RGB16;
++#elif defined(QT_FB_DRM_RGB32)
++    mDepth = 32;
++    mFormat = QImage::Format_RGB32;
++#elif defined(QT_FB_DRM_ARGB32)
+     mDepth = 32;
+     mFormat = QImage::Format_ARGB32;
++#else
++    return false;
++#endif
+     mPhysicalSize = output->kmsOutput.physical_size;
+     qCDebug(qLcFbDrm) << mGeometry << mPhysicalSize;
+ 
+-- 
+2.20.1
+

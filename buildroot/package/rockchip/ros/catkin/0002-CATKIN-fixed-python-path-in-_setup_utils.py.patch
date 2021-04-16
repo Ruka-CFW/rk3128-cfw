@@ -1,0 +1,23 @@
+From 2c02b903681003511ba5fc54bb48167d0663b292 Mon Sep 17 00:00:00 2001
+From: "zain.wang" <wzz@rock-chips.com>
+Date: Tue, 28 Aug 2018 16:38:09 +0800
+Subject: [PATCH] CATKIN: fixed python path in _setup_utils.py
+
+Signed-off-by: zain.wang <wzz@rock-chips.com>
+---
+ cmake/templates/_setup_util.py.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/cmake/templates/_setup_util.py.in b/cmake/templates/_setup_util.py.in
+index 106507a..f696ba1 100755
+--- a/cmake/templates/_setup_util.py.in
++++ b/cmake/templates/_setup_util.py.in
+@@ -1,4 +1,4 @@
+-#!@PYTHON_EXECUTABLE@
++#!/usr/bin/env python
+ # -*- coding: utf-8 -*-
+ 
+ # Software License Agreement (BSD License)
+-- 
+2.17.1
+

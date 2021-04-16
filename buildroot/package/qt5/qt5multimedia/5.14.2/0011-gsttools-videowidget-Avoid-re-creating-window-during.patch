@@ -1,0 +1,32 @@
+From 493e03575749c17defde6e33891627dd4c790b11 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Tue, 19 Jan 2021 10:06:04 +0800
+Subject: [PATCH 11/13] gsttools: videowidget: Avoid re-creating window during
+ destroying
+
+There's a WinIdChange event when clearing window's winId.
+
+Use internalWinId() instead of winId() in WinIdChange event to avoid
+re-creating window.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/gsttools/qgstreamervideowidget.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gsttools/qgstreamervideowidget.cpp b/src/gsttools/qgstreamervideowidget.cpp
+index 684fa24..0ad4d97 100644
+--- a/src/gsttools/qgstreamervideowidget.cpp
++++ b/src/gsttools/qgstreamervideowidget.cpp
+@@ -171,7 +171,7 @@ bool QGstreamerVideoWidgetControl::eventFilter(QObject *object, QEvent *e)
+ {
+     if (m_widget && object == m_widget) {
+         if (e->type() == QEvent::ParentChange || e->type() == QEvent::Show || e->type() == QEvent::WinIdChange) {
+-            WId newWId = m_widget->winId();
++            WId newWId = m_widget->internalWinId();
+             if (newWId != m_windowId)
+                 m_videoOverlay.setWindowHandle(m_windowId = newWId);
+         }
+-- 
+2.20.1
+

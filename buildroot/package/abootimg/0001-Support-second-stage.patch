@@ -1,0 +1,39 @@
+From 2e1b5531d6a54f3e9a193dbb16c1c846301c4b63 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sat, 15 Dec 2018 15:56:12 +0800
+Subject: [PATCH 1/3] Support second stage
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ abootimg.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/abootimg.c b/abootimg.c
+index a55c5c8..1ad03f1 100644
+--- a/abootimg.c
++++ b/abootimg.c
+@@ -718,7 +718,7 @@ void print_bootimg_info(t_abootimg* img)
+   printf ("* kernel size       = %u bytes (%.2f MB)\n", kernel_size, (double)kernel_size/0x100000);
+   printf ("  ramdisk size      = %u bytes (%.2f MB)\n", ramdisk_size, (double)ramdisk_size/0x100000);
+   if (second_size)
+-    printf ("  second stage size = %u bytes (%.2f MB)\n", ramdisk_size, (double)ramdisk_size/0x100000);
++    printf ("  second stage size = %u bytes (%.2f MB)\n", second_size, (double)second_size/0x100000);
+  
+   printf ("\n* load addresses:\n");
+   printf ("  kernel:       0x%08x\n", img->header.kernel_addr);
+@@ -843,8 +843,10 @@ void extract_second(t_abootimg* img)
+   if (!ssize) // Second Stage not present
+     return;
+ 
+-  unsigned n = (rsize + ksize + psize - 1) / psize;
+-  unsigned soffset = (1+n)*psize;
++  unsigned n, soffset;
++  n = (ksize + psize - 1) / psize;
++  n += (rsize + psize - 1) / psize;
++  soffset = (1+n)*psize;
+ 
+   printf ("extracting second stage image in %s\n", img->second_fname);
+ 
+-- 
+2.11.0
+

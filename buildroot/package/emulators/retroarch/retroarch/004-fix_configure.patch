@@ -1,0 +1,20 @@
+diff --git a/qb/qb.comp.sh b/qb/qb.comp.sh
+index bde2b8f..f09754a 100644
+--- a/qb/qb.comp.sh
++++ b/qb/qb.comp.sh
+@@ -101,8 +101,13 @@ fi
+ 
+ printf %s 'Checking for pkg-config ... '
+ 
+-PKG_CONF_PATH="${PKG_CONF_PATH:-$(exists "${CROSS_COMPILE}pkgconf" ||
+-	exists "${CROSS_COMPILE}pkg-config" || :)}"
++PKG_CONF_PATH="none"
++for p in $(exists "${CROSS_COMPILE}pkg-config") ''; do
++[ -n "$p" ] && {
++	PKG_CONF_PATH=$p;
++   break; 
++}
++done
+ 
+ printf %s\\n "${PKG_CONF_PATH:=none}"
+ 

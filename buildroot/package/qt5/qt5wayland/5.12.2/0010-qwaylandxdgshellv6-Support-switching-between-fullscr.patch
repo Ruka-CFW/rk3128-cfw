@@ -1,0 +1,53 @@
+From 16b4473c1c2538bc477ddefacdc4f9355fc18d79 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sat, 9 May 2020 17:23:59 +0800
+Subject: [PATCH 10/16] qwaylandxdgshellv6: Support switching between
+ fullscreen and maximized
+
+1/ The weston expected a commit to apply new window states.
+2/ Switching between fullscreen and maximized requests unsetting the old
+state firstly.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ .../xdg-shell-v6/qwaylandxdgshellv6.cpp                | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6.cpp b/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6.cpp
+index a8a16fa..7d40980 100644
+--- a/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6.cpp
++++ b/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6.cpp
+@@ -98,6 +98,9 @@ void QWaylandXdgSurfaceV6::Toplevel::applyConfigure()
+     // Set initial position
+     updatePosition();
+ 
++    // Trigger a update to commit new state
++    m_xdgSurface->m_window->window()->requestUpdate();
++
+     m_applied = m_pending;
+     qCDebug(lcQpaWayland) << "Applied pending zxdg_toplevel_v6 configure event:" << m_applied.size << m_applied.states;
+ }
+@@ -160,6 +163,11 @@ void QWaylandXdgSurfaceV6::Toplevel::requestWindowStates(Qt::WindowStates states
+     // Re-send what's different from the applied state
+     Qt::WindowStates changedStates = m_applied.states ^ states;
+ 
++    if (changedStates & Qt::WindowFullScreen) {
++        if (!(states & Qt::WindowFullScreen))
++            unset_fullscreen();
++    }
++
+     if (changedStates & Qt::WindowMaximized) {
+         if (states & Qt::WindowMaximized)
+             set_maximized();
+@@ -170,8 +178,6 @@ void QWaylandXdgSurfaceV6::Toplevel::requestWindowStates(Qt::WindowStates states
+     if (changedStates & Qt::WindowFullScreen) {
+         if (states & Qt::WindowFullScreen)
+             set_fullscreen(nullptr);
+-        else
+-            unset_fullscreen();
+     }
+ 
+     // Minimized state is not reported by the protocol, so always send it
+-- 
+2.20.1
+

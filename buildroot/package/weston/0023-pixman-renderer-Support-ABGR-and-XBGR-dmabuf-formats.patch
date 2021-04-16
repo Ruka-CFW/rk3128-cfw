@@ -1,0 +1,30 @@
+From a9fb20959b94e23df6c36f025445307df1dbeea8 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Tue, 14 Jul 2020 15:52:51 +0800
+Subject: [PATCH 23/41] pixman-renderer: Support ABGR and XBGR dmabuf formats
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ libweston/pixman-renderer.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/libweston/pixman-renderer.c b/libweston/pixman-renderer.c
+index ae2a311..ee76278 100644
+--- a/libweston/pixman-renderer.c
++++ b/libweston/pixman-renderer.c
+@@ -687,6 +687,12 @@ pixman_renderer_attach_dmabuf(struct weston_surface *es,
+ 	case DRM_FORMAT_XRGB8888:
+ 		pixman_format = PIXMAN_x8r8g8b8;
+ 		break;
++	case DRM_FORMAT_ABGR8888:
++		pixman_format = PIXMAN_a8b8g8r8;
++		break;
++	case DRM_FORMAT_XBGR8888:
++		pixman_format = PIXMAN_x8b8g8r8;
++		break;
+ 	case DRM_FORMAT_YUYV:
+ 		pixman_format = PIXMAN_yuy2;
+ 		break;
+-- 
+2.20.1
+

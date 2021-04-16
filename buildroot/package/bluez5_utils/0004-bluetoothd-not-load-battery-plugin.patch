@@ -1,0 +1,28 @@
+From c94fe9571ffa0f5a2e07390a9e42f7b9c3fb8391 Mon Sep 17 00:00:00 2001
+From: XINHUANG LI <buluess.li@rock-chips.com>
+Date: Fri, 7 Sep 2018 17:11:25 +0800
+Subject: [PATCH] bluetoothd: not load battery plugin
+
+---
+ src/plugin.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/plugin.c b/src/plugin.c
+index 39310a7..0176ae1 100644
+--- a/src/plugin.c
++++ b/src/plugin.c
+@@ -67,6 +67,11 @@ static gboolean add_plugin(void *handle, struct bluetooth_plugin_desc *desc)
+ 		return FALSE;
+ 	}
+ 
++	if (strcmp(desc->name, "battery") == 0) {
++		DBG("not load %s plugin", desc->name);
++		return FALSE;
++	}
++
+ 	DBG("Loading %s plugin", desc->name);
+ 
+ 	plugin = g_try_new0(struct bluetooth_plugin, 1);
+-- 
+1.9.1
+

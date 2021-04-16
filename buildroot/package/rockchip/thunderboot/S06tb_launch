@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+
+lunch_start()
+{
+	echo none > /sys/class/leds/red/trigger
+	echo 5 > /sys/class/leds/red/brightness
+	export HDR_MODE=0
+	ispserver -f CAMERA_FPS &
+	echo "Now we are ready to start your first application" > /dev/kmsg
+
+	{
+		insmod /lib/modules/dw_mmc-rockchip.ko
+		insmod /lib/modules/rk_sdmmc_ops.ko
+		insmod /lib/modules/sdmmc_vendor_storage.ko
+	}&
+	insmod /lib/modules/snd-soc-es8311.ko &
+
+	echo 297000000 > /proc/mpp_service/rkvenc/clk_core
+
+	export mediaserver_log_level=2
+	mediaserver -a -d -c /usr/share/mediaserver/tb.conf > /dev/kmsg 2>&1 &
+
+	echo 20 > /proc/pir/sensibility
+	auto_poweroff.sh &
+}
+
+lunch_stop()
+{
+	killall mediaserver
+	killall ispserver
+	echo "All applications have been stopped"
+
+	io -4 0xfe020104 0x00840084
+}
+
+case "$1" in
+	start)
+		lunch_start
+		;;
+	stop)
+		lunch_stop
+		;;
+	*)
+		echo "Usage: $0 {start|stop}"
+		exit 1
+		;;
+esac
+
+exit 0

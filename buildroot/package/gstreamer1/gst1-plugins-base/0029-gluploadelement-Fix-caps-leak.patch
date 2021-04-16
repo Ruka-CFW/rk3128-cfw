@@ -1,0 +1,30 @@
+From 8d4922f75f8a9f7195d7280e159d73d4defd11a3 Mon Sep 17 00:00:00 2001
+From: Seungha Yang <seungha.yang@navercorp.com>
+Date: Fri, 29 Mar 2019 12:42:45 +0900
+Subject: [PATCH 29/45] gluploadelement: Fix caps leak
+
+gst_event_new_caps() does not take ownership of the caps
+
+Fixes https://gitlab.freedesktop.org/gstreamer/gst-plugins-bad/issues/885
+
+(cherry picked from commit e007710b591f924b84bcc03f114728ba110a1925)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ ext/gl/gstgluploadelement.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/ext/gl/gstgluploadelement.c b/ext/gl/gstgluploadelement.c
+index 68b3bdc884..c9a3b45f2c 100644
+--- a/ext/gl/gstgluploadelement.c
++++ b/ext/gl/gstgluploadelement.c
+@@ -256,6 +256,7 @@ again:
+      * Reconfiguring must be synchronous to avoid dropping the current
+      * buffer */
+     gst_pad_send_event (sinkpad, gst_event_new_caps (incaps));
++    gst_caps_unref (incaps);
+     if (!gst_pad_needs_reconfigure (GST_BASE_TRANSFORM_SRC_PAD (bt))) {
+       GST_DEBUG_OBJECT (bt, "Retry uploading with new caps");
+       goto again;
+-- 
+2.11.0
+

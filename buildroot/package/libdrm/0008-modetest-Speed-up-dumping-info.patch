@@ -1,0 +1,144 @@
+From 8938182d04147324c590494a1d7d0420226b3732 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sat, 15 Dec 2018 12:20:01 +0800
+Subject: [PATCH] modetest: Speed up dumping info
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ tests/modetest/modetest.c | 28 ++++++++++++++++++++++------
+ 1 file changed, 22 insertions(+), 6 deletions(-)
+
+diff --git a/tests/modetest/modetest.c b/tests/modetest/modetest.c
+index 62d9332..bb8b9f4 100644
+--- a/tests/modetest/modetest.c
++++ b/tests/modetest/modetest.c
+@@ -54,6 +54,7 @@
+ #include <strings.h>
+ #include <errno.h>
+ #include <poll.h>
++#include <fcntl.h>
+ #include <sys/time.h>
+ #ifdef HAVE_SYS_SELECT_H
+ #include <sys/select.h>
+@@ -71,6 +72,10 @@
+ #include "buffers.h"
+ #include "cursor.h"
+ 
++int encoders = 0, connectors = 0, crtcs = 0, planes = 0, fbs = 0;
++int dump_only;
++#define need_resource(type) (!dump_only || type##s)
++
+ struct crtc {
+ 	drmModeCrtc *crtc;
+ 	drmModeObjectProperties *props;
+@@ -492,7 +497,7 @@ static void dump_crtcs(struct device *dev)
+ 	printf("\n");
+ }
+ 
+-static void dump_framebuffers(struct device *dev)
++static void dump_fbs(struct device *dev)
+ {
+ 	drmModeFB *fb;
+ 	int i;
+@@ -564,6 +569,7 @@ static void free_resources(struct resources *res)
+ 		return;
+ 
+ #define free_resource(_res, __res, type, Type)					\
++	if (need_resource(type))						\
+ 	do {									\
+ 		if (!(_res)->type##s)						\
+ 			break;							\
+@@ -576,6 +582,7 @@ static void free_resources(struct resources *res)
+ 	} while (0)
+ 
+ #define free_properties(_res, __res, type)					\
++	if (need_resource(type))						\
+ 	do {									\
+ 		for (i = 0; i < (int)(_res)->__res->count_##type##s; ++i) {	\
+ 			drmModeFreeObjectProperties(res->type##s[i].props);	\
+@@ -589,6 +596,7 @@ static void free_resources(struct resources *res)
+ 		free_resource(res, res, crtc, Crtc);
+ 		free_resource(res, res, encoder, Encoder);
+ 
++		if (need_resource(connector))
+ 		for (i = 0; i < res->res->count_connectors; i++)
+ 			free(res->connectors[i].name);
+ 
+@@ -636,6 +644,7 @@ static struct resources *get_resources(struct device *dev)
+ 		goto error;
+ 
+ #define get_resource(_res, __res, type, Type)					\
++	if (need_resource(type))						\
+ 	do {									\
+ 		for (i = 0; i < (int)(_res)->__res->count_##type##s; ++i) {	\
+ 			(_res)->type##s[i].type =				\
+@@ -653,6 +662,7 @@ static struct resources *get_resources(struct device *dev)
+ 	get_resource(res, res, fb, FB);
+ 
+ 	/* Set the name of all connectors based on the type name and the per-type ID. */
++	if (need_resource(connector))
+ 	for (i = 0; i < res->res->count_connectors; i++) {
+ 		struct connector *connector = &res->connectors[i];
+ 		drmModeConnector *conn = connector->connector;
+@@ -663,6 +673,7 @@ static struct resources *get_resources(struct device *dev)
+ 	}
+ 
+ #define get_properties(_res, __res, type, Type)					\
++	if (need_resource(type))						\
+ 	do {									\
+ 		for (i = 0; i < (int)(_res)->__res->count_##type##s; ++i) {	\
+ 			struct type *obj = &res->type##s[i];			\
+@@ -690,6 +701,7 @@ static struct resources *get_resources(struct device *dev)
+ 	get_properties(res, res, crtc, CRTC);
+ 	get_properties(res, res, connector, CONNECTOR);
+ 
++	if (need_resource(crtc))
+ 	for (i = 0; i < res->res->count_crtcs; ++i)
+ 		res->crtcs[i].mode = &res->crtcs[i].crtc->mode;
+ 
+@@ -1617,7 +1629,6 @@ int main(int argc, char **argv)
+ 	struct device dev;
+ 
+ 	int c;
+-	int encoders = 0, connectors = 0, crtcs = 0, planes = 0, framebuffers = 0;
+ 	int drop_master = 0;
+ 	int test_vsync = 0;
+ 	int test_cursor = 0;
+@@ -1653,7 +1664,7 @@ int main(int argc, char **argv)
+ 			encoders = 1;
+ 			break;
+ 		case 'f':
+-			framebuffers = 1;
++			fbs = 1;
+ 			break;
+ 		case 'M':
+ 			module = optarg;
+@@ -1719,9 +1730,14 @@ int main(int argc, char **argv)
+ 	}
+ 
+ 	if (!args)
+-		encoders = connectors = crtcs = planes = framebuffers = 1;
++		encoders = connectors = crtcs = planes = fbs = 1;
++
++	dump_only = !count && !plane_count && !prop_count;
+ 
+-	dev.fd = util_open(device, module);
++	if (dump_only && !device)
++		dev.fd = open("/dev/dri/card0", O_RDWR);
++	else
++		dev.fd = util_open(device, module);
+ 	if (dev.fd < 0)
+ 		return -1;
+ 
+@@ -1760,7 +1776,7 @@ int main(int argc, char **argv)
+ 	dump_resource(&dev, connectors);
+ 	dump_resource(&dev, crtcs);
+ 	dump_resource(&dev, planes);
+-	dump_resource(&dev, framebuffers);
++	dump_resource(&dev, fbs);
+ 
+ 	for (i = 0; i < prop_count; ++i)
+ 		set_property(&dev, &prop_args[i]);
+-- 
+2.11.0
+

@@ -1,0 +1,127 @@
+From b070ed18006ca8af12a63678af7908c57a5ee88a Mon Sep 17 00:00:00 2001
+From: Nicolas Dufresne <nicolas.dufresne@collabora.com>
+Date: Mon, 27 Aug 2018 15:08:08 -0400
+Subject: [PATCH 07/60] kmssink: Add 'plane-properties' property
+
+This is similar to 'connector-properties' but will change
+selected plane properties instead.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=797027
+---
+ sys/kms/gstkmssink.c | 44 +++++++++++++++++++++++++++++++++++++++++++-
+ sys/kms/gstkmssink.h |  1 +
+ 2 files changed, 44 insertions(+), 1 deletion(-)
+
+diff --git a/sys/kms/gstkmssink.c b/sys/kms/gstkmssink.c
+index 041eda500..651a8eb77 100644
+--- a/sys/kms/gstkmssink.c
++++ b/sys/kms/gstkmssink.c
+@@ -89,7 +89,8 @@ enum
+   PROP_DISPLAY_WIDTH,
+   PROP_DISPLAY_HEIGHT,
+   PROP_CONNECTOR_PROPS,
+-  PROP_N
++  PROP_PLANE_PROPS,
++  PROP_N,
+ };
+ 
+ static GParamSpec *g_properties[PROP_N] = { NULL, };
+@@ -659,7 +660,20 @@ gst_kms_sink_update_connector_properties (GstKMSSink * self)
+   gst_kms_sink_update_properties (&iter, self->connector_props);
+ }
+ 
++static void
++gst_kms_sink_update_plane_properties (GstKMSSink * self)
++{
++  SetPropsIter iter;
++
++  if (!self->plane_props)
++    return;
++
++  iter.self = self;
++  iter.obj_id = self->plane_id;
++  iter.obj_type = DRM_MODE_OBJECT_PLANE;
++  iter.obj_type_str = "plane";
+ 
++  gst_kms_sink_update_properties (&iter, self->plane_props);
+ }
+ 
+ static gboolean
+@@ -771,6 +785,7 @@ retry_find_plane:
+   g_object_notify_by_pspec (G_OBJECT (self), g_properties[PROP_DISPLAY_HEIGHT]);
+ 
+   gst_kms_sink_update_connector_properties (self);
++  gst_kms_sink_update_plane_properties (self);
+ 
+   ret = TRUE;
+ 
+@@ -1710,6 +1725,16 @@ gst_kms_sink_set_property (GObject * object, guint prop_id,
+ 
+       break;
+     }
++    case PROP_PLANE_PROPS:{
++      const GstStructure *s = gst_value_get_structure (value);
++
++      g_clear_pointer (&sink->plane_props, gst_structure_free);
++
++      if (s)
++        sink->plane_props = gst_structure_copy (s);
++
++      break;
++    }
+     default:
+       if (!gst_video_overlay_set_property (object, PROP_N, prop_id, value))
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+@@ -1757,6 +1782,9 @@ gst_kms_sink_get_property (GObject * object, guint prop_id,
+     case PROP_CONNECTOR_PROPS:
+       gst_value_set_structure (value, sink->connector_props);
+       break;
++    case PROP_PLANE_PROPS:
++      gst_value_set_structure (value, sink->plane_props);
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+       break;
+@@ -1773,6 +1801,7 @@ gst_kms_sink_finalize (GObject * object)
+   g_clear_pointer (&sink->bus_id, g_free);
+   gst_poll_free (sink->poll);
+   g_clear_pointer (&sink->connector_props, gst_structure_free);
++  g_clear_pointer (&sink->plane_props, gst_structure_free);
+ 
+   G_OBJECT_CLASS (parent_class)->finalize (object);
+ }
+@@ -1927,6 +1956,19 @@ gst_kms_sink_class_init (GstKMSSinkClass * klass)
+       "Additionnal properties for the connector",
+       GST_TYPE_STRUCTURE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+ 
++  /**
++   * kmssink:plane-properties:
++   *
++   * Additional properties for the plane. Keys are strings and values
++   * unsigned 64 bits integers.
++   *
++   * Since: 1.16
++   */
++  g_properties[PROP_PLANE_PROPS] =
++      g_param_spec_boxed ("plane-properties", "Connector Plane",
++      "Additionnal properties for the plane",
++      GST_TYPE_STRUCTURE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
++
+   g_object_class_install_properties (gobject_class, PROP_N, g_properties);
+ 
+   gst_video_overlay_install_properties (gobject_class, PROP_N);
+diff --git a/sys/kms/gstkmssink.h b/sys/kms/gstkmssink.h
+index bb978bcd4..778c51c8b 100644
+--- a/sys/kms/gstkmssink.h
++++ b/sys/kms/gstkmssink.h
+@@ -66,6 +66,7 @@ struct _GstKMSSink {
+ 
+   gboolean modesetting_enabled;
+   GstStructure *connector_props;
++  GstStructure *plane_props;
+ 
+   GstVideoInfo vinfo;
+   GstCaps *allowed_caps;
+-- 
+2.20.1
+

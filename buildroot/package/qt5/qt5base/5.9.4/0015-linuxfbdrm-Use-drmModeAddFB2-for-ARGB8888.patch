@@ -1,0 +1,64 @@
+From be3d22bd565fe3da7a67e5c9d45b0c4d05f6c087 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Tue, 30 Jun 2020 15:53:52 +0800
+Subject: [PATCH] linuxfbdrm: Use drmModeAddFB2 for ARGB8888
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ .../platforms/linuxfb/qlinuxfbdrmscreen.cpp   | 23 ++++++++++++++++---
+ 1 file changed, 20 insertions(+), 3 deletions(-)
+
+diff --git a/src/plugins/platforms/linuxfb/qlinuxfbdrmscreen.cpp b/src/plugins/platforms/linuxfb/qlinuxfbdrmscreen.cpp
+index 9e9199fb..60143023 100644
+--- a/src/plugins/platforms/linuxfb/qlinuxfbdrmscreen.cpp
++++ b/src/plugins/platforms/linuxfb/qlinuxfbdrmscreen.cpp
+@@ -58,6 +58,8 @@
+ #include <QtCore/private/qcore_unix_p.h>
+ #include <sys/mman.h>
+ 
++#include <drm_fourcc.h>
++
+ QT_BEGIN_NAMESPACE
+ 
+ Q_LOGGING_CATEGORY(qLcFbDrm, "qt.qpa.fb")
+@@ -207,9 +209,15 @@ bool QLinuxFbDevice::createFramebuffer(QLinuxFbDevice::Output *output, int buffe
+     const uint32_t h = size.height();
+ 
+ #ifdef QT_FB_DRM_RGB565
++    const int format = DRM_FORMAT_RGB565;
+     const int depth = 16;
+     const int bpp = 16;
+ #else
++#if defined(QT_FB_DRM_RGB32)
++    const int format = DRM_FORMAT_XRGB8888;
++#else
++    const int format = DRM_FORMAT_ARGB8888;
++#endif
+     const int depth = 24;
+     const int bpp = 32;
+ #endif
+@@ -232,9 +240,18 @@ bool QLinuxFbDevice::createFramebuffer(QLinuxFbDevice::Output *output, int buffe
+     qCDebug(qLcFbDrm, "Got a dumb buffer for size %dx%d, handle %u, pitch %u, size %u",
+             w, h, fb.handle, fb.pitch, (uint) fb.size);
+ 
+-    if (drmModeAddFB(fd(), w, h, depth, bpp, fb.pitch, fb.handle, &fb.fb) == -1) {
+-        qErrnoWarning(errno, "Failed to add FB");
+-        return false;
++    uint32_t handles[4] = { 0 }, pitches[4] = { 0 }, offsets[4] = { 0 };
++    handles[0] = fb.handle;
++    pitches[0] = fb.pitch;
++    offsets[0] = 0;
++
++    if (drmModeAddFB2(fd(), w, h, format,
++                      handles, pitches, offsets, &fb.fb, 0) < 0) {
++        if (drmModeAddFB(fd(), w, h, depth, bpp, fb.pitch,
++                         fb.handle, &fb.fb) < 0) {
++            qErrnoWarning(errno, "Failed to add FB");
++            return false;
++        }
+     }
+ 
+     drm_mode_map_dumb mreq = {
+-- 
+2.20.1
+

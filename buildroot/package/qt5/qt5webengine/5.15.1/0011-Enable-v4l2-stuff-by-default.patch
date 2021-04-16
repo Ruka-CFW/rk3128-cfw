@@ -1,0 +1,36 @@
+From b93f269550c84641ec02d7af50954426fe1416f6 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Wed, 1 Apr 2020 09:17:45 +0800
+Subject: [PATCH 11/12] Enable v4l2 stuff by default
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/3rdparty/chromium/media/gpu/args.gni | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/3rdparty/chromium/media/gpu/args.gni b/src/3rdparty/chromium/media/gpu/args.gni
+index ac740ffee..df860c5a6 100644
+--- a/src/3rdparty/chromium/media/gpu/args.gni
++++ b/src/3rdparty/chromium/media/gpu/args.gni
+@@ -4,15 +4,15 @@
+ 
+ declare_args() {
+   # Indicates if V4L plugin is used.
+-  use_v4lplugin = false
++  use_v4lplugin = true
+ 
+   # Indicates if Video4Linux2 codec is used. This is used for all CrOS
+   # platforms which have v4l2 hardware encoder / decoder.
+-  use_v4l2_codec = false
++  use_v4l2_codec = true
+ 
+   # Indicates that only definitions available in the mainline linux kernel
+   # will be used.
+-  use_linux_v4l2_only = false
++  use_linux_v4l2_only = true
+ 
+   # Indicates if VA-API-based hardware acceleration is to be used. This
+   # is typically the case on x86-based ChromeOS devices.
+-- 
+2.20.1
+

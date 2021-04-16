@@ -1,0 +1,263 @@
+From ee367b4a4c6a11eff8f71c96b502ace3c6fcee08 Mon Sep 17 00:00:00 2001
+From: Wonchul Lee <w.lee@lge.com>
+Date: Mon, 3 Dec 2018 16:18:32 +0900
+Subject: [PATCH 11/60] waylandsink: Avoid race condition on multi-threaded
+ client
+
+When waylandsink is used on some other thread than the main wayland
+client thread, the waylandsink implementation is vulnerable to a
+
+condition related to registry and surface events which handled in
+seperated event queue.
+
+The race that may happen is that after a proxy is created, but
+before the queue is set, events meant to be emitted via the yet to
+
+set queue may already have been queued on the wrong queue.
+
+Wayland 1.11 introduced new API that allows creating a proxy
+wrappper which can help to avoid this race condition.
+---
+ configure.ac            |  2 +-
+ ext/wayland/wldisplay.c | 47 +++++++++--------------------------------
+ ext/wayland/wldisplay.h |  1 +
+ ext/wayland/wlwindow.c  | 39 ++++++++++++++++++++--------------
+ ext/wayland/wlwindow.h  |  2 ++
+ 5 files changed, 37 insertions(+), 54 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 943412cfb..e41591284 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1319,7 +1319,7 @@ dnl **** Wayland ****
+ translit(dnm, m, l) AM_CONDITIONAL(USE_WAYLAND, true)
+ AC_PATH_PROG([wayland_scanner], [wayland-scanner])
+ AG_GST_CHECK_FEATURE(WAYLAND, [wayland sink], wayland , [
+-  PKG_CHECK_MODULES(WAYLAND, wayland-client >= 1.4.0 libdrm >= 2.4.55 wayland-protocols >= 1.4, [
++  PKG_CHECK_MODULES(WAYLAND, wayland-client >= 1.11.0 libdrm >= 2.4.55 wayland-protocols >= 1.4, [
+     if test "x$wayland_scanner" != "x"; then
+       HAVE_WAYLAND="yes"
+       AC_SUBST(WAYLAND_PROTOCOLS_DATADIR, `$PKG_CONFIG --variable=pkgdatadir wayland-protocols`)
+diff --git a/ext/wayland/wldisplay.c b/ext/wayland/wldisplay.c
+index 90a57fbf8..cf7036167 100644
+--- a/ext/wayland/wldisplay.c
++++ b/ext/wayland/wldisplay.c
+@@ -102,6 +102,9 @@ gst_wl_display_finalize (GObject * gobject)
+   if (self->registry)
+     wl_registry_destroy (self->registry);
+ 
++  if (self->display_wrapper)
++    wl_proxy_wrapper_destroy (self->display_wrapper);
++
+   if (self->queue)
+     wl_event_queue_destroy (self->queue);
+ 
+@@ -113,37 +116,6 @@ gst_wl_display_finalize (GObject * gobject)
+   G_OBJECT_CLASS (gst_wl_display_parent_class)->finalize (gobject);
+ }
+ 
+-static void
+-sync_callback (void *data, struct wl_callback *callback, uint32_t serial)
+-{
+-  gboolean *done = data;
+-  *done = TRUE;
+-}
+-
+-static const struct wl_callback_listener sync_listener = {
+-  sync_callback
+-};
+-
+-static gint
+-gst_wl_display_roundtrip (GstWlDisplay * self)
+-{
+-  struct wl_callback *callback;
+-  gint ret = 0;
+-  gboolean done = FALSE;
+-
+-  g_return_val_if_fail (self != NULL, -1);
+-
+-  /* We don't own the display, process only our queue */
+-  callback = wl_display_sync (self->display);
+-  wl_callback_add_listener (callback, &sync_listener, &done);
+-  wl_proxy_set_queue ((struct wl_proxy *) callback, self->queue);
+-  while (ret != -1 && !done)
+-    ret = wl_display_dispatch_queue (self->display, self->queue);
+-  wl_callback_destroy (callback);
+-
+-  return ret;
+-}
+-
+ static void
+ shm_format (void *data, struct wl_shm *wl_shm, uint32_t format)
+ {
+@@ -271,10 +243,10 @@ gst_wl_display_thread_run (gpointer data)
+         break;
+       else
+         goto error;
+-    } else {
+-      wl_display_read_events (self->display);
+-      wl_display_dispatch_queue_pending (self->display, self->queue);
+     }
++    if (wl_display_read_events (self->display) == -1)
++      goto error;
++    wl_display_dispatch_queue_pending (self->display, self->queue);
+   }
+ 
+   return NULL;
+@@ -313,16 +285,17 @@ gst_wl_display_new_existing (struct wl_display * display,
+ 
+   self = g_object_new (GST_TYPE_WL_DISPLAY, NULL);
+   self->display = display;
++  self->display_wrapper = wl_proxy_create_wrapper (display);
+   self->own_display = take_ownership;
+ 
+   self->queue = wl_display_create_queue (self->display);
+-  self->registry = wl_display_get_registry (self->display);
+-  wl_proxy_set_queue ((struct wl_proxy *) self->registry, self->queue);
++  wl_proxy_set_queue ((struct wl_proxy *) self->display_wrapper, self->queue);
++  self->registry = wl_display_get_registry (self->display_wrapper);
+   wl_registry_add_listener (self->registry, &registry_listener, self);
+ 
+   /* we need exactly 2 roundtrips to discover global objects and their state */
+   for (i = 0; i < 2; i++) {
+-    if (gst_wl_display_roundtrip (self) < 0) {
++    if (wl_display_roundtrip_queue (self->display, self->queue) < 0) {
+       *error = g_error_new (g_quark_from_static_string ("GstWlDisplay"), 0,
+           "Error communicating with the wayland display");
+       g_object_unref (self);
+diff --git a/ext/wayland/wldisplay.h b/ext/wayland/wldisplay.h
+index 5bab5edcd..89bedee5a 100644
+--- a/ext/wayland/wldisplay.h
++++ b/ext/wayland/wldisplay.h
+@@ -46,6 +46,7 @@ struct _GstWlDisplay
+ 
+   /* public objects */
+   struct wl_display *display;
++  struct wl_display *display_wrapper;
+   struct wl_event_queue *queue;
+ 
+   /* globals */
+diff --git a/ext/wayland/wlwindow.c b/ext/wayland/wlwindow.c
+index 0c2e92937..e1efb75ed 100644
+--- a/ext/wayland/wlwindow.c
++++ b/ext/wayland/wlwindow.c
+@@ -92,6 +92,7 @@ gst_wl_window_finalize (GObject * gobject)
+   if (self->video_viewport)
+     wp_viewport_destroy (self->video_viewport);
+ 
++  wl_proxy_wrapper_destroy (self->video_surface_wrapper);
+   wl_subsurface_destroy (self->video_subsurface);
+   wl_surface_destroy (self->video_surface);
+ 
+@@ -101,6 +102,7 @@ gst_wl_window_finalize (GObject * gobject)
+   if (self->area_viewport)
+     wp_viewport_destroy (self->area_viewport);
+ 
++  wl_proxy_wrapper_destroy (self->area_surface_wrapper);
+   wl_surface_destroy (self->area_surface);
+ 
+   g_clear_object (&self->display);
+@@ -121,8 +123,13 @@ gst_wl_window_new_internal (GstWlDisplay * display, GMutex * render_lock)
+   window->area_surface = wl_compositor_create_surface (display->compositor);
+   window->video_surface = wl_compositor_create_surface (display->compositor);
+ 
+-  wl_proxy_set_queue ((struct wl_proxy *) window->area_surface, display->queue);
+-  wl_proxy_set_queue ((struct wl_proxy *) window->video_surface,
++  window->area_surface_wrapper = wl_proxy_create_wrapper (window->area_surface);
++  window->video_surface_wrapper =
++      wl_proxy_create_wrapper (window->video_surface);
++
++  wl_proxy_set_queue ((struct wl_proxy *) window->area_surface_wrapper,
++      display->queue);
++  wl_proxy_set_queue ((struct wl_proxy *) window->video_surface_wrapper,
+       display->queue);
+ 
+   /* embed video_surface in area_surface */
+@@ -233,7 +240,7 @@ gst_wl_window_get_wl_surface (GstWlWindow * window)
+ {
+   g_return_val_if_fail (window != NULL, NULL);
+ 
+-  return window->video_surface;
++  return window->video_surface_wrapper;
+ }
+ 
+ gboolean
+@@ -267,8 +274,8 @@ gst_wl_window_resize_video_surface (GstWlWindow * window, gboolean commit)
+   wl_subsurface_set_position (window->video_subsurface, res.x, res.y);
+ 
+   if (commit) {
+-    wl_surface_damage (window->video_surface, 0, 0, res.w, res.h);
+-    wl_surface_commit (window->video_surface);
++    wl_surface_damage (window->video_surface_wrapper, 0, 0, res.w, res.h);
++    wl_surface_commit (window->video_surface_wrapper);
+   }
+ 
+   if (gst_wl_window_is_toplevel (window)) {
+@@ -322,20 +329,20 @@ gst_wl_window_render (GstWlWindow * window, GstWlBuffer * buffer,
+   }
+ 
+   if (G_LIKELY (buffer))
+-    gst_wl_buffer_attach (buffer, window->video_surface);
++    gst_wl_buffer_attach (buffer, window->video_surface_wrapper);
+   else
+-    wl_surface_attach (window->video_surface, NULL, 0, 0);
++    wl_surface_attach (window->video_surface_wrapper, NULL, 0, 0);
+ 
+-  wl_surface_damage (window->video_surface, 0, 0, window->video_rectangle.w,
+-      window->video_rectangle.h);
+-  wl_surface_commit (window->video_surface);
++  wl_surface_damage (window->video_surface_wrapper, 0, 0,
++      window->video_rectangle.w, window->video_rectangle.h);
++  wl_surface_commit (window->video_surface_wrapper);
+ 
+   if (G_UNLIKELY (info)) {
+     /* commit also the parent (area_surface) in order to change
+      * the position of the video_subsurface */
+-    wl_surface_damage (window->area_surface, 0, 0, window->render_rectangle.w,
+-        window->render_rectangle.h);
+-    wl_surface_commit (window->area_surface);
++    wl_surface_damage (window->area_surface_wrapper, 0, 0,
++        window->render_rectangle.w, window->render_rectangle.h);
++    wl_surface_commit (window->area_surface_wrapper);
+     wl_subsurface_set_desync (window->video_subsurface);
+   }
+ 
+@@ -385,7 +392,7 @@ gst_wl_window_update_borders (GstWlWindow * window)
+       gst_wl_shm_memory_construct_wl_buffer (gst_buffer_peek_memory (buf, 0),
+       window->display, &info);
+   gwlbuf = gst_buffer_add_wl_buffer (buf, wlbuf, window->display);
+-  gst_wl_buffer_attach (gwlbuf, window->area_surface);
++  gst_wl_buffer_attach (gwlbuf, window->area_surface_wrapper);
+ 
+   /* at this point, the GstWlBuffer keeps the buffer
+    * alive and will free it on wl_buffer::release */
+@@ -419,8 +426,8 @@ gst_wl_window_set_render_rectangle (GstWlWindow * window, gint x, gint y,
+     gst_wl_window_resize_video_surface (window, TRUE);
+   }
+ 
+-  wl_surface_damage (window->area_surface, 0, 0, w, h);
+-  wl_surface_commit (window->area_surface);
++  wl_surface_damage (window->area_surface_wrapper, 0, 0, w, h);
++  wl_surface_commit (window->area_surface_wrapper);
+ 
+   if (window->video_width != 0)
+     wl_subsurface_set_desync (window->video_subsurface);
+diff --git a/ext/wayland/wlwindow.h b/ext/wayland/wlwindow.h
+index 10b49fd67..547ed55e0 100644
+--- a/ext/wayland/wlwindow.h
++++ b/ext/wayland/wlwindow.h
+@@ -45,9 +45,11 @@ struct _GstWlWindow
+ 
+   GstWlDisplay *display;
+   struct wl_surface *area_surface;
++  struct wl_surface *area_surface_wrapper;
+   struct wl_subsurface *area_subsurface;
+   struct wp_viewport *area_viewport;
+   struct wl_surface *video_surface;
++  struct wl_surface *video_surface_wrapper;
+   struct wl_subsurface *video_subsurface;
+   struct wp_viewport *video_viewport;
+   struct wl_shell_surface *shell_surface;
+-- 
+2.20.1
+

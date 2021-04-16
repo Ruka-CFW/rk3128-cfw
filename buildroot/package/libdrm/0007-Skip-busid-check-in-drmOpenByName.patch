@@ -1,0 +1,33 @@
+From dbcd8c771dac617efccecca9a86521eafc68f5a3 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 2 Nov 2018 10:37:18 +0800
+Subject: [PATCH] Skip busid check in drmOpenByName()
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ xf86drm.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/xf86drm.c b/xf86drm.c
+index 74b4e23..b0c8c83 100644
+--- a/xf86drm.c
++++ b/xf86drm.c
+@@ -662,13 +662,9 @@ static int drmOpenByName(const char *name, int type)
+                     drmFreeVersion(version);
+                     id = drmGetBusid(fd);
+                     drmMsg("drmGetBusid returned '%s'\n", id ? id : "NULL");
+-                    if (!id || !*id) {
+-                        if (id)
+-                            drmFreeBusid(id);
+-                        return fd;
+-                    } else {
++                    if (id)
+                         drmFreeBusid(id);
+-                    }
++                    return fd;
+                 } else {
+                     drmFreeVersion(version);
+                 }
+-- 
+2.11.0
+

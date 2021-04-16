@@ -1,0 +1,122 @@
+From 63e712238f0bc0b104e53bdf1456c272928e7664 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Wed, 27 Feb 2019 16:52:15 +0800
+Subject: [PATCH 09/18] qwaylandxdgshellv6: Support setting window position
+
+Support setting window position.
+Note:
+1/ (0,0) initial position(default position) would be ignored.
+2/ The decoration would be ignored when the space not enough.
+3/ QT would not aware of the wayland position.
+
+Also with:
+1/ 5f8db38e Avoid spurious move events after configure call
+2/ Solved conflict due to missing this big commit:
+	(c5ab40d2 "Client: Add acked configure support and implement it for xdg-shell v6")
+
+Change-Id: Ifb1433b3902d44c1b2e43036bc1805a6e00128fb
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/client/qwaylandwindow.cpp     |  4 +---
+ src/client/qwaylandxdgshellv6.cpp | 28 ++++++++++++++++++++++++++++
+ src/client/qwaylandxdgshellv6_p.h |  2 ++
+ 3 files changed, 31 insertions(+), 3 deletions(-)
+
+diff --git a/src/client/qwaylandwindow.cpp b/src/client/qwaylandwindow.cpp
+index aae1c678..398ba2ef 100644
+--- a/src/client/qwaylandwindow.cpp
++++ b/src/client/qwaylandwindow.cpp
+@@ -343,8 +343,6 @@ void QWaylandWindow::setGeometry(const QRect &rect)
+     sendExposeEvent(QRect(QPoint(), geometry().size()));
+ }
+ 
+-
+-
+ void QWaylandWindow::sendExposeEvent(const QRect &rect)
+ {
+     if (!(mShellSurface && mShellSurface->handleExpose(rect)))
+@@ -484,7 +482,7 @@ void QWaylandWindow::doResize()
+ 
+     widthWithoutMargins = qMax(widthWithoutMargins, window()->minimumSize().width());
+     heightWithoutMargins = qMax(heightWithoutMargins, window()->minimumSize().height());
+-    QRect geometry = QRect(0,0, widthWithoutMargins, heightWithoutMargins);
++    QRect geometry(windowGeometry().topLeft(), QSize(widthWithoutMargins, heightWithoutMargins));
+ 
+     int x = 0;
+     int y = 0;
+diff --git a/src/client/qwaylandxdgshellv6.cpp b/src/client/qwaylandxdgshellv6.cpp
+index ac974536..3a84b5d7 100644
+--- a/src/client/qwaylandxdgshellv6.cpp
++++ b/src/client/qwaylandxdgshellv6.cpp
+@@ -72,6 +72,26 @@ void QWaylandXdgSurfaceV6::Toplevel::applyConfigure()
+     m_xdgSurface->m_window->configure(0, m_configureState.width, m_configureState.height);
+ }
+ 
++void QWaylandXdgSurfaceV6::Toplevel::updatePosition()
++{
++    QWaylandWindow *window = m_xdgSurface->m_window;
++    QPoint position = window->geometry().topLeft(); // this is absolute
++
++    // Also avoid initial position (0,0).
++    // What if we do want to be at (0,0)?
++    if (m_position == position)
++        return;
++    m_position = position;
++
++    position += QPoint(window->frameMargins().top(),
++                       window->frameMargins().left());
++
++    // HACK: Set window position through .set_window_geometry(x, y, 0, 0)
++    m_xdgSurface->set_window_geometry(position.x() > 0 ? position.x() : 0,
++                                      position.y() > 0 ? position.y() : 0,
++                                      0, 0);
++}
++
+ void QWaylandXdgSurfaceV6::Toplevel::zxdg_toplevel_v6_configure(int32_t width, int32_t height, wl_array *states)
+ {
+     m_configureState.width = width;
+@@ -211,6 +231,10 @@ bool QWaylandXdgSurfaceV6::handleExpose(const QRegion &region)
+         m_exposeRegion = region;
+         return true;
+     }
++
++    if (m_toplevel && !region.isEmpty())
++	    m_toplevel->updatePosition();
++
+     return false;
+ }
+ 
+@@ -252,6 +276,10 @@ void QWaylandXdgSurfaceV6::zxdg_surface_v6_configure(uint32_t serial)
+     else if (m_popup)
+         m_popup->applyConfigure();
+ 
++    // Set initial position
++    if (m_toplevel && !m_configured)
++        m_toplevel->updatePosition();
++
+     m_configured = true;
+     ack_configure(serial);
+ 
+diff --git a/src/client/qwaylandxdgshellv6_p.h b/src/client/qwaylandxdgshellv6_p.h
+index fbcaafda..6016580c 100644
+--- a/src/client/qwaylandxdgshellv6_p.h
++++ b/src/client/qwaylandxdgshellv6_p.h
+@@ -102,6 +102,7 @@ private:
+         ~Toplevel();
+ 
+         void applyConfigure();
++        void updatePosition();
+ 
+         void zxdg_toplevel_v6_configure(int32_t width, int32_t height, wl_array *states) override;
+         void zxdg_toplevel_v6_close() override;
+@@ -112,6 +113,7 @@ private:
+             bool fullscreen;
+         } m_configureState;
+         QSize m_normalSize;
++        QPoint m_position;
+ 
+         QWaylandXdgSurfaceV6 *m_xdgSurface;
+     };
+-- 
+2.20.1
+

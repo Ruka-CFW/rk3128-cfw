@@ -1,0 +1,29 @@
+From fb26081dbf2db4bf15fd099771dfb92a35dc715d Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Thu, 31 Dec 2020 10:14:49 +0800
+Subject: [PATCH 38/41] HACK: backend-drm: Prefer earliest primary plane
+
+The vop2 might provide multiple primary planes, let's prefer the
+earliest one.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ libweston/backend-drm/drm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libweston/backend-drm/drm.c b/libweston/backend-drm/drm.c
+index fdc5401..106f0e8 100644
+--- a/libweston/backend-drm/drm.c
++++ b/libweston/backend-drm/drm.c
+@@ -1256,7 +1256,7 @@ drm_output_find_special_plane(struct drm_backend *b, struct drm_output *output,
+ 		return drm_plane_create(b, NULL, output, type, format);
+ 	}
+ 
+-	wl_list_for_each(plane, &b->plane_list, link) {
++	wl_list_for_each_reverse(plane, &b->plane_list, link) {
+ 		struct drm_output *tmp;
+ 		bool found_elsewhere = false;
+ 
+-- 
+2.20.1
+

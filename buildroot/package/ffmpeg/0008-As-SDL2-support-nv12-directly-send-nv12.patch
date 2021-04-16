@@ -1,0 +1,166 @@
+From 4f6ca8c4228f453d2f3267009792439ad47975ad Mon Sep 17 00:00:00 2001
+From: Hertz Wang <wangh@rock-chips.com>
+Date: Mon, 10 Jun 2019 16:39:11 +0800
+Subject: [PATCH 08/11] As SDL2 support nv12, directly send nv12
+
+Change-Id: I49ce83f65ac8564a60b2add3f6adcb11c4ca5183
+Signed-off-by: Hertz Wang <wangh@rock-chips.com>
+---
+ fftools/ffplay.c | 54 ++++++++++++++++++++++++++++++++++++++----------------
+ 1 file changed, 38 insertions(+), 16 deletions(-)
+
+diff --git a/fftools/ffplay.c b/fftools/ffplay.c
+index f9717e4..84fd8b0 100644
+--- a/fftools/ffplay.c
++++ b/fftools/ffplay.c
+@@ -392,6 +392,7 @@ static const struct TextureFormatEntry {
+     { AV_PIX_FMT_BGR32,          SDL_PIXELFORMAT_ABGR8888 },
+     { AV_PIX_FMT_BGR32_1,        SDL_PIXELFORMAT_BGRA8888 },
+     { AV_PIX_FMT_YUV420P,        SDL_PIXELFORMAT_IYUV },
++    { AV_PIX_FMT_NV12,           SDL_PIXELFORMAT_NV12 },
+     { AV_PIX_FMT_YUYV422,        SDL_PIXELFORMAT_YUY2 },
+     { AV_PIX_FMT_UYVY422,        SDL_PIXELFORMAT_UYVY },
+     { AV_PIX_FMT_NONE,           SDL_PIXELFORMAT_UNKNOWN },
+@@ -912,10 +913,14 @@ static void get_sdl_pix_fmt_and_blendmode(int format, Uint32 *sdl_pix_fmt, SDL_B
+ 
+ static void get_avframe_info(AVFrame *frame,
+                              uint8_t *srcSlice[],
+-                             int srcStride[]) {
++                             int srcStride[],
++                             int *hStride,
++                             int *vStride) {
+     if (frame->format != AV_PIX_FMT_DRM_PRIME) {
+         memcpy(srcSlice, frame->data, sizeof(frame->data));
+         memcpy(srcStride, frame->linesize, sizeof(frame->linesize));
++        *hStride = frame->width;
++        *vStride = frame->height;
+     } else {
+         AVDRMFrameDescriptor *desc = (AVDRMFrameDescriptor*)frame->data[0];
+         AVDRMLayerDescriptor *layer = &desc->layers[0];
+@@ -924,6 +929,8 @@ static void get_avframe_info(AVFrame *frame,
+         srcSlice[0] = (uint8_t*)desc->objects[0].ptr;
+         srcSlice[1] = srcSlice[0] + layer->planes[1].offset;
+         srcStride[0] = srcStride[1] = layer->planes[0].pitch;
++        *hStride = layer->planes[0].pitch; // always nv12
++        *vStride = layer->planes[1].offset / layer->planes[0].pitch;
+     }
+ }
+ 
+@@ -950,8 +957,13 @@ static int upload_texture(SDL_Texture **tex, AVFrame *frame, struct SwsContext *
+     Uint32 sdl_pix_fmt;
+     SDL_BlendMode sdl_blendmode;
+     int av_format = get_avframe_format(frame);
+-    get_sdl_pix_fmt_and_blendmode(frame->format, &sdl_pix_fmt, &sdl_blendmode);
+-    if (realloc_texture(tex, sdl_pix_fmt == SDL_PIXELFORMAT_UNKNOWN ? SDL_PIXELFORMAT_ARGB8888 : sdl_pix_fmt, frame->width, frame->height, sdl_blendmode, 0) < 0)
++    uint8_t *srcSlice[AV_NUM_DATA_POINTERS] = { NULL };
++    int srcStride[AV_NUM_DATA_POINTERS] = { 0 };
++    int tex_w, tex_h;
++
++    get_avframe_info(frame, srcSlice, srcStride, &tex_w, &tex_h);
++    get_sdl_pix_fmt_and_blendmode(av_format, &sdl_pix_fmt, &sdl_blendmode);
++    if (realloc_texture(tex, sdl_pix_fmt == SDL_PIXELFORMAT_UNKNOWN ? SDL_PIXELFORMAT_ARGB8888 : sdl_pix_fmt, tex_w, tex_h, sdl_blendmode, 0) < 0)
+         return -1;
+     switch (sdl_pix_fmt) {
+         case SDL_PIXELFORMAT_UNKNOWN:
+@@ -960,14 +972,10 @@ static int upload_texture(SDL_Texture **tex, AVFrame *frame, struct SwsContext *
+                 frame->width, frame->height, av_format, frame->width, frame->height,
+                 AV_PIX_FMT_BGRA, sws_flags, NULL, NULL, NULL);
+             if (*img_convert_ctx != NULL) {
+-                uint8_t *pixels[4];
+-                int pitch[4];
++                uint8_t *pixels[4] = { NULL };
++                int pitch[4] = { 0 };
+                 if (!SDL_LockTexture(*tex, NULL, (void **)pixels, pitch)) {
+-                    uint8_t *srcSlice[AV_NUM_DATA_POINTERS] = { NULL };
+-                    int srcStride[AV_NUM_DATA_POINTERS] = { 0 };
+-
+-                    get_avframe_info(frame, srcSlice, srcStride);
+-                    sws_scale(*img_convert_ctx, (const uint8_t * const *)srcSlice, srcStride,
++                    sws_scale(*img_convert_ctx, (const uint8_t * const *)frame->data, frame->linesize,
+                               0, frame->height, pixels, pitch);
+                     SDL_UnlockTexture(*tex);
+                 }
+@@ -976,6 +984,16 @@ static int upload_texture(SDL_Texture **tex, AVFrame *frame, struct SwsContext *
+                 ret = -1;
+             }
+             break;
++        case SDL_PIXELFORMAT_NV12:
++            {
++                if (srcStride[0] > 0 && srcStride[1] > 0) {
++                    ret = SDL_UpdateTexture(*tex, NULL, srcSlice[0], srcStride[0]);
++                } else {
++                    av_log(NULL, AV_LOG_ERROR, "TODO: negative linesizes are not supported.\n");
++                    return -1;
++                }
++            }
++            break;
+         case SDL_PIXELFORMAT_IYUV:
+             if (frame->linesize[0] > 0 && frame->linesize[1] > 0 && frame->linesize[2] > 0) {
+                 ret = SDL_UpdateYUVTexture(*tex, NULL, frame->data[0], frame->linesize[0],
+@@ -1021,7 +1039,7 @@ static void video_image_display(VideoState *is)
+ {
+     Frame *vp;
+     Frame *sp = NULL;
+-    SDL_Rect rect;
++    SDL_Rect rect, src_rect;
+ 
+     vp = frame_queue_peek_last(&is->pictq);
+     if (is->subtitle_st) {
+@@ -1071,6 +1089,10 @@ static void video_image_display(VideoState *is)
+ 
+     calculate_display_rect(&rect, is->xleft, is->ytop, is->width, is->height, vp->width, vp->height, vp->sar);
+ 
++    src_rect.x = 0;
++    src_rect.y = 0;
++    src_rect.w = vp->frame->width;
++    src_rect.h = vp->frame->height;
+     if (!vp->uploaded) {
+         if (upload_texture(&is->vid_texture, vp->frame, &is->img_convert_ctx) < 0)
+             return;
+@@ -1079,7 +1101,7 @@ static void video_image_display(VideoState *is)
+     }
+ 
+     set_sdl_yuv_conversion_mode(vp->frame);
+-    SDL_RenderCopyEx(renderer, is->vid_texture, NULL, &rect, 0, NULL, vp->flip_v ? SDL_FLIP_VERTICAL : 0);
++    SDL_RenderCopyEx(renderer, is->vid_texture, &src_rect, &rect, 0, NULL, vp->flip_v ? SDL_FLIP_VERTICAL : 0);
+     set_sdl_yuv_conversion_mode(NULL);
+     if (sp) {
+ #if USE_ONEPASS_SUBTITLE_RENDER
+@@ -1533,7 +1555,7 @@ static void stream_seek(VideoState *is, int64_t pos, int64_t rel, int seek_by_by
+ static void stream_toggle_pause(VideoState *is)
+ {
+     if (is->paused) {
+-        is->frame_timer += av_gettime_relative() / 1000000.0; // make play immediately
++        is->frame_timer = av_gettime_relative() / 1000000.0; // make play immediately
+         if (is->read_pause_return != AVERROR(ENOSYS)) {
+             is->vidclk.paused = 0;
+         }
+@@ -2241,14 +2263,14 @@ static int video_thread(void *arg)
+             frame_rate = av_buffersink_get_frame_rate(filt_out);
+         }
+ 
+-        if (support_avfilter) {
++        if (filt_in) {
+         ret = av_buffersrc_add_frame(filt_in, frame);
+         if (ret < 0)
+             goto the_end;
+         }
+ 
+         while (ret >= 0) {
+-            if (support_avfilter) {
++            if (filt_out) {
+             is->frame_last_returned_time = av_gettime_relative() / 1000000.0;
+ 
+             ret = av_buffersink_get_frame_flags(filt_out, frame, 0);
+@@ -2270,7 +2292,7 @@ static int video_thread(void *arg)
+             ret = queue_picture(is, frame, pts, duration, frame->pkt_pos, is->viddec.pkt_serial);
+             av_frame_unref(frame);
+ #if CONFIG_AVFILTER
+-            if (!support_avfilter || is->videoq.serial != is->viddec.pkt_serial)
++            if (!filt_out || is->videoq.serial != is->viddec.pkt_serial)
+                 break;
+         }
+ #endif
+-- 
+2.7.4
+

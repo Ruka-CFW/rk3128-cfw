@@ -1,0 +1,765 @@
+From 0dbde847438a59a65fe7c20e75c1a5e653832238 Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Tue, 7 Aug 2018 16:58:12 +0800
+Subject: [PATCH] Adapt to base and dueros ble wifi config
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ src/main.c           |  40 +++-
+ tools/gatt-service.c | 553 +++++++++++++++++++++++++++++++++++++++++++++------
+ 2 files changed, 527 insertions(+), 66 deletions(-)
+
+diff --git a/src/main.c b/src/main.c
+index 7e6af42..8116104 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -37,7 +37,9 @@
+ #include <sys/signalfd.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+-
++#include <sys/ioctl.h>
++#include <net/if.h>
++#include <arpa/inet.h>
+ #include <glib.h>
+ 
+ #include <dbus/dbus.h>
+@@ -421,13 +423,49 @@ static void parse_config(GKeyFile *config)
+ 	}
+ }
+ 
++static int get_mac_address(char* mac, size_t len, const char* inter)
++{
++    int sock_mac;
++    struct ifreq ifr_mac;
++    char mac_addr[30] = {0};
++
++    sock_mac = socket(AF_INET, SOCK_STREAM, 0);
++    if (sock_mac == -1) {
++        printf("create mac socket failed.\n");
++        return -1;
++    }
++    memset(&ifr_mac,0,sizeof(ifr_mac));
++    strncpy(ifr_mac.ifr_name, inter, sizeof(ifr_mac.ifr_name)-1);
++
++    if ((ioctl( sock_mac, SIOCGIFHWADDR, &ifr_mac)) < 0) {
++        printf("Mac socket ioctl failed.\n");
++        close(sock_mac);
++        return -1;
++    }
++    sprintf(mac_addr,"%02X%02X",
++            (unsigned char)ifr_mac.ifr_hwaddr.sa_data[4],
++            (unsigned char)ifr_mac.ifr_hwaddr.sa_data[5]);
++    snprintf(mac, len, "%s", mac_addr);
++    printf("bluez5 %s mac:%s\n", inter, mac);
++    close(sock_mac);
++
++    return 0;
++}
++
+ static void init_defaults(void)
+ {
+ 	uint8_t major, minor;
+ 
+ 	/* Default HCId settings */
+ 	memset(&main_opts, 0, sizeof(main_opts));
++
++#ifdef DUEROS
++	main_opts.name = g_strdup_printf("DUEROS_1234");
++	get_mac_address(main_opts.name + sizeof("DUEROS_") - 1, 5, "wlan0");
++#else
+ 	main_opts.name = g_strdup_printf("BlueZ %s", VERSION);
++#endif
++
+ 	main_opts.class = 0x000000;
+ 	main_opts.pairto = DEFAULT_PAIRABLE_TIMEOUT;
+ 	main_opts.discovto = DEFAULT_DISCOVERABLE_TIMEOUT;
+diff --git a/tools/gatt-service.c b/tools/gatt-service.c
+index 2ce8a1f..3cce6e2 100644
+--- a/tools/gatt-service.c
++++ b/tools/gatt-service.c
+@@ -26,11 +26,17 @@
+ #endif
+ 
+ #include <errno.h>
++#include <fcntl.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <stdbool.h>
+ #include <unistd.h>
+ #include <string.h>
+ #include <sys/signalfd.h>
++#include <sys/socket.h>
++#include <sys/stat.h>
++#include <sys/un.h>
++#include <time.h>
+ 
+ #include <glib.h>
+ #include <dbus/dbus.h>
+@@ -44,25 +50,57 @@
+ #define GATT_CHR_IFACE			"org.bluez.GattCharacteristic1"
+ #define GATT_DESCRIPTOR_IFACE		"org.bluez.GattDescriptor1"
+ 
+-/* Immediate Alert Service UUID */
+-#define IAS_UUID			"00001802-0000-1000-8000-00805f9b34fb"
+-#define ALERT_LEVEL_CHR_UUID		"00002a06-0000-1000-8000-00805f9b34fb"
+-#define IAS_UUID1   "A00B"
+-#define IAS_UUID2   "A00C"
+-#define IAS_UUID3   "A00D"
+-#define ALERT_LEVEL_CHR_UUID1		"00002b06-0000-1000-8000-00805f9b34fb"
+-#define ALERT_LEVEL_CHR_UUID2		"00002c07-0000-1000-8000-00805f9b34fb"
+-/* Random UUID for testing purpose */
+-
+-/* Random UUID for testing purpose */
+-#define READ_WRITE_DESCRIPTOR_UUID	"8260c653-1a54-426b-9e36-e84c238bc669"
+-#define READ_WRITE_DESCRIPTOR_UUID1 "0260c653-1a54-426b-9e36-e84c238bc669"
+-#define READ_WRITE_DESCRIPTOR_UUID2 "FFFF"
++/* Immediate wifi Service UUID */
++#define WIFI_SERVICES_UUID       "1B7E8251-2877-41C3-B46E-CF057C562023"
++#define SECURITY_UUID            "CAC2ABA4-EDBB-4C4A-BBAF-0A84A5CD93A1"
++#define SSID_UUID                "ACA0EF7C-EEAA-48AD-9508-19A6CEF6B356"
++#define PASSWORD_UUID            "40B7DE33-93E4-4C8B-A876-D833B415A6CE"
++#define CONFIG_NOTIFY_UUID       "8AC32D3f-5CB9-4D44-BEC2-EE689169F626"
++#define CONFIG_UUID              "00002902-0000-1000-8000-00805f9b34fb"
++
++#ifdef DUEROS
++#define DUEROS_WIFI_SERVICES_UUID       "00001111-0000-1000-8000-00805f9b34fb"
++#define DUEROS_CHARACTERISTIC_UUID      "00002222-0000-1000-8000-00805f9b34fb"
++
++#define DUEROS_SOCKET_RECV_LEN 20
++
++static pthread_t dueros_tid = 0;
++static int dueros_socket_done = 0;
++static int dueros_socket_fd = -1;
++static char dueros_socket_path[] = "/data/bluez5_utils/socket_dueros";
++
++struct characteristic *dueros_chr;
++
++typedef struct{
++    int server_sockfd;
++    int client_sockfd;
++    int server_len;
++    int client_len;
++    struct sockaddr_un server_address;
++    struct sockaddr_un client_address;
++    char sock_path[512];
++} tAPP_SOCKET;
++
++#define CMD_ADV                  "hcitool -i hci0 cmd 0x08 0x0008 15 02 01 06 11 07 fb 34 9b 5f 80 00 00 80 00 10 00 00 11 11 00 00"
++#else
++#define CMD_ADV                  "hcitool -i hci0 cmd 0x08 0x0008 15 02 01 06 11 07 23 20 56 7c 05 cf 6e b4 c3 41 77 28 51 82 7e 1b"
++#endif
++
++#define CMD_EN                   "hcitool -i hci0 cmd 0x08 0x000a 1"
++
++#define ADV_IRK		"\x69\x30\xde\xc3\x8f\x84\x74\x14" \
++
++const char *WIFI_CONFIG_FORMAT = "ctrl_interface=/var/run/wpa_supplicant\n"
++                                "ap_scan=1\n\nnetwork={\nssid=\"%s\"\n"
++                                "psk=\"%s\"\npriority=1\n}\n";
+ 
+ static GMainLoop *main_loop;
+ static GSList *services;
+ static DBusConnection *connection;
+ 
++char wifi_ssid[256];
++char wifi_password[256];
++
+ struct characteristic {
+ 	char *service;
+ 	char *uuid;
+@@ -82,13 +120,181 @@ struct descriptor {
+ };
+ 
+ /*
+- * Alert Level support Write Without Response only. Supported
+- * properties are defined at doc/gatt-api.txt. See "Flags"
++ * Supported properties are defined at doc/gatt-api.txt. See "Flags"
+  * property of the GattCharacteristic1.
+  */
+-static const char *ias_alert_level_props[] = { "write-without-response", NULL };
++//static const char *chr_props[] = { "read", "write", "notify", "indicate", NULL };
++static const char *chr_props[] = { "read", "write", "notify", NULL };
+ static const char *desc_props[] = { "read", "write", NULL };
+ 
++static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
++static void chr_iface_destroy(gpointer user_data);
++
++#ifdef DUEROS
++/********************SERVER API***************************/
++static int setup_socket_server(tAPP_SOCKET *app_socket)
++{
++    unlink (app_socket->sock_path);
++    if ((app_socket->server_sockfd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
++        printf("fail to create socket\n");
++        perror("socket");
++        return -1;
++    }
++    app_socket->server_address.sun_family = AF_UNIX;
++    strcpy (app_socket->server_address.sun_path, app_socket->sock_path);
++    app_socket->server_len = sizeof (app_socket->server_address);
++    app_socket->client_len = sizeof (app_socket->client_address);
++    if ((bind (app_socket->server_sockfd, (struct sockaddr *)&app_socket->server_address, app_socket->server_len)) < 0) {
++        perror("bind");
++        return -1;
++
++    }
++    if (listen (app_socket->server_sockfd, 10) < 0) {
++        perror("listen");
++        return -1;
++    }
++    printf ("Server is ready for client connect...\n");
++
++    return 0;
++}
++
++static int accpet_client(tAPP_SOCKET *app_socket)
++{
++    app_socket->client_sockfd = accept (app_socket->server_sockfd, (struct sockaddr *)&app_socket->server_address, (socklen_t *)&app_socket->client_len);
++    if (app_socket->client_sockfd == -1) {
++        perror ("accept");
++        return -1;
++    }
++    return 0;
++}
++
++static void teardown_socket_server(tAPP_SOCKET *app_socket)
++{
++    unlink (app_socket->sock_path);
++    app_socket->server_sockfd = 0;
++    app_socket->client_sockfd = 0;
++}
++
++/********************CLIENT API***************************/
++static int setup_socket_client(char *socket_path)
++{
++    struct sockaddr_un address;
++    int sockfd,  len;
++
++    if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
++            printf("%s: can not creat socket\n", __func__);
++            return -1;
++    }
++
++    address.sun_family = AF_UNIX;
++    strcpy (address.sun_path, socket_path);
++    len = sizeof (address);
++
++    if (connect (sockfd, (struct sockaddr *)&address, len) == -1) {
++        printf("%s: can not connect to socket\n", __func__);;
++        return -1;
++    }
++
++    return sockfd;
++
++}
++
++static void teardown_socket_client(int sockfd)
++{
++    close(sockfd);
++}
++
++/********************COMMON API***************************/
++static int socket_send(int sockfd, char *msg, int len)
++{
++    int bytes;
++    if (sockfd < 0) {
++        printf("%s: invalid sockfd\n",__func__);
++        return -1;
++    }
++    if ((bytes = send(sockfd, msg, len, 0)) < 0) {
++        perror ("send");
++    }
++    return bytes;
++}
++
++static int socket_recieve(int sockfd, char *msg, int len)
++{
++    int bytes;
++
++    if (sockfd < 0) {
++        printf("%s: invalid sockfd\n",__func__);
++        return -1;
++    }
++
++    if ((bytes = recv(sockfd, msg, len, 0)) < 0)
++    {
++        perror ("recv");
++    }
++    return bytes;
++
++}
++
++static int dueros_socket_send(char *msg, int len) {
++    return socket_send(dueros_socket_fd, msg, len);
++}
++
++static void *dueros_socket_recieve(void *arg) {
++    int bytes = 0;
++    char data[DUEROS_SOCKET_RECV_LEN];
++
++    dueros_socket_fd = setup_socket_client(dueros_socket_path);
++    if (dueros_socket_fd < 0) {
++        printf("Fail to connect server socket\n");
++        goto exit;
++    }
++
++    while (dueros_socket_done) {
++        memset(data, 0, sizeof(data));
++        bytes = socket_recieve(dueros_socket_fd, data, sizeof(data));
++        if (bytes <= 0) {
++            printf("Server leaved, break\n");
++            break;
++        }
++
++        printf("dueros_socket_recieve, len: %d\n", bytes);
++        for(int i = 0; i < bytes; i++)
++            printf("%02x ", data[i]);
++        printf("\n\n");
++
++        //send to apk
++        chr_write(dueros_chr, (uint8_t *) data, bytes);
++        usleep(1000000); //sleep 1s
++    }
++
++exit:
++    printf("Exit dueros socket thread\n");
++    pthread_exit(0);
++}
++
++static int dueros_socket_thread_create(void) {
++    dueros_socket_done = 1;
++    if (pthread_create(&dueros_tid, NULL, dueros_socket_recieve, NULL)) {
++        printf("Create dueros socket thread failed\n");
++        return -1;
++    }
++
++    return 0;
++}
++
++static void dueros_socket_thread_delete(void) {
++    dueros_socket_done = 0;
++
++    teardown_socket_client(dueros_socket_fd);
++
++    if (dueros_tid) {
++        pthread_join(dueros_tid, NULL);
++        dueros_tid = 0;
++    }
++}
++
++#endif
++
+ static gboolean desc_get_uuid(const GDBusPropertyTable *property,
+ 					DBusMessageIter *iter, void *user_data)
+ {
+@@ -380,8 +586,14 @@ static gboolean service_exist_includes(const GDBusPropertyTable *property,
+ 	const char *uuid = user_data;
+ 
+ 	printf("Exist Includes: %s\n", uuid);
+-	if (strncmp(uuid, "00001802", 8) == 0)
++
++#ifdef DUEROS
++	if (strncmp(uuid, "00001111", 8) == 0)
++		return TRUE;
++#else
++	if (strncmp(uuid, "1B7E8251", 8) == 0)
+ 		return TRUE;
++#endif
+ 
+ 	return FALSE;
+ }
+@@ -449,6 +661,143 @@ static int parse_options(DBusMessageIter *iter, const char **device)
+ 	return 0;
+ }
+ 
++void execute(const char cmdline[],char recv_buff[]){
++    printf("consule_run: %s\n",cmdline);
++
++    FILE *stream = NULL;
++    char buff[1024];
++
++    memset(recv_buff, 0, sizeof(recv_buff));
++
++    if((stream = popen(cmdline,"r"))!=NULL){
++        while(fgets(buff,1024,stream)){
++            strcat(recv_buff,buff);
++        }
++    }
++
++    pclose(stream);
++}
++
++//wpa_supplicant
++static int wpa_supplicant_config_wifi() {
++    FILE *fp = NULL;
++
++    if ((fp = fopen("/data/cfg/wpa_supplicant.conf", "w+")) == NULL)
++    {
++        printf("open cfg wpa_supplicant.conf failed");
++        return -1;
++    }
++
++    fprintf(fp, "%s\n", "ctrl_interface=/var/run/wpa_supplicant");
++    fprintf(fp, "%s\n", "ap_scan=1");
++    fprintf(fp, "%s\n", "network={");
++    fprintf(fp, "%s%s%s\n", "ssid=\"", wifi_ssid, "\"");
++    fprintf(fp, "%s%s%s\n", "psk=\"", wifi_password, "\"");
++    fprintf(fp, "%s\n", "key_mgmt=WPA-PSK");
++    fprintf(fp, "%s\n", "}");
++
++    fclose(fp);
++
++    if (-1 == system("killall wpa_supplicant; dhcpcd -k wlan0; killall dhcpcd;"
++                   "ifconfig wlan0 0.0.0.0")) {
++        printf("killall wpa_supplicant dhcpcd failed");
++        return -1;
++    }
++
++    if (-1 == system("wpa_supplicant -Dnl80211 -i wlan0 "
++                   "-c /data/cfg/wpa_supplicant.conf &")) {
++        printf("start wpa_supplicant failed");
++        return -1;
++    }
++
++    if (-1 == system("dhcpcd wlan0 -t 0 &")) {
++        printf("dhcpcd failed");
++        return -1;
++    }
++
++    return 0;
++}
++
++//wpa_cli
++static gboolean wpa_cli_config_wifi(){
++    printf("start config_wifi\n");
++    char buff[256] = {0};
++    char cmdline[256] = {0};
++    int id = -1;
++    bool execute_result = false;
++
++    // 1. add network
++    execute("wpa_cli -iwlan0 add_network",buff);
++    id = atoi(buff);
++    if(id < 0){
++        perror("add_network failed.\n");
++        return FALSE;
++    }
++
++    // 2. setNetWorkSSID
++    memset(cmdline, 0, sizeof(cmdline));
++    sprintf(cmdline,"wpa_cli -iwlan0 set_network %d ssid \\\"%s\\\"",id, wifi_ssid);
++    printf("%s\n", cmdline);
++    execute(cmdline,buff);
++    execute_result = !strncmp(buff,"OK",2);
++
++    if(!execute_result){
++        perror("setNetWorkSSID failed.\n");
++        return FALSE;
++    }
++
++    // 3. setNetWorkPWD
++    memset(cmdline, 0, sizeof(cmdline));
++    sprintf(cmdline,"wpa_cli -iwlan0 set_network %d psk \\\"%s\\\"", id,wifi_password);
++    printf("%s\n", cmdline);
++    execute(cmdline,buff);
++    execute_result = !strncmp(buff,"OK",2);
++
++    if(!execute_result){
++        perror("setNetWorkPWD failed.\n");
++        return FALSE;
++    }
++
++    // 4. selectNetWork
++    memset(cmdline, 0, sizeof(cmdline));
++    sprintf(cmdline,"wpa_cli -iwlan0 select_network %d", id);
++    printf("%s\n", cmdline);
++    execute(cmdline,buff);
++    execute_result = !strncmp(buff,"OK",2);
++
++    if(!execute_result){
++        perror("setNetWorkPWD failed.\n");
++        return FALSE;
++    }
++
++    return TRUE;
++}
++
++static bool save_wifi_config(const char* name, const char* pwd)
++{
++    FILE *fp;
++    char body[256];
++    int fd;
++    fp = fopen("/data/cfg/wpa_supplicant.conf", "w");
++
++    if (fp == NULL)
++    {
++        return -1;
++    }
++
++    snprintf(body, sizeof(body), WIFI_CONFIG_FORMAT, name, pwd);
++    fputs(body, fp);
++    fflush(fp);
++    fd = fileno(fp);
++    if (fd >= 0) {
++        fsync(fd);
++        printf("save wpa_supplicant.conf sucecees.\n");
++    }
++    fclose(fp);
++
++    return 0;
++}
++
+ static DBusMessage *chr_read_value(DBusConnection *conn, DBusMessage *msg,
+ 							void *user_data)
+ {
+@@ -496,7 +845,32 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
+ 		return g_dbus_create_error(msg, DBUS_ERROR_INVALID_ARGS,
+ 							"Invalid arguments");
+ 
+-	chr_write(chr, value, len);
++#ifdef DUEROS
++    printf("chr_write_value, len: %d\n", len);
++    for(int i = 0; i < len; i++)
++        printf("%02x ", value[i]);
++    printf("\n\n");
++
++    if (!strcmp(DUEROS_CHARACTERISTIC_UUID, chr->uuid)) {
++        dueros_socket_send((char *) value, len);
++    }
++
++#else
++    if (!strcmp(SSID_UUID, chr->uuid)) {
++        strcpy(wifi_ssid, value);
++        printf("wifi ssid is  %s\n", wifi_ssid);
++    }
++    if (!strcmp(PASSWORD_UUID, chr->uuid)) {
++        strcpy(wifi_password, value);
++        printf("wifi pwd is  %s\n", wifi_password);
++        #if 1
++        wpa_cli_config_wifi();
++        save_wifi_config(wifi_ssid, wifi_password);
++        #else
++        wpa_supplicant_config_wifi();
++        #endif
++    }
++#endif
+ 
+ 	return dbus_message_new_method_return(msg);
+ }
+@@ -639,6 +1013,13 @@ static gboolean register_characteristic(const char *chr_uuid,
+ 		return FALSE;
+ 	}
+ 
++#ifdef DUEROS
++    if (strcmp(chr_uuid, DUEROS_CHARACTERISTIC_UUID) == 0) {
++        printf("save dueros characteristic\n");
++        dueros_chr = chr;
++    }
++#endif
++
+ 	return TRUE;
+ }
+ 
+@@ -659,23 +1040,26 @@ static char *register_service(const char *uuid)
+ 	return path;
+ }
+ 
+-static void create_services_one(void)
++#ifdef DUEROS
++static void create_wifi_services(void)
+ {
+ 	char *service_path;
+-	uint8_t level = 0;
++	uint8_t level = 20;
+ 
+-	service_path = register_service(IAS_UUID);
++	service_path = register_service(DUEROS_WIFI_SERVICES_UUID);
+ 	if (!service_path)
+ 		return;
+ 
+-	/* Add Alert Level Characteristic to Immediate Alert Service */
+-	if (!register_characteristic(ALERT_LEVEL_CHR_UUID,
++	gboolean mSsidPassword = register_characteristic(DUEROS_CHARACTERISTIC_UUID,
+ 						&level, sizeof(level),
+-						ias_alert_level_props,
+-						READ_WRITE_DESCRIPTOR_UUID,
++						chr_props,
++						CONFIG_UUID, /*NULL*/
+ 						desc_props,
+-						service_path)) {
+-		printf("Couldn't register Alert Level characteristic (IAS)\n");
++						service_path);
++
++	/* Add Wifi Config Characteristic to Immediate Wifi Config Service */
++	if (!mSsidPassword) {
++		printf("Couldn't register wifi config characteristic (IAS)\n");
+ 		g_dbus_unregister_interface(connection, service_path,
+ 							GATT_SERVICE_IFACE);
+ 		g_free(service_path);
+@@ -685,62 +1069,93 @@ static void create_services_one(void)
+ 	services = g_slist_prepend(services, service_path);
+ 	printf("Registered service: %s\n", service_path);
+ }
+-
+-
+-static void create_services_two(void)
++#else
++static void create_wifi_services(void)
+ {
+ 	char *service_path;
+-	uint8_t level = 0;
++	uint8_t level = 20;
+ 
+-	service_path = register_service(IAS_UUID2);
++	service_path = register_service(WIFI_SERVICES_UUID);
+ 	if (!service_path)
+ 		return;
+ 
+-	if (!register_characteristic(ALERT_LEVEL_CHR_UUID2,
++	gboolean mSecure = register_characteristic(SECURITY_UUID,
+ 						&level, sizeof(level),
+-						ias_alert_level_props,
+-						READ_WRITE_DESCRIPTOR_UUID2,
++						chr_props,
++						NULL,
+ 						desc_props,
+-						service_path)) {
+-		printf("Couldn't register Alert Level characteristic (IAS)\n");
+-		g_dbus_unregister_interface(connection, service_path,
+-							GATT_SERVICE_IFACE);
+-		g_free(service_path);
+-		return;
+-	}
+-	services = g_slist_prepend(services, service_path);
+-	printf("Registered service: %s\n", service_path);
+-}
+-
+-static void create_services_three(void)
+-{
+-	char *service_path;
+-	uint8_t level = 0;
+-
+-	service_path = register_service(IAS_UUID3);
+-	if (!service_path)
+-		return;
+-
+-	if (!register_characteristic(ALERT_LEVEL_CHR_UUID1,
++						service_path);
++	gboolean mSsid = register_characteristic(SSID_UUID,
++						&level, sizeof(level),
++						chr_props,
++						NULL,
++						desc_props,
++						service_path);
++	gboolean mPassword = register_characteristic(PASSWORD_UUID,
+ 						&level, sizeof(level),
+-						ias_alert_level_props,
+-						READ_WRITE_DESCRIPTOR_UUID1,
++						chr_props,
++						NULL,
+ 						desc_props,
+-						service_path)) {
+-		printf("Couldn't register Alert Level characteristic (IAS)\n");
++						service_path);
++	gboolean mConfigCharNotify = register_characteristic(CONFIG_NOTIFY_UUID,
++						&level, sizeof(level),
++						chr_props,
++						CONFIG_UUID,
++						desc_props,
++						service_path);
++
++	/* Add Wifi Config Characteristic to Immediate Wifi Config Service */
++	if (!mSecure || !mSsid || !mPassword || !mConfigCharNotify) {
++		printf("Couldn't register Wifi Config characteristic (IAS)\n");
+ 		g_dbus_unregister_interface(connection, service_path,
+ 							GATT_SERVICE_IFACE);
+ 		g_free(service_path);
+ 		return;
+ 	}
+ 
+-
+ 	services = g_slist_prepend(services, service_path);
+ 	printf("Registered service: %s\n", service_path);
+ }
++#endif
++
++static void send_advertise(){
++        printf("send_advertise\n");
++        char buff[256] = {0};
++        char addr[6];
++        char CMD_RA[256] = "hcitool -i hci0 cmd 0x08 0x0005 ";
++        char temp[256];
++
++        //creat random address
++        int i;
++        srand(time(NULL));
++        for(i = 0; i < 6;i++)
++                addr[i]=rand()&0xFF;
++
++        addr[0] &= 0x3f;	/* Clear two most significant bits */
++	    addr[0] |= 0x40;	/* Set second most significant bit */
++
++        for(i = 0; i < 6;i++) {
++              sprintf(temp,"%02x", addr[i]);
++              strcat(CMD_RA, temp);
++              strcat(CMD_RA, " ");
++        }
++        printf ("%s\n", CMD_RA);
++
++        //LE Set Random Address Command
++        execute(CMD_RA, buff);
++        sleep(1);
++
++        // LE Set Advertising Data Command
++        execute(CMD_ADV, buff);
++        sleep(1);
++
++        // LE Set Advertise Enable Command
++        execute(CMD_EN, buff);
++}
+ 
+ static void register_app_reply(DBusMessage *reply, void *user_data)
+ {
++    printf("register_app_reply\n");
+ 	DBusError derr;
+ 
+ 	dbus_error_init(&derr);
+@@ -751,6 +1166,8 @@ static void register_app_reply(DBusMessage *reply, void *user_data)
+ 	else
+ 		printf("RegisterApplication: OK\n");
+ 
++	send_advertise();
++
+ 	dbus_error_free(&derr);
+ }
+ 
+@@ -877,9 +1294,11 @@ int main(int argc, char *argv[])
+ 	printf("gatt-service unique name: %s\n",
+ 				dbus_bus_get_unique_name(connection));
+ 
+-	create_services_one();
+-	create_services_two();
+-	create_services_three();
++#ifdef DUEROS
++    dueros_socket_thread_create();
++#endif
++
++	create_wifi_services();
+ 
+ 	client = g_dbus_client_new(connection, "org.bluez", "/");
+ 
+@@ -888,6 +1307,10 @@ int main(int argc, char *argv[])
+ 
+ 	g_main_loop_run(main_loop);
+ 
++#ifdef DUEROS
++    dueros_socket_thread_delete();
++#endif
++
+ 	g_dbus_client_unref(client);
+ 
+ 	g_source_remove(signal);
+-- 
+2.7.4
+

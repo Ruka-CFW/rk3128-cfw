@@ -1,0 +1,31 @@
+From 20582228966c2e6f6af5e6cc5cafbaeb6035f5a7 Mon Sep 17 00:00:00 2001
+From: Hans Yang <yhx@rock-chips.com>
+Date: Wed, 12 Dec 2018 20:24:51 +0800
+Subject: [PATCH 1/1] choose the avtive connector with valid encoder_id
+
+Signed-off-by: Hans Yang <yhx@rock-chips.com>
+---
+ src/video/kmsdrm/SDL_kmsdrmvideo.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/src/video/kmsdrm/SDL_kmsdrmvideo.c b/src/video/kmsdrm/SDL_kmsdrmvideo.c
+index 14f1eae..742b5bd 100644
+--- a/src/video/kmsdrm/SDL_kmsdrmvideo.c
++++ b/src/video/kmsdrm/SDL_kmsdrmvideo.c
+@@ -325,9 +325,10 @@ KMSDRM_VideoInit(_THIS)
+             continue;
+ 
+         if (connector->connection == DRM_MODE_CONNECTED &&
+-            connector->count_modes > 0) {
+-            SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "Found connector %d with %d modes.",
+-                         connector->connector_id, connector->count_modes);
++            connector->count_modes > 0 &&
++            connector->encoder_id > 0) {
++            SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "Found connector %d with %d modes, encoder_id %d.",
++                         connector->connector_id, connector->count_modes, connector->encoder_id);
+             vdata->saved_conn_id = connector->connector_id;
+             break;
+         }
+-- 
+2.7.4
+

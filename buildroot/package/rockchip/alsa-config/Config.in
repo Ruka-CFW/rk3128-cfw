@@ -1,0 +1,5 @@
+config BR2_PACKAGE_ALSA_CONFIG
+	bool "alsa-config"
+        depends on BR2_PACKAGE_ALSA_LIB
+	help
+	  "Copy extra alsa configs to /usr/share/alsa/"

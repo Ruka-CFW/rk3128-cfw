@@ -1,0 +1,51 @@
+From 544b5feb210ca65a181610f5b90218e2dde20ddf Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Mon, 23 Dec 2019 16:14:10 +0800
+Subject: [PATCH] Policy: enable AutoEnable
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ plugins/policy.c | 6 +++---
+ src/main.conf    | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+ mode change 100644 => 100755 plugins/policy.c
+
+diff --git a/plugins/policy.c b/plugins/policy.c
+old mode 100644
+new mode 100755
+index 1f5a506..76b7427
+--- a/plugins/policy.c
++++ b/plugins/policy.c
+@@ -80,7 +80,7 @@ static GSList *reconnects = NULL;
+ static unsigned int service_id = 0;
+ static GSList *devices = NULL;
+ 
+-static bool auto_enable = false;
++static bool auto_enable = true;
+ 
+ struct policy_data {
+ 	struct btd_device *dev;
+@@ -812,8 +812,8 @@ static int policy_init(void)
+ 						sizeof(default_intervals));
+ 	}
+ 
+-	auto_enable = g_key_file_get_boolean(conf, "Policy", "AutoEnable",
+-									NULL);
++	//auto_enable = g_key_file_get_boolean(conf, "Policy", "AutoEnable",
++	//								NULL);
+ 
+ done:
+ 	if (reconnect_uuids && reconnect_uuids[0] && reconnect_attempts) {
+diff --git a/src/main.conf b/src/main.conf
+index cbae32e..ee4a1c5 100644
+--- a/src/main.conf
++++ b/src/main.conf
+@@ -104,4 +104,4 @@
+ # AutoEnable defines option to enable all controllers when they are found.
+ # This includes adapters present on start as well as adapters that are plugged
+ # in later on. Defaults to 'false'.
+-#AutoEnable=false
++AutoEnable=true
+-- 
+2.7.4
+

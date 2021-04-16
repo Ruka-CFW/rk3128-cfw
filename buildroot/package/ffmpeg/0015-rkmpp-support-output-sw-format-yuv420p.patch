@@ -1,0 +1,363 @@
+From 6fdbec99fa76dd5bfd1d04e7a0f54cd7f3f77197 Mon Sep 17 00:00:00 2001
+From: Hertz Wang <wangh@rock-chips.com>
+Date: Thu, 12 Sep 2019 12:22:00 +0000
+Subject: [PATCH 3/4] rkmpp: support output sw format yuv420p
+
+chromium brower only set it's mind on an codec that can be output
+yuv420p
+
+Signed-off-by: Hertz Wang <wangh@rock-chips.com>
+Change-Id: I54a458567afba7a6ac88db3f80b167f6f5b9a8ea
+---
+ configure             |   8 ++-
+ debian_config.sh      |  10 +++
+ libavcodec/rkmppdec.c | 184 +++++++++++++++++++++++++++++++++++++++++++++-----
+ 3 files changed, 184 insertions(+), 18 deletions(-)
+ create mode 100755 debian_config.sh
+
+diff --git a/configure b/configure
+index b0630f6..6d79529 100755
+--- a/configure
++++ b/configure
+@@ -332,6 +332,7 @@ External library support:
+   --disable-nvenc          disable Nvidia video encoding code [autodetect]
+   --enable-omx             enable OpenMAX IL code [no]
+   --enable-omx-rpi         enable OpenMAX IL code for Raspberry Pi [no]
++  --enable-librga          enable Rockchip rga external library [no]
+   --enable-rkmpp           enable Rockchip Media Process Platform code [no]
+   --disable-v4l2-m2m       disable V4L2 mem2mem code [autodetect]
+   --disable-vaapi          disable Video Acceleration API (mainly Unix/Intel) code [autodetect]
+@@ -1688,6 +1689,7 @@ EXTERNAL_LIBRARY_VERSION3_LIST="
+     libvmaf
+     libvo_amrwbenc
+     mbedtls
++    librga
+     rkmpp
+ "
+ 
+@@ -2929,6 +2931,7 @@ qsvenc_select="qsv"
+ qsvvpp_select="qsv"
+ vaapi_encode_deps="vaapi"
+ v4l2_m2m_deps="linux_videodev2_h sem_timedwait"
++rkmpp_deps="librga"
+ 
+ hwupload_cuda_filter_deps="ffnvcodec"
+ scale_npp_filter_deps="ffnvcodec libnpp"
+@@ -6234,10 +6237,13 @@ enabled openssl           && { check_pkg_config openssl openssl openssl/ssl.h OP
+                                check_lib openssl openssl/ssl.h SSL_library_init -lssl32 -leay32 ||
+                                check_lib openssl openssl/ssl.h SSL_library_init -lssl -lcrypto -lws2_32 -lgdi32 ||
+                                die "ERROR: openssl not found"; }
++enabled librga            && require librga "rga/RgaApi.h" c_RkRgaInit -lrga
+ enabled rkmpp             && { require_pkg_config rkmpp rockchip_mpp  rockchip/rk_mpi.h mpp_create &&
+                                require_pkg_config rockchip_mpp "rockchip_mpp >= 1.3.7" rockchip/rk_mpi.h mpp_create &&
+                                { enabled libdrm ||
+-                                 warn "WARNING: rkmpp requires --enable-libdrm"; }
++                                 die "ERROR: rkmpp requires --enable-libdrm"; } &&
++                               { enabled librga ||
++                                 die "ERROR: rkmpp requires --enable-librga"; }
+                              }
+ enabled vapoursynth       && require_pkg_config vapoursynth "vapoursynth-script >= 42" VSScript.h vsscript_init
+ 
+diff --git a/debian_config.sh b/debian_config.sh
+new file mode 100755
+index 0000000..bd6f3bd
+--- /dev/null
++++ b/debian_config.sh
+@@ -0,0 +1,10 @@
++./configure \
++	--enable-version3 \
++	--enable-libdrm --enable-librga --enable-rkmpp \
++	--enable-ffplay \
++	--disable-v4l2_m2m \
++	--disable-decoder=h264_v4l2m2m \
++	--disable-decoder=vp8_v4l2m2m \
++	--disable-decoder=mpeg2_v4l2m2m \
++	--disable-decoder=mpeg4_v4l2m2m \
++	--disable-static --enable-shared
+diff --git a/libavcodec/rkmppdec.c b/libavcodec/rkmppdec.c
+index 3584c9a..e74a15c 100644
+--- a/libavcodec/rkmppdec.c
++++ b/libavcodec/rkmppdec.c
+@@ -24,6 +24,7 @@
+ #endif
+ 
+ #include <pthread.h>
++#include <rga/RgaApi.h>
+ #include <rockchip/mpp_buffer.h>
+ #include <rockchip/rk_mpi.h>
+ #include <time.h>
+@@ -41,10 +42,12 @@
+ #include "libavutil/imgutils.h"
+ #include "libavutil/log.h"
+ 
+-#define RECEIVE_FRAME_TIMEOUT   100
++#define RECEIVE_FRAME_TIMEOUT   10
+ #define FRAMEGROUP_MAX_FRAMES   16
+ #define INPUT_MAX_PACKETS       4
+ 
++static int rga_supported = -1;
++
+ typedef struct {
+     MppCtx ctx;
+     MppApi *mpi;
+@@ -67,6 +70,105 @@ typedef struct {
+     AVBufferRef *decoder_ref;
+ } RKMPPFrameContext;
+ 
++static int get_rga_format(int av_fmt) {
++    switch (av_fmt) {
++        case AV_PIX_FMT_NV12:
++            return RK_FORMAT_YCrCb_420_SP;
++        case AV_PIX_FMT_YUV420P:
++            return RK_FORMAT_YCbCr_420_P;
++        default:
++            return -1;
++    }
++}
++
++// only pixel conversion, keep width/height
++static int rkmpp_write_nv12(MppBuffer mpp_buffer, int mpp_vir_width,
++                            int mpp_vir_height, AVFrame* dst_frame) {
++    rga_info_t src_info = {0};
++    rga_info_t dst_info = {0};
++    int width = dst_frame->width;
++    int height = dst_frame->height;
++    int possible_height;
++    int rga_format = get_rga_format(dst_frame->format);
++
++    if (rga_format < 0)
++        return AVERROR(EINVAL);
++
++    if (rga_supported <= 0)
++        goto bail;
++
++    possible_height =
++        (dst_frame->data[1] - dst_frame->data[0]) / dst_frame->linesize[0];
++
++    if (dst_frame->format == AV_PIX_FMT_YUV420P &&
++        (dst_frame->linesize[0] != 2 * dst_frame->linesize[1] ||
++         dst_frame->linesize[1] != dst_frame->linesize[2] ||
++         dst_frame->data[1] - dst_frame->data[0] !=
++         4 * (dst_frame->data[2] - dst_frame->data[1]))) {
++        av_log(NULL, AV_LOG_DEBUG, "dst frame memory is not continuous for planes, fall down to soft copy\n");
++        goto bail; // mostly is not continuous memory
++    }
++
++    if (possible_height != height && possible_height != mpp_vir_height)
++        av_log(NULL, AV_LOG_WARNING,
++            "dst frame possiable %d is strange, expect %d or %d\n",
++            possible_height, height, mpp_vir_height);
++
++    src_info.fd = mpp_buffer_get_fd(mpp_buffer);
++    src_info.mmuFlag = 1;
++    // mpp decoder always return nv12(yuv420sp)
++    rga_set_rect(&src_info.rect, 0, 0, width, height,
++                 mpp_vir_width, mpp_vir_height, RK_FORMAT_YCrCb_420_SP);
++
++    dst_info.fd = -1;
++    // dst_frame data[*] must be continuous
++    dst_info.virAddr = dst_frame->data[0];
++    dst_info.mmuFlag = 1;
++    rga_set_rect(&dst_info.rect, 0, 0, width, height, dst_frame->linesize[0],
++        possible_height, rga_format);
++    if (c_RkRgaBlit(&src_info, &dst_info, NULL) < 0) {
++        av_log(NULL, AV_LOG_ERROR, "Failed to do rga blit\n");
++        goto bail;
++    }
++    return 0;
++
++bail:
++    do {
++        int i;
++        uint8_t* src_ptr = (uint8_t*) mpp_buffer_get_ptr(mpp_buffer);
++        for (i = 0; i < height; i++)
++            memcpy(dst_frame->data[0] + dst_frame->linesize[0] * i,
++                   src_ptr + mpp_vir_width * i, width);
++        src_ptr += mpp_vir_width * mpp_vir_height;
++        switch (dst_frame->format) {
++        case AV_PIX_FMT_NV12:
++            for (i = 0; i < height / 2; i++)
++                memcpy(dst_frame->data[1] + dst_frame->linesize[1] * i,
++                   src_ptr + mpp_vir_width * i, width);
++            return 0;
++        case AV_PIX_FMT_YUV420P: {
++            int j;
++            uint8_t* dst_u = dst_frame->data[1];
++            uint8_t* dst_v = dst_frame->data[2];
++            for (i = 0; i < height / 2; i++) {
++                for (j = 0; j < width; j++) {
++                    dst_u[j] = src_ptr[2 * j + 0];
++                    dst_v[j] = src_ptr[2 * j + 1];
++                }
++                dst_u += dst_frame->linesize[1];
++                dst_v += dst_frame->linesize[2];
++                src_ptr += mpp_vir_width;
++            }
++            return 0;
++        }
++        default:
++            break;
++        }
++    } while(0);
++
++    return AVERROR(EINVAL);
++}
++
+ static MppCodingType rkmpp_get_codingtype(AVCodecContext *avctx)
+ {
+     switch (avctx->codec_id) {
+@@ -105,6 +207,9 @@ static int rkmpp_write_data(AVCodecContext *avctx, uint8_t *buffer, int size, in
+         return AVERROR_UNKNOWN;
+     }
+ 
++    if (pts == AV_NOPTS_VALUE || !pts)
++        pts = avctx->reordered_opaque;
++
+     mpp_packet_set_pts(packet, pts);
+ 
+     if (!buffer)
+@@ -163,7 +268,16 @@ static int rkmpp_init_decoder(AVCodecContext *avctx)
+     RK_S64 paramS64;
+     RK_S32 paramS32;
+ 
+-    avctx->pix_fmt = AV_PIX_FMT_DRM_PRIME;
++    if (avctx->pix_fmt == AV_PIX_FMT_NONE &&
++        avctx->sw_pix_fmt == AV_PIX_FMT_NONE) {
++        // chromium only support AV_PIX_FMT_YUV420P
++        avctx->pix_fmt = avctx->sw_pix_fmt = AV_PIX_FMT_YUV420P;
++    } else {
++        if (avctx->pix_fmt == AV_PIX_FMT_NONE)
++            avctx->pix_fmt = AV_PIX_FMT_DRM_PRIME;
++        avctx->sw_pix_fmt = (avctx->pix_fmt == AV_PIX_FMT_DRM_PRIME) ?
++                            AV_PIX_FMT_NV12 : avctx->pix_fmt;
++    }
+ 
+     // create a decoder and a ref to it
+     decoder = av_mallocz(sizeof(RKMPPDecoder));
+@@ -263,6 +377,15 @@ static int rkmpp_init_decoder(AVCodecContext *avctx)
+     if (ret < 0)
+         goto fail;
+ 
++    if (rga_supported < 0)
++        rga_supported = c_RkRgaInit() ? 0 : 1;
++    if (!rga_supported) {
++        if (access("/dev/rga", R_OK) != 0)
++            av_log(avctx, AV_LOG_ERROR, "Fail to access rga: %s\n",
++                   strerror(errno));
++        av_log(avctx, AV_LOG_ERROR, "No rga support\n");
++    }
++
+     return 0;
+ 
+ fail:
+@@ -322,6 +445,26 @@ static void rkmpp_release_frame(void *opaque, uint8_t *data)
+     av_free(desc);
+ }
+ 
++static void rkmpp_setinfo_avframe(AVFrame *frame, MppFrame mppframe) {
++    int mode;
++
++    frame->pts              = mpp_frame_get_pts(mppframe);
++#if FF_API_PKT_PTS
++    FF_DISABLE_DEPRECATION_WARNINGS
++    frame->pkt_pts          = frame->pts;
++    FF_ENABLE_DEPRECATION_WARNINGS
++#endif
++    frame->reordered_opaque = frame->pts;
++    frame->color_range      = mpp_frame_get_color_range(mppframe);
++    frame->color_primaries  = mpp_frame_get_color_primaries(mppframe);
++    frame->color_trc        = mpp_frame_get_color_trc(mppframe);
++    frame->colorspace       = mpp_frame_get_colorspace(mppframe);
++
++    mode = mpp_frame_get_mode(mppframe);
++    frame->interlaced_frame = ((mode & MPP_FRAME_FLAG_FIELD_ORDER_MASK) == MPP_FRAME_FLAG_DEINTERLACED);
++    frame->top_field_first  = ((mode & MPP_FRAME_FLAG_FIELD_ORDER_MASK) == MPP_FRAME_FLAG_TOP_FIRST);
++}
++
+ static int rkmpp_retrieve_frame(AVCodecContext *avctx, AVFrame *frame)
+ {
+     RKMPPDecodeContext *rk_context = avctx->priv_data;
+@@ -333,7 +476,6 @@ static int rkmpp_retrieve_frame(AVCodecContext *avctx, AVFrame *frame)
+     MppBuffer buffer = NULL;
+     AVDRMFrameDescriptor *desc = NULL;
+     AVDRMLayerDescriptor *layer = NULL;
+-    int mode;
+     MppFrameFormat mppformat;
+     uint32_t drmformat;
+ 
+@@ -403,18 +545,9 @@ static int rkmpp_retrieve_frame(AVCodecContext *avctx, AVFrame *frame)
+         av_log(avctx, AV_LOG_DEBUG, "Received a frame.\n");
+ 
+         // setup general frame fields
+-        frame->format           = AV_PIX_FMT_DRM_PRIME;
++        frame->format           = avctx->pix_fmt;
+         frame->width            = mpp_frame_get_width(mppframe);
+         frame->height           = mpp_frame_get_height(mppframe);
+-        frame->pts              = mpp_frame_get_pts(mppframe);
+-        frame->color_range      = mpp_frame_get_color_range(mppframe);
+-        frame->color_primaries  = mpp_frame_get_color_primaries(mppframe);
+-        frame->color_trc        = mpp_frame_get_color_trc(mppframe);
+-        frame->colorspace       = mpp_frame_get_colorspace(mppframe);
+-
+-        mode = mpp_frame_get_mode(mppframe);
+-        frame->interlaced_frame = ((mode & MPP_FRAME_FLAG_FIELD_ORDER_MASK) == MPP_FRAME_FLAG_DEINTERLACED);
+-        frame->top_field_first  = ((mode & MPP_FRAME_FLAG_FIELD_ORDER_MASK) == MPP_FRAME_FLAG_TOP_FIRST);
+ 
+         mppformat = mpp_frame_get_fmt(mppframe);
+         drmformat = rkmpp_get_frameformat(mppformat);
+@@ -422,6 +555,23 @@ static int rkmpp_retrieve_frame(AVCodecContext *avctx, AVFrame *frame)
+         // now setup the frame buffer info
+         buffer = mpp_frame_get_buffer(mppframe);
+         if (buffer) {
++            if (avctx->pix_fmt != AV_PIX_FMT_DRM_PRIME) {
++                if (avctx->get_buffer2 == avcodec_default_get_buffer2)
++                    ret = av_frame_get_buffer(frame, 0);
++                else
++                    ret = ff_get_buffer(avctx, frame, 0);
++                if (ret) {
++                    av_log(avctx, AV_LOG_ERROR, "Fail to alloc frame.\n");
++                    goto fail;
++                }
++                rkmpp_setinfo_avframe(frame, mppframe);
++                // Do pixel conversion, TODO: implement rga AVFilter
++                ret = rkmpp_write_nv12(buffer,
++                    mpp_frame_get_hor_stride(mppframe),
++                    mpp_frame_get_ver_stride(mppframe), frame);
++                goto fail; // alway release mpp resource
++            }
++            rkmpp_setinfo_avframe(frame, mppframe);
+             desc = av_mallocz(sizeof(AVDRMFrameDescriptor));
+             if (!desc) {
+                 ret = AVERROR(ENOMEM);
+@@ -536,10 +686,6 @@ static int rkmpp_receive_frame(AVCodecContext *avctx, AVFrame *frame)
+                 return ret;
+             }
+         }
+-
+-        // make sure we keep decoder full
+-        if (freeslots > 1)
+-            return AVERROR(EAGAIN);
+     }
+ 
+     return rkmpp_retrieve_frame(avctx, frame);
+@@ -563,6 +709,8 @@ static void rkmpp_flush(AVCodecContext *avctx)
+ 
+ static const AVCodecHWConfigInternal *rkmpp_hw_configs[] = {
+     HW_CONFIG_INTERNAL(DRM_PRIME),
++    HW_CONFIG_INTERNAL(NV12),
++    HW_CONFIG_INTERNAL(YUV420P),
+     NULL
+ };
+ 
+@@ -587,6 +735,8 @@ static const AVCodecHWConfigInternal *rkmpp_hw_configs[] = {
+         .priv_class     = &rkmpp_##NAME##_dec_class, \
+         .capabilities   = AV_CODEC_CAP_DELAY | AV_CODEC_CAP_AVOID_PROBING | AV_CODEC_CAP_HARDWARE, \
+         .pix_fmts       = (const enum AVPixelFormat[]) { AV_PIX_FMT_DRM_PRIME, \
++                                                         AV_PIX_FMT_NV12, \
++                                                         AV_PIX_FMT_YUV420P, \
+                                                          AV_PIX_FMT_NONE}, \
+         .hw_configs     = rkmpp_hw_configs, \
+         .bsfs           = BSFS, \
+-- 
+2.7.4
+

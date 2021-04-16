@@ -1,0 +1,5 @@
+# CEMU
+
+source "package/emulators/cemu/cemu/Config.in"
+source "package/emulators/cemu/cemu-hook/Config.in"
+source "package/emulators/cemu/cemutil/Config.in"

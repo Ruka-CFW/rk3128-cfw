@@ -1,0 +1,109 @@
+From a9a7eab89ba159fde359c2f9c5f14d6953866b4f Mon Sep 17 00:00:00 2001
+From: Johan Klokkhammer Helsing <johan.helsing@qt.io>
+Date: Thu, 30 Aug 2018 09:31:33 +0200
+Subject: [PATCH 02/18] Fix regression in QWaylandGlContext::makeCurrent for
+ offscreen surfaces
+
+[ChangeLog][QPA plugin] Fixed a bug where offscreen surfaces would get
+surfaceless EGL contexts.
+
+Fixes a regression in in bf09c7a1.
+
+The call, window->updateSurface(window->isExposed()), is problematic because
+offscreen textures are never exposed, and consequently, eglSurface will be
+EGL_NO_SURFACE, which will then create a surfaceless context in the call:
+
+    eglMakeCurrent(m_eglDisplay, eglSurface, eglSurface, m_context)
+
+This reverts to the old behavior of always trying to create an EGL surface,
+unless the window doesn't have a valid wl_surface, in which case it doesn't
+make sense (which is what bf09c7a1 fixed, QTBUG-65553).
+
+Task-number: QTBUG-70242
+Task-number: QTBUG-68605
+Task-number: QTBUG-67601
+Reviewed-by: Paul Olav Tvete <paul.tvete@qt.io>
+(cherry picked from commit 192b2e8f59e7f0cb3c2d482524bf171a81a213c5)
+
+Also with:
+1/ Change "qCWarning(lcQpaWayland, ..." to qWarning.
+2/ 3bbb85c3 Fix eglGetError call in error handling
+3/ Change QWaylandWindow::configure() to call doResize() directly, which
+   is part of this big commit:
+   (c5ab40d2 "Client: Add acked configure support and implement it for xdg-shell v6")
+
+Change-Id: I44b07bb8bf4b33c73c6379a1de8e9e5cfd220b51
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/client/qwaylanddisplay_p.h                           | 3 +++
+ src/client/qwaylandwindow.cpp                            | 4 ++++
+ .../client/wayland-egl/qwaylandeglwindow.cpp             | 9 ++++++---
+ 3 files changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/src/client/qwaylanddisplay_p.h b/src/client/qwaylanddisplay_p.h
+index 35d86176..d81d5fa4 100644
+--- a/src/client/qwaylanddisplay_p.h
++++ b/src/client/qwaylanddisplay_p.h
+@@ -57,6 +57,7 @@
+ #include <QtCore/QVector>
+ 
+ #include <QtCore/QWaitCondition>
++#include <QtCore/QLoggingCategory>
+ 
+ #include <wayland-client.h>
+ 
+@@ -83,6 +84,8 @@ namespace QtWayland {
+ 
+ namespace QtWaylandClient {
+ 
++Q_DECLARE_LOGGING_CATEGORY(lcQpaWayland);
++
+ class QWaylandInputDevice;
+ class QWaylandBuffer;
+ class QWaylandScreen;
+diff --git a/src/client/qwaylandwindow.cpp b/src/client/qwaylandwindow.cpp
+index 10c18c36..dc664304 100644
+--- a/src/client/qwaylandwindow.cpp
++++ b/src/client/qwaylandwindow.cpp
+@@ -433,10 +433,14 @@ void QWaylandWindow::configure(uint32_t edges, int32_t width, int32_t height)
+     mConfigure.width = width;
+     mConfigure.height = height;
+ 
++#if 0
+     if (!mRequestResizeSent && !mConfigure.isEmpty()) {
+         mRequestResizeSent= true;
+         QMetaObject::invokeMethod(this, "requestResize", Qt::QueuedConnection);
+     }
++#else
++    doResize();
++#endif
+ }
+ 
+ void QWaylandWindow::doResize()
+diff --git a/src/hardwareintegration/client/wayland-egl/qwaylandeglwindow.cpp b/src/hardwareintegration/client/wayland-egl/qwaylandeglwindow.cpp
+index 6b5c5326..2a4ec332 100644
+--- a/src/hardwareintegration/client/wayland-egl/qwaylandeglwindow.cpp
++++ b/src/hardwareintegration/client/wayland-egl/qwaylandeglwindow.cpp
+@@ -132,13 +132,16 @@ void QWaylandEglWindow::updateSurface(bool create)
+ 
+                 m_resize = true;
+             }
+-        } else if (create) {
+-            m_waylandEglWindow = wl_egl_window_create(object(), sizeWithMargins.width(), sizeWithMargins.height());
++        } else if (create && wl_surface::isInitialized()) {
++            ::wl_surface *wlSurface = wl_surface::object();
++            m_waylandEglWindow = wl_egl_window_create(wlSurface, sizeWithMargins.width(), sizeWithMargins.height());
+         }
+ 
+-        if (!m_eglSurface && create) {
++        if (!m_eglSurface && m_waylandEglWindow && create) {
+             EGLNativeWindowType eglw = (EGLNativeWindowType) m_waylandEglWindow;
+             m_eglSurface = eglCreateWindowSurface(m_clientBufferIntegration->eglDisplay(), m_eglConfig, eglw, 0);
++            if (Q_UNLIKELY(m_eglSurface == EGL_NO_SURFACE))
++                qWarning("Could not create EGL surface (EGL error 0x%x)\n", eglGetError());
+         }
+     }
+ }
+-- 
+2.20.1
+

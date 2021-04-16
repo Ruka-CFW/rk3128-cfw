@@ -1,0 +1,35 @@
+From bfb68bf54fe3624104899d61eb704bc03d5c0581 Mon Sep 17 00:00:00 2001
+From: "jkand.huang" <jkand.huang@rock-chips.com>
+Date: Mon, 23 Mar 2020 17:02:38 +0800
+Subject: [PATCH] live555: If no session is found, the first session is
+ returned.
+
+Signed-off-by: jkand.huang <jkand.huang@rock-chips.com>
+---
+ liveMedia/GenericMediaServer.cpp | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/liveMedia/GenericMediaServer.cpp b/liveMedia/GenericMediaServer.cpp
+index efcce63..df18d89 100644
+--- a/liveMedia/GenericMediaServer.cpp
++++ b/liveMedia/GenericMediaServer.cpp
+@@ -39,8 +39,15 @@ void GenericMediaServer::addServerMediaSession(ServerMediaSession* serverMediaSe
+ 
+ ServerMediaSession* GenericMediaServer
+ ::lookupServerMediaSession(char const* streamName, Boolean /*isFirstLookupInSession*/) {
++  // if not found, return the first.
++  ServerMediaSession *session =
++      (ServerMediaSession *)(fServerMediaSessions->Lookup(streamName));
++  if (session == NULL) {
++    session = (ServerMediaSession *)(fServerMediaSessions->getFirst());
++  }
++  return session;
+   // Default implementation:
+-  return (ServerMediaSession*)(fServerMediaSessions->Lookup(streamName));
++  // return (ServerMediaSession*)(fServerMediaSessions->Lookup(streamName));
+ }
+ 
+ void GenericMediaServer::removeServerMediaSession(ServerMediaSession* serverMediaSession) {
+-- 
+2.25.0
+

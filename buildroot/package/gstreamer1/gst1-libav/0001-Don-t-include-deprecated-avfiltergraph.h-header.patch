@@ -1,0 +1,26 @@
+From db7e7dc138a8ee4dbcf49701695f05828d9f8886 Mon Sep 17 00:00:00 2001
+From: Nicolas Dufresne <nicolas.dufresne@collabora.com>
+Date: Mon, 30 Apr 2018 15:37:50 -0400
+Subject: [PATCH 1/5] Don't include deprecated avfiltergraph.h header
+
+https://bugzilla.gnome.org/show_bug.cgi?id=792900
+---
+ ext/libav/gstav.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ext/libav/gstav.c b/ext/libav/gstav.c
+index 1482bae..f7213e1 100644
+--- a/ext/libav/gstav.c
++++ b/ext/libav/gstav.c
+@@ -30,7 +30,7 @@
+ 
+ #include <libavcodec/avcodec.h>
+ #include <libavformat/avformat.h>
+-#include <libavfilter/avfiltergraph.h>
++#include <libavfilter/avfilter.h>
+ 
+ #include "gstav.h"
+ #include "gstavutils.h"
+-- 
+2.17.1
+

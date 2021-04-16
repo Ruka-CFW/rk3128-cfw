@@ -1,0 +1,36 @@
+From 0601f481e75274636dd4e06abad5cb2ba42b5bf3 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sat, 30 Jan 2021 07:22:44 +0800
+Subject: [PATCH] configure: remove legacy reference to qtConfig(mirclient)
+
+The optio mirclient is removed since Qt-5.14.x (see [1])
+Fixes:
+
+  Project ERROR: Could not find feature mirclient.
+
+[1] https://code.qt.io/cgit/qt/qtbase.git/commit/?id=8c73ddd8e3fb43cc22fa111b855ab1f9f5b83405
+
+Signed-off-by: Peter Seiderer <ps.report@gmx.net>
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ mkspecs/features/platform.prf | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/mkspecs/features/platform.prf b/mkspecs/features/platform.prf
+index 35eb6b8..9adc02f 100644
+--- a/mkspecs/features/platform.prf
++++ b/mkspecs/features/platform.prf
+@@ -67,10 +67,6 @@ defineTest(isPlatformSupported) {
+     skipBuild("C++14 support is required in order to build chromium.")
+     return(false)
+   }
+-  qtConfig(mirclient) {
+-    skipBuild("Mir is not yet supported as graphics backend for Qt WebEngine.")
+-    return(false)
+-  }
+   static {
+     skipBuild("Static builds of QtWebEngine aren't supported.")
+     return(false)
+-- 
+2.20.1
+

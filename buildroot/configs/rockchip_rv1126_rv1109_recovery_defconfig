@@ -1,0 +1,5 @@
+#include "base.config"
+#include "base_extra.config"
+#include "rv1126_rv1109_arm.config"
+#include "recovery_updateEngine.config"
+BR2_ROOTFS_OVERLAY="board/rockchip/rv1126_rv1109/fs-overlay-recovery/"

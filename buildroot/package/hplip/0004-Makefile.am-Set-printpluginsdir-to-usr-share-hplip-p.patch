@@ -1,0 +1,27 @@
+From 517940ce9fed77d9b1f6998a1229aee8806db3cb Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 10 Jul 2020 14:46:35 +0800
+Subject: [PATCH] Makefile.am: Set printpluginsdir to
+ /usr/share/hplip/prnt/plugins
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ Makefile.am | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 6e5e71c..f4a6939 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -675,7 +675,7 @@ endif
+ 
+ if HPLIP_CLASS_DRIVER
+ filterdir=$(cupsfilterdir)
+-printpluginsdir=$(cupsfilterdir)
++printpluginsdir=$(hplipdir)/prnt/plugins
+ 
+ 
+ dist_filter_DATA = hpcups hpps dat2drv
+-- 
+2.20.1
+

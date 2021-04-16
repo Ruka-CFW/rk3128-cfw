@@ -1,0 +1,10 @@
+config BR2_PACKAGE_LIBPNG12
+	bool "libpng12"
+	depends on !BR2_PACKAGE_LIBPNG
+	select BR2_PACKAGE_ZLIB
+	help
+	  Library for handling PNG12 (Portable Network Graphics)
+	  images, some library build need libpng 1.2 instead of
+	  1.6. So need unselect BR2_PACKAGE_LIBPNG.
+
+	  http://www.libpng.org/

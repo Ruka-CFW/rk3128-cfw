@@ -1,0 +1,30 @@
+From ed030495427ab4c9ad85d795a3f9a37303018596 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Wed, 6 Jun 2018 21:26:46 +0800
+Subject: [PATCH 05/14] qoffscreensurface: Clear current surface before destroy
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/gui/kernel/qoffscreensurface.cpp | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/gui/kernel/qoffscreensurface.cpp b/src/gui/kernel/qoffscreensurface.cpp
+index ae027af62..f7395288c 100644
+--- a/src/gui/kernel/qoffscreensurface.cpp
++++ b/src/gui/kernel/qoffscreensurface.cpp
+@@ -226,6 +226,12 @@ void QOffscreenSurface::destroy()
+     QPlatformSurfaceEvent e(QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed);
+     QGuiApplication::sendEvent(this, &e);
+ 
++#ifndef QT_NO_OPENGL
++    QOpenGLContext *context = QOpenGLContext::currentContext();
++    if (context && context->surface() == this)
++        context->doneCurrent();
++#endif
++
+     delete d->platformOffscreenSurface;
+     d->platformOffscreenSurface = 0;
+     if (d->offscreenWindow) {
+-- 
+2.20.1
+

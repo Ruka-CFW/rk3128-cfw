@@ -1,0 +1,47 @@
+From 5f1bb04dccaef40bf54009a81fad02510008a55e Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Thu, 7 Jan 2021 03:38:36 +0800
+Subject: [PATCH 39/41] launcher-direct: Only require tty when vt switching
+ enabled
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ libweston/launcher-direct.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/libweston/launcher-direct.c b/libweston/launcher-direct.c
+index 9fa329b..9688d28 100644
+--- a/libweston/launcher-direct.c
++++ b/libweston/launcher-direct.c
+@@ -301,7 +301,7 @@ launcher_direct_connect(struct weston_launcher **out, struct weston_compositor *
+ 	launcher->base.iface = &launcher_direct_iface;
+ 	launcher->compositor = compositor;
+ 
+-	if (setup_tty(launcher, tty) == -1) {
++	if (compositor->vt_switching && setup_tty(launcher, tty) == -1) {
+ 		free(launcher);
+ 		return -1;
+ 	}
+@@ -314,12 +314,15 @@ static void
+ launcher_direct_destroy(struct weston_launcher *launcher_base)
+ {
+ 	struct launcher_direct *launcher = wl_container_of(launcher_base, launcher, base);
++	struct weston_compositor *compositor = launcher->compositor;
+ 
+-	launcher_direct_restore(&launcher->base);
+-	wl_event_source_remove(launcher->vt_source);
++	if (compositor->vt_switching) {
++		launcher_direct_restore(&launcher->base);
++		wl_event_source_remove(launcher->vt_source);
+ 
+-	if (launcher->tty >= 0)
+-		close(launcher->tty);
++		if (launcher->tty >= 0)
++			close(launcher->tty);
++	}
+ 
+ 	free(launcher);
+ }
+-- 
+2.20.1
+

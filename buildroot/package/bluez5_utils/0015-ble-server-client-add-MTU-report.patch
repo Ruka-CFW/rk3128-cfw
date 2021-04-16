@@ -1,0 +1,238 @@
+From 82f74c02ab307a385d82d90f3223e8d9470f8ea4 Mon Sep 17 00:00:00 2001
+From: ctf <ctf@rock-chips.com>
+Date: Fri, 17 Apr 2020 16:59:30 +0800
+Subject: [PATCH] ble server/client add MTU report
+
+Signed-off-by: ctf <ctf@rock-chips.com>
+---
+ src/device.c             | 34 ++++++++++++++++++++++++++++++++++
+ src/gatt-database.c      |  8 ++++++++
+ src/gatt-database.h      |  2 ++
+ src/shared/gatt-client.c | 18 +++++++++++++++++-
+ src/shared/gatt-client.h |  4 ++++
+ src/shared/gatt-server.c | 18 +++++++++++++++++-
+ src/shared/gatt-server.h |  4 ++++
+ 7 files changed, 86 insertions(+), 2 deletions(-)
+
+diff --git a/src/device.c b/src/device.c
+index 4f1af70..c1da35c 100644
+--- a/src/device.c
++++ b/src/device.c
+@@ -1316,6 +1316,21 @@ dev_property_advertising_data_exist(const GDBusPropertyTable *property,
+ 	return bt_ad_has_data(device->ad, NULL);
+ }
+ 
++static gboolean dev_property_get_client_mtu(const GDBusPropertyTable *property,
++					DBusMessageIter *iter, void *data)
++{
++	struct btd_device *device = data;
++	uint16_t mtu;
++
++	if(!device)
++		return FALSE;
++
++	mtu = btd_gatt_database_get_mtu(device->att);
++	dbus_message_iter_append_basic(iter, DBUS_TYPE_UINT16, &mtu);
++
++	return TRUE;
++}
++
+ static gboolean disconnect_all(gpointer user_data)
+ {
+ 	struct btd_device *device = user_data;
+@@ -2739,6 +2754,7 @@ static const GDBusPropertyTable device_properties[] = {
+ 	{ "AdvertisingData", "a{yv}", dev_property_get_advertising_data,
+ 				NULL, dev_property_advertising_data_exist,
+ 				G_DBUS_PROPERTY_FLAG_EXPERIMENTAL },
++	{ "MTU", "q", dev_property_get_client_mtu },
+ 	{ }
+ };
+ 
+@@ -4859,6 +4875,22 @@ static void gatt_debug(const char *str, void *user_data)
+ 	DBG("%s", str);
+ }
+ 
++static void gatt_update_mtu(uint16_t mtu, void *user_data)
++{
++	struct btd_device *device = user_data;
++	int device_att_mtu;
++
++	if(!device)
++		return;
++
++	device_att_mtu = btd_gatt_database_get_mtu(device->att);
++	if(mtu != device_att_mtu)
++		DBG("Error: client exchange mtu(%d) != device->att->mtu(%d)", mtu, device_att_mtu);
++
++	g_dbus_emit_property_changed(dbus_conn, device->path,
++					DEVICE_INTERFACE, "MTU");
++}
++
+ static void gatt_client_init(struct btd_device *device)
+ {
+ 	gatt_client_cleanup(device);
+@@ -4871,6 +4903,7 @@ static void gatt_client_init(struct btd_device *device)
+ 	}
+ 
+ 	bt_gatt_client_set_debug(device->client, gatt_debug, NULL, NULL);
++	bt_gatt_client_set_mtu_cb(device->client, gatt_update_mtu, device);
+ 
+ 	/*
+ 	 * Notify notify existing service about the new connection so they can
+@@ -4919,6 +4952,7 @@ static void gatt_server_init(struct btd_device *device,
+ 
+ 	bt_att_set_enc_key_size(device->att, device->ltk_enc_size);
+ 	bt_gatt_server_set_debug(device->server, gatt_debug, NULL, NULL);
++	bt_gatt_server_set_mtu_cb(device->server, gatt_update_mtu, device);
+ 
+ 	btd_gatt_database_att_connected(database, device->att);
+ }
+diff --git a/src/gatt-database.c b/src/gatt-database.c
+index 7534b39..9d55e51 100644
+--- a/src/gatt-database.c
++++ b/src/gatt-database.c
+@@ -3454,3 +3454,11 @@ void btd_gatt_database_restore_svc_chng_ccc(struct btd_gatt_database *database)
+ 	send_notification_to_devices(database, handle, value, sizeof(value),
+ 					ccc_handle, service_changed_conf, NULL);
+ }
++
++uint16_t btd_gatt_database_get_mtu(struct bt_att *att)
++{
++	if (!att)
++		return 0;
++
++	return bt_att_get_mtu(att);
++}
+diff --git a/src/gatt-database.h b/src/gatt-database.h
+index a6c3139..210e3c5 100644
+--- a/src/gatt-database.h
++++ b/src/gatt-database.h
+@@ -27,3 +27,5 @@ void btd_gatt_database_att_connected(struct btd_gatt_database *database,
+ 						struct bt_att *att);
+ 
+ void btd_gatt_database_restore_svc_chng_ccc(struct btd_gatt_database *database);
++
++uint16_t btd_gatt_database_get_mtu(struct bt_att *att);
+diff --git a/src/shared/gatt-client.c b/src/shared/gatt-client.c
+index 2e153db..59bda62 100644
+--- a/src/shared/gatt-client.c
++++ b/src/shared/gatt-client.c
+@@ -116,6 +116,9 @@ struct bt_gatt_client {
+ 
+ 	struct bt_gatt_request *discovery_req;
+ 	unsigned int mtu_req_id;
++
++	bt_gatt_client_mtu_func_t mtu_callback;
++	void *mtu_data;
+ };
+ 
+ struct request {
+@@ -1275,9 +1278,12 @@ static void exchange_mtu_cb(bool success, uint8_t att_ecode, void *user_data)
+ 	}
+ 
+ 	util_debug(client->debug_callback, client->debug_data,
+-					"MTU exchange complete, with MTU: %u",
++					"Client MTU exchange complete, with MTU: %u",
+ 					bt_att_get_mtu(client->att));
+ 
++	if(client->mtu_callback)
++		client->mtu_callback(bt_att_get_mtu(client->att), client->mtu_data);
++
+ discover:
+ 	client->discovery_req = bt_gatt_discover_all_primary_services(
+ 							client->att, NULL,
+@@ -3287,3 +3293,13 @@ int bt_gatt_client_get_security(struct bt_gatt_client *client)
+ 
+ 	return bt_att_get_security(client->att, NULL);
+ }
++
++bool bt_gatt_client_set_mtu_cb(struct bt_gatt_client *client,
++					bt_gatt_client_mtu_func_t callback, void *user_data) {
++	if (!client)
++		return false;
++
++	client->mtu_callback = callback;
++	client->mtu_data = user_data;
++	return true;
++}
+diff --git a/src/shared/gatt-client.h b/src/shared/gatt-client.h
+index 6d8bf80..22ae4db 100644
+--- a/src/shared/gatt-client.h
++++ b/src/shared/gatt-client.h
+@@ -55,6 +55,7 @@ typedef void (*bt_gatt_client_register_callback_t)(uint16_t att_ecode,
+ typedef void (*bt_gatt_client_service_changed_callback_t)(uint16_t start_handle,
+ 							uint16_t end_handle,
+ 							void *user_data);
++typedef void (*bt_gatt_client_mtu_func_t)(uint16_t mtu, void *user_data);
+ 
+ bool bt_gatt_client_is_ready(struct bt_gatt_client *client);
+ unsigned int bt_gatt_client_ready_register(struct bt_gatt_client *client,
+@@ -136,3 +137,6 @@ bool bt_gatt_client_unregister_notify(struct bt_gatt_client *client,
+ 
+ bool bt_gatt_client_set_security(struct bt_gatt_client *client, int level);
+ int bt_gatt_client_get_security(struct bt_gatt_client *client);
++
++bool bt_gatt_client_set_mtu_cb(struct bt_gatt_client *client,
++					bt_gatt_client_mtu_func_t callback, void *user_data);
+diff --git a/src/shared/gatt-server.c b/src/shared/gatt-server.c
+index cdade76..0f37e30 100644
+--- a/src/shared/gatt-server.c
++++ b/src/shared/gatt-server.c
+@@ -114,6 +114,9 @@ struct bt_gatt_server {
+ 	bt_gatt_server_debug_func_t debug_callback;
+ 	bt_gatt_server_destroy_func_t debug_destroy;
+ 	void *debug_data;
++
++	bt_gatt_server_mtu_func_t mtu_callback;
++	void *mtu_data;
+ };
+ 
+ static void bt_gatt_server_free(struct bt_gatt_server *server)
+@@ -1455,7 +1458,10 @@ static void exchange_mtu_cb(uint8_t opcode, const void *pdu,
+ 	bt_att_set_mtu(server->att, final_mtu);
+ 
+ 	util_debug(server->debug_callback, server->debug_data,
+-			"MTU exchange complete, with MTU: %u", final_mtu);
++			"Server MTU exchange complete, with MTU: %u", final_mtu);
++
++	if(server->mtu_callback)
++		server->mtu_callback(final_mtu, server->mtu_data);
+ }
+ 
+ static bool gatt_server_register_att_handlers(struct bt_gatt_server *server)
+@@ -1717,3 +1723,13 @@ bool bt_gatt_server_send_indication(struct bt_gatt_server *server,
+ 
+ 	return result;
+ }
++
++bool bt_gatt_server_set_mtu_cb(struct bt_gatt_server *server,
++					bt_gatt_server_mtu_func_t callback, void *user_data) {
++	if (!server)
++		return false;
++
++	server->mtu_callback = callback;
++	server->mtu_data = user_data;
++	return true;
++}
+diff --git a/src/shared/gatt-server.h b/src/shared/gatt-server.h
+index d5d2093..937e5ef 100644
+--- a/src/shared/gatt-server.h
++++ b/src/shared/gatt-server.h
+@@ -36,6 +36,7 @@ void bt_gatt_server_unref(struct bt_gatt_server *server);
+ typedef void (*bt_gatt_server_destroy_func_t)(void *user_data);
+ typedef void (*bt_gatt_server_debug_func_t)(const char *str, void *user_data);
+ typedef void (*bt_gatt_server_conf_func_t)(void *user_data);
++typedef void (*bt_gatt_server_mtu_func_t)(uint16_t mtu, void *user_data);
+ 
+ bool bt_gatt_server_set_debug(struct bt_gatt_server *server,
+ 					bt_gatt_server_debug_func_t callback,
+@@ -52,3 +53,6 @@ bool bt_gatt_server_send_indication(struct bt_gatt_server *server,
+ 					bt_gatt_server_conf_func_t callback,
+ 					void *user_data,
+ 					bt_gatt_server_destroy_func_t destroy);
++
++bool bt_gatt_server_set_mtu_cb(struct bt_gatt_server *server,
++					bt_gatt_server_mtu_func_t callback, void *user_data);
+-- 
+2.25.0
+

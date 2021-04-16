@@ -1,0 +1,94 @@
+From 4293e314203dec749872d232256c21f003e455e5 Mon Sep 17 00:00:00 2001
+From: Zain Wang <wzz@rock-chips.com>
+Date: Mon, 10 Jun 2019 16:54:28 +0800
+Subject: [PATCH] Revert "monotonic clock for callback queue timeouts (#1250)"
+
+This reverts commit 2a8015fe6722720aae82832eeee9ca0846ac5e61.
+---
+ clients/roscpp/include/ros/callback_queue.h  | 16 +---------------
+ clients/roscpp/src/libros/callback_queue.cpp | 17 ++---------------
+ 2 files changed, 3 insertions(+), 30 deletions(-)
+
+diff --git a/clients/roscpp/include/ros/callback_queue.h b/clients/roscpp/include/ros/callback_queue.h
+index 4fe811d..7afb682 100644
+--- a/clients/roscpp/include/ros/callback_queue.h
++++ b/clients/roscpp/include/ros/callback_queue.h
+@@ -35,21 +35,6 @@
+ #ifndef ROSCPP_CALLBACK_QUEUE_H
+ #define ROSCPP_CALLBACK_QUEUE_H
+ 
+-// check if we might need to include our own backported version boost::condition_variable
+-// in order to use CLOCK_MONOTONIC for the condition variable
+-// the include order here is important!
+-#ifdef BOOST_THREAD_HAS_CONDATTR_SET_CLOCK_MONOTONIC
+-#include <boost/version.hpp>
+-#if BOOST_VERSION < 106100
+-// use backported version of boost condition variable, see https://svn.boost.org/trac/boost/ticket/6377
+-#include "boost_161_condition_variable.h"
+-#else // Boost version is 1.61 or greater and has the steady clock fixes
+-#include <boost/thread/condition_variable.hpp>
+-#endif
+-#else // !BOOST_THREAD_HAS_CONDATTR_SET_CLOCK_MONOTONIC
+-#include <boost/thread/condition_variable.hpp>
+-#endif // BOOST_THREAD_HAS_CONDATTR_SET_CLOCK_MONOTONIC
+-
+ #include "ros/callback_queue_interface.h"
+ #include "ros/time.h"
+ #include "common.h"
+@@ -57,6 +42,7 @@
+ #include <boost/shared_ptr.hpp>
+ #include <boost/thread/mutex.hpp>
+ #include <boost/thread/shared_mutex.hpp>
++#include <boost/thread/condition_variable.hpp>
+ #include <boost/thread/tss.hpp>
+ 
+ #include <list>
+diff --git a/clients/roscpp/src/libros/callback_queue.cpp b/clients/roscpp/src/libros/callback_queue.cpp
+index b2bab57..5827646 100644
+--- a/clients/roscpp/src/libros/callback_queue.cpp
++++ b/clients/roscpp/src/libros/callback_queue.cpp
+@@ -32,23 +32,10 @@
+  *  POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-// Make sure we use CLOCK_MONOTONIC for the condition variable wait_for if not Apple.
+-#ifndef __APPLE__
+-#define BOOST_THREAD_HAS_CONDATTR_SET_CLOCK_MONOTONIC
+-#endif
+-
+ #include "ros/callback_queue.h"
+ #include "ros/assert.h"
+ #include <boost/scope_exit.hpp>
+ 
+-// check if we have really included the backported boost condition variable
+-// just in case someone messes with the include order...
+-#if BOOST_VERSION < 106100
+-#ifndef USING_BACKPORTED_BOOST_CONDITION_VARIABLE
+-#error "needs boost version >= 1.61 or the backported headers!"
+-#endif
+-#endif
+-
+ namespace ros
+ {
+ 
+@@ -242,7 +229,7 @@ CallbackQueue::CallOneResult CallbackQueue::callOne(ros::WallDuration timeout)
+     {
+       if (!timeout.isZero())
+       {
+-        condition_.wait_for(lock, boost::chrono::nanoseconds(timeout.toNSec()));
++        condition_.timed_wait(lock, boost::posix_time::microseconds(timeout.toSec() * 1000000.0f));
+       }
+ 
+       if (callbacks_.empty())
+@@ -318,7 +305,7 @@ void CallbackQueue::callAvailable(ros::WallDuration timeout)
+     {
+       if (!timeout.isZero())
+       {
+-        condition_.wait_for(lock, boost::chrono::nanoseconds(timeout.toNSec()));
++        condition_.timed_wait(lock, boost::posix_time::microseconds(timeout.toSec() * 1000000.0f));
+       }
+ 
+       if (callbacks_.empty() || !enabled_)
+-- 
+2.7.4
+

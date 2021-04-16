@@ -1,0 +1,23 @@
+config BR2_PACKAGE_GST1_LIBAV_RK
+	bool "Gstreamer Rockchip ffmpeg plugins"
+	select BR2_PACKAGE_GST1_PLUGINS_BASE
+	select BR2_PACKAGE_LIBDRM
+	help
+	  Rockchip rkvdec video accel Gstreamer plugin.
+
+	  This package contains GStreamer plugins base on
+	  the libav project.
+
+          https://github.com/JamesLinEngineer/gst-libav-rk
+
+if BR2_PACKAGE_GST1_LIBAV_RK
+config BR2_PACKAGE_GST1_LIBAV_RK_COLMV
+	bool "Use 4K colmv separate config to save memory"
+
+config BR2_PACKAGE_GST1_LIBAV_RK_DROP_ERROR
+	bool "Drop error video frame no use to display"
+
+config BR2_PACKAGE_GST1_LIBAV_RK_LOW_MEMORY
+	bool "Low memory mode allow less memory to be allocated"
+
+endif

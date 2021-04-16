@@ -1,0 +1,36 @@
+From 5e9f7a0221d90886509ecff3397bd0204f4d4f5c Mon Sep 17 00:00:00 2001
+From: Guillaume Desmottes <guillaume.desmottes@collabora.com>
+Date: Tue, 18 Dec 2018 15:41:09 +0100
+Subject: [PATCH 12/60] kmssink: fix tmp_kmsmem leaks
+
+configure_mode_setting() keeps a ref on tmp_kmsmem which is released in
+gst_kms_sink_show_frame().
+But if for some reason configure_mode_setting() is re-called before
+showing a frame or if none is showed this memory was leaked.
+---
+ sys/kms/gstkmssink.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/sys/kms/gstkmssink.c b/sys/kms/gstkmssink.c
+index 6002e25da..927a7b13b 100644
+--- a/sys/kms/gstkmssink.c
++++ b/sys/kms/gstkmssink.c
+@@ -456,6 +456,7 @@ configure_mode_setting (GstKMSSink * self, GstVideoInfo * vinfo)
+   if (err)
+     goto modesetting_failed;
+ 
++  g_clear_pointer (&self->tmp_kmsmem, gst_memory_unref);
+   self->tmp_kmsmem = (GstMemory *) kmsmem;
+ 
+   ret = TRUE;
+@@ -1833,6 +1834,7 @@ gst_kms_sink_finalize (GObject * object)
+   gst_poll_free (sink->poll);
+   g_clear_pointer (&sink->connector_props, gst_structure_free);
+   g_clear_pointer (&sink->plane_props, gst_structure_free);
++  g_clear_pointer (&sink->tmp_kmsmem, gst_memory_unref);
+ 
+   G_OBJECT_CLASS (parent_class)->finalize (object);
+ }
+-- 
+2.20.1
+

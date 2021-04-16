@@ -1,0 +1,39 @@
+From e7f214c2f54c8667a1dfd93e04a42d89e04abd99 Mon Sep 17 00:00:00 2001
+From: "james.lin" <james.lin@rock-chips.com>
+Date: Thu, 12 Apr 2018 16:20:36 +0800
+Subject: [PATCH 07/13] qgstreamerplayersession add seek direct to ensure seek
+ effective
+
+Signed-off-by: james.lin <james.lin@rock-chips.com>
+---
+ .../gstreamer/mediaplayer/qgstreamerplayersession.cpp     | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+ mode change 100644 => 100755 src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
+
+diff --git a/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp b/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
+old mode 100644
+new mode 100755
+index a609065..aa8ce5a
+--- a/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
++++ b/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
+@@ -964,10 +964,16 @@ bool QGstreamerPlayerSession::seek(qint64 ms)
+     if (m_playbin && !m_pendingVideoSink && m_state != QMediaPlayer::StoppedState && m_seekable) {
+         ms = qMax(ms,qint64(0));
+         gint64  position = ms * 1000000;
++        gint64  now = 0;
++        GstSeekFlags direct_flag = GST_SEEK_FLAG_SNAP_AFTER;
++
++        qt_gst_element_query_position(m_playbin, GST_FORMAT_TIME, &now);
++        if (now > position)
++            direct_flag = GST_SEEK_FLAG_SNAP_BEFORE;
+         bool isSeeking = gst_element_seek(m_playbin,
+                                           m_playbackRate,
+                                           GST_FORMAT_TIME,
+-                                          GstSeekFlags(GST_SEEK_FLAG_FLUSH),
++                                          GstSeekFlags(GST_SEEK_FLAG_FLUSH  | GST_SEEK_FLAG_KEY_UNIT | direct_flag),
+                                           GST_SEEK_TYPE_SET,
+                                           position,
+                                           GST_SEEK_TYPE_NONE,
+-- 
+2.20.1
+

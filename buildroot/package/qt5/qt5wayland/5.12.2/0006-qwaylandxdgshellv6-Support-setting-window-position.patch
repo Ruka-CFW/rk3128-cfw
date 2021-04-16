@@ -1,0 +1,91 @@
+From a5fddc99a064c8867080e7839845c81ce0bc5a82 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Wed, 27 Feb 2019 16:52:15 +0800
+Subject: [PATCH 06/16] qwaylandxdgshellv6: Support setting window position
+
+Support setting window position.
+Note:
+1/ (0,0) initial position(default position) would be ignored.
+2/ The decoration would be ignored when the space not enough.
+3/ QT would not aware of the wayland position.
+
+Change-Id: Ifb1433b3902d44c1b2e43036bc1805a6e00128fb
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ .../xdg-shell-v6/qwaylandxdgshellv6.cpp       | 28 +++++++++++++++++++
+ .../xdg-shell-v6/qwaylandxdgshellv6_p.h       |  2 ++
+ 2 files changed, 30 insertions(+)
+
+diff --git a/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6.cpp b/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6.cpp
+index 2f729d9..a8a16fa 100644
+--- a/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6.cpp
++++ b/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6.cpp
+@@ -94,10 +94,34 @@ void QWaylandXdgSurfaceV6::Toplevel::applyConfigure()
+ 
+     QSize windowGeometrySize = m_xdgSurface->m_window->window()->frameGeometry().size();
+     m_xdgSurface->set_window_geometry(0, 0, windowGeometrySize.width(), windowGeometrySize.height());
++
++    // Set initial position
++    updatePosition();
++
+     m_applied = m_pending;
+     qCDebug(lcQpaWayland) << "Applied pending zxdg_toplevel_v6 configure event:" << m_applied.size << m_applied.states;
+ }
+ 
++void QWaylandXdgSurfaceV6::Toplevel::updatePosition()
++{
++    QWaylandWindow *window = m_xdgSurface->m_window;
++    QPoint position = window->geometry().topLeft(); // this is absolute
++
++    // Also avoid initial position (0,0).
++    // What if we do want to be at (0,0)?
++    if (m_position == position)
++        return;
++    m_position = position;
++
++    position += QPoint(window->frameMargins().top(),
++                       window->frameMargins().left());
++
++	// HACK: Set window position through .set_window_geometry(x, y, 0, 0)
++    m_xdgSurface->set_window_geometry(position.x() > 0 ? position.x() : 0,
++                                      position.y() > 0 ? position.y() : 0,
++                                      0, 0);
++}
++
+ void QWaylandXdgSurfaceV6::Toplevel::zxdg_toplevel_v6_configure(int32_t width, int32_t height, wl_array *states)
+ {
+     m_pending.size = QSize(width, height);
+@@ -271,6 +295,10 @@ bool QWaylandXdgSurfaceV6::handleExpose(const QRegion &region)
+         m_exposeRegion = region;
+         return true;
+     }
++
++    if (m_toplevel && !region.isEmpty())
++        m_toplevel->updatePosition();
++
+     return false;
+ }
+ 
+diff --git a/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6_p.h b/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6_p.h
+index 659aad0..b76b783 100644
+--- a/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6_p.h
++++ b/src/plugins/shellintegration/xdg-shell-v6/qwaylandxdgshellv6_p.h
+@@ -103,6 +103,7 @@ private:
+         ~Toplevel() override;
+ 
+         void applyConfigure();
++        void updatePosition();
+ 
+         void zxdg_toplevel_v6_configure(int32_t width, int32_t height, wl_array *states) override;
+         void zxdg_toplevel_v6_close() override;
+@@ -113,6 +114,7 @@ private:
+             Qt::WindowStates states = Qt::WindowNoState;
+         }  m_pending, m_applied;
+         QSize m_normalSize;
++        QPoint m_position;
+ 
+         QWaylandXdgSurfaceV6 *m_xdgSurface = nullptr;
+     };
+-- 
+2.20.1
+

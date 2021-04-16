@@ -1,0 +1,405 @@
+From 8641de0d2d1b5992c0fdbfd27d9158da217f5e3c Mon Sep 17 00:00:00 2001
+From: Matthew Waters <matthew@centricular.com>
+Date: Tue, 5 Mar 2019 16:13:15 +1100
+Subject: [PATCH 28/45] gl: Don't restore the viewport on function exit
+
+Doing so involves retrieving the current viewport from OpenGL which as
+with any glGet operation, is expensive.
+
+This means that the various sinks need to reset the viewport on draw.
+
+In the process, fix resizing on cocoa.
+
+(cherry picked from commit 6a37bf9bb91e329464a5c5349d2dd5e88bd95b54)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ ext/gl/gstglimagesink.c                         | 14 +++++++++
+ gst-libs/gst/gl/cocoa/gstglcaopengllayer.m      | 10 ++++++-
+ gst-libs/gst/gl/cocoa/gstglwindow_cocoa.m       | 40 ++++++++++++++++++++-----
+ gst-libs/gst/gl/gstglcolorconvert.c             |  7 -----
+ gst-libs/gst/gl/gstglframebuffer.c              |  4 ---
+ gst-libs/gst/gl/gstglviewconvert.c              |  4 ---
+ gst-libs/gst/gl/gstglwindow.c                   | 14 +++++++++
+ gst-libs/gst/gl/gstglwindow.h                   |  7 ++++-
+ gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.c | 21 ++++++++++---
+ gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.h |  1 +
+ 10 files changed, 93 insertions(+), 29 deletions(-)
+
+diff --git a/ext/gl/gstglimagesink.c b/ext/gl/gstglimagesink.c
+index 43653bbe57..4a7f70f8b5 100644
+--- a/ext/gl/gstglimagesink.c
++++ b/ext/gl/gstglimagesink.c
+@@ -2166,6 +2166,16 @@ gst_glimage_sink_on_resize (GstGLImageSink * gl_sink, gint width, gint height)
+     GST_DEBUG_OBJECT (gl_sink, "GL output area now %u,%u %ux%u",
+         gl_sink->display_rect.x, gl_sink->display_rect.y,
+         gl_sink->display_rect.w, gl_sink->display_rect.h);
++  } else {
++    gint viewport_dims[4];
++
++    /* save the viewport for use later */
++    gl->GetIntegerv (GL_VIEWPORT, viewport_dims);
++
++    gl_sink->display_rect.x = viewport_dims[0];
++    gl_sink->display_rect.y = viewport_dims[1];
++    gl_sink->display_rect.w = viewport_dims[2];
++    gl_sink->display_rect.h = viewport_dims[3];
+   }
+   GST_GLIMAGE_SINK_UNLOCK (gl_sink);
+ }
+@@ -2213,6 +2223,10 @@ gst_glimage_sink_on_draw (GstGLImageSink * gl_sink)
+   gst_gl_context_clear_shader (gl_sink->context);
+   gl->BindTexture (gl_target, 0);
+ 
++  if (!gst_gl_window_controls_viewport (window))
++    gl->Viewport (gl_sink->display_rect.x, gl_sink->display_rect.y,
++        gl_sink->display_rect.w, gl_sink->display_rect.h);
++
+   sample = gst_sample_new (gl_sink->stored_buffer[0],
+       gl_sink->out_caps, &GST_BASE_SINK (gl_sink)->segment, NULL);
+   g_signal_emit (gl_sink, gst_glimage_sink_signals[CLIENT_DRAW_SIGNAL], 0,
+diff --git a/gst-libs/gst/gl/cocoa/gstglcaopengllayer.m b/gst-libs/gst/gl/cocoa/gstglcaopengllayer.m
+index 065d596de7..254a3f21f4 100644
+--- a/gst-libs/gst/gl/cocoa/gstglcaopengllayer.m
++++ b/gst-libs/gst/gl/cocoa/gstglcaopengllayer.m
+@@ -206,15 +206,21 @@ _context_ready (gpointer data)
+    * the CA viewport set up on entry to this function */
+   gl->GetIntegerv (GL_VIEWPORT, ca_viewport);
+ 
++  GST_TRACE ("retrieved viewport from CA %u,%u %ux%u", self->expected_dims[0],
++      self->expected_dims[1], self->expected_dims[2], self->expected_dims[3]);
+   gst_gl_context_activate (self->draw_context, TRUE);
+   if (self->queue_resize || self->last_bounds.size.width != self.bounds.size.width
+       || self->last_bounds.size.height != self.bounds.size.height) {
+     if (self->resize_cb) {
+-      self->resize_cb (self->resize_data, 
++      self->resize_cb (self->resize_data,
+           self.bounds.size.width*self.contentsScale,
+           self.bounds.size.height*self.contentsScale);
+ 
+       gl->GetIntegerv (GL_VIEWPORT, self->expected_dims);
++
++      GST_LOG ("resize callback wants viewport %u,%u %ux%u",
++          self->expected_dims[0], self->expected_dims[1],
++          self->expected_dims[2], self->expected_dims[3]);
+     } else {
+       /* default to whatever ca gives us */
+       self->expected_dims[0] = ca_viewport[0];
+@@ -239,6 +245,8 @@ _context_ready (gpointer data)
+ 
+   gst_video_sink_center_rect (src, dst, &result, TRUE);
+ 
++  GST_TRACE ("Using viewport %u,%u %ux%u", result.x, result.y, result.w,
++      result.h);
+   gl->Viewport (result.x, result.y, result.w, result.h);
+ 
+   if (self->draw_cb)
+diff --git a/gst-libs/gst/gl/cocoa/gstglwindow_cocoa.m b/gst-libs/gst/gl/cocoa/gstglwindow_cocoa.m
+index 1aecf09c16..d9e9651bb0 100644
+--- a/gst-libs/gst/gl/cocoa/gstglwindow_cocoa.m
++++ b/gst-libs/gst/gl/cocoa/gstglwindow_cocoa.m
+@@ -88,6 +88,8 @@ static void gst_gl_window_cocoa_send_message_async (GstGLWindow * window,
+     GstGLWindowCB callback, gpointer data, GDestroyNotify destroy);
+ static gboolean gst_gl_window_cocoa_set_render_rectangle (GstGLWindow * window,
+     gint x, gint y, gint width, gint height);
++static gboolean gst_gl_window_cocoa_controls_viewport (GstGLWindow * window);
++
+ 
+ struct _GstGLWindowCocoaPrivate
+ {
+@@ -126,6 +128,8 @@ gst_gl_window_cocoa_class_init (GstGLWindowCocoaClass * klass)
+       GST_DEBUG_FUNCPTR (gst_gl_window_cocoa_send_message_async);
+   window_class->set_render_rectangle =
+       GST_DEBUG_FUNCPTR (gst_gl_window_cocoa_set_render_rectangle);
++  window_class->controls_viewport =
++      GST_DEBUG_FUNCPTR (gst_gl_window_cocoa_controls_viewport);
+ 
+   gobject_class->finalize = gst_gl_window_cocoa_finalize;
+ }
+@@ -388,9 +392,11 @@ gst_gl_cocoa_draw_cb (GstGLWindowCocoa *window_cocoa)
+   GstGLNSWindow *internal_win_id = (__bridge GstGLNSWindow *)priv->internal_win_id;
+ 
+   if (internal_win_id && ![internal_win_id isClosed]) {
+-   GstGLWindow *window = GST_GL_WINDOW (window_cocoa);
++    GstGLWindow *window = GST_GL_WINDOW (window_cocoa);
+ 
+     /* draw opengl scene in the back buffer */
++    /* We do not need to change viewports like in other window implementations
++     * as the caopengllayer will take care of that for us. */
+     if (window->draw)
+       window->draw (window->draw_data);
+   }
+@@ -410,6 +416,7 @@ gst_gl_cocoa_resize_cb (GstGLNSView * view, guint width, guint height)
+     NSRect bounds = [view bounds];
+     NSRect visibleRect = [view visibleRect];
+     gint viewport_dim[4];
++    GstVideoRectangle viewport;
+ 
+     gl = context->gl_vtable;
+ 
+@@ -418,19 +425,30 @@ gst_gl_cocoa_resize_cb (GstGLNSView * view, guint width, guint height)
+     visibleRect = [view convertRectToBacking:visibleRect];
+ #endif
+ 
++    /* don't use the default gst_gl_window_resize() as that will marshal through
++     * the GL thread.  We are being called from the main thread by the
++     * caopengllayer */
++    if (window->resize)
++      window->resize (window->resize_data, width, height);
++
++    gl->GetIntegerv (GL_VIEWPORT, viewport_dim);
++
+     GST_DEBUG_OBJECT (window, "Window resized: bounds %lf %lf %lf %lf "
+-                      "visibleRect %lf %lf %lf %lf",
++                      "visibleRect %lf %lf %lf %lf, "
++                      "viewport dimensions %i %i %i %i",
+                       bounds.origin.x, bounds.origin.y,
+                       bounds.size.width, bounds.size.height,
+                       visibleRect.origin.x, visibleRect.origin.y,
+-                      visibleRect.size.width, visibleRect.size.height);
++                      visibleRect.size.width, visibleRect.size.height,
++                      viewport_dim[0], viewport_dim[1], viewport_dim[2],
++                      viewport_dim[3]);
+ 
+-    gst_gl_window_resize (window, width, height);
+-    gl->GetIntegerv (GL_VIEWPORT, viewport_dim);
++    viewport.x = viewport_dim[0] - visibleRect.origin.x;
++    viewport.x = viewport_dim[1] - visibleRect.origin.y;
++    viewport.w = viewport_dim[2];
++    viewport.h = viewport_dim[3];
+ 
+-    gl->Viewport (viewport_dim[0] - visibleRect.origin.x,
+-                  viewport_dim[1] - visibleRect.origin.y,
+-                  viewport_dim[2], viewport_dim[3]);
++    gl->Viewport (viewport.x, viewport.y, viewport.w, viewport.h);
+   }
+ 
+   gst_object_unref (context);
+@@ -533,6 +551,12 @@ gst_gl_window_cocoa_set_render_rectangle (GstGLWindow * window, gint x, gint y,
+  return TRUE;
+ }
+ 
++static gboolean
++gst_gl_window_cocoa_controls_viewport (GstGLWindow * window)
++{
++  return TRUE;
++}
++
+ /* =============================================================*/
+ /*                                                              */
+ /*                    GstGLNSWindow implementation              */
+diff --git a/gst-libs/gst/gl/gstglcolorconvert.c b/gst-libs/gst/gl/gstglcolorconvert.c
+index 60d9653a5a..d293c50870 100644
+--- a/gst-libs/gst/gl/gstglcolorconvert.c
++++ b/gst-libs/gst/gl/gstglcolorconvert.c
+@@ -2468,8 +2468,6 @@ _do_convert_draw (GstGLContext * context, GstGLColorConvert * convert)
+   gint i;
+   gboolean ret = TRUE;
+ 
+-  GLint viewport_dim[4] = { 0 };
+-
+   GLenum multipleRT[] = {
+     GL_COLOR_ATTACHMENT0,
+     GL_COLOR_ATTACHMENT1,
+@@ -2492,8 +2490,6 @@ _do_convert_draw (GstGLContext * context, GstGLColorConvert * convert)
+   else if (gl->DrawBuffer)
+     gl->DrawBuffer (GL_COLOR_ATTACHMENT0);
+ 
+-  gl->GetIntegerv (GL_VIEWPORT, viewport_dim);
+-
+   gst_gl_framebuffer_get_effective_dimensions (convert->fbo, &out_width,
+       &out_height);
+   gl->Viewport (0, 0, out_width, out_height);
+@@ -2534,9 +2530,6 @@ _do_convert_draw (GstGLContext * context, GstGLColorConvert * convert)
+   /* we are done with the shader */
+   gst_gl_context_clear_shader (context);
+ 
+-  gl->Viewport (viewport_dim[0], viewport_dim[1], viewport_dim[2],
+-      viewport_dim[3]);
+-
+   if (!gst_gl_context_check_framebuffer_status (context, GL_FRAMEBUFFER))
+     ret = FALSE;
+ 
+diff --git a/gst-libs/gst/gl/gstglframebuffer.c b/gst-libs/gst/gl/gstglframebuffer.c
+index b1d64b288c..88b3aab385 100644
+--- a/gst-libs/gst/gl/gstglframebuffer.c
++++ b/gst-libs/gst/gl/gstglframebuffer.c
+@@ -274,7 +274,6 @@ gboolean
+ gst_gl_framebuffer_draw_to_texture (GstGLFramebuffer * fb, GstGLMemory * mem,
+     GstGLFramebufferFunc func, gpointer user_data)
+ {
+-  GLint viewport_dim[4] = { 0 };
+   const GstGLFuncs *gl;
+   gboolean ret;
+ 
+@@ -290,7 +289,6 @@ gst_gl_framebuffer_draw_to_texture (GstGLFramebuffer * fb, GstGLMemory * mem,
+   gst_gl_framebuffer_bind (fb);
+   gst_gl_framebuffer_attach (fb, GL_COLOR_ATTACHMENT0, (GstGLBaseMemory *) mem);
+ 
+-  gl->GetIntegerv (GL_VIEWPORT, viewport_dim);
+   gl->Viewport (0, 0, fb->priv->effective_width, fb->priv->effective_height);
+   if (gst_gl_context_get_gl_api (fb->context) & (GST_GL_API_OPENGL |
+           GST_GL_API_OPENGL3))
+@@ -301,8 +299,6 @@ gst_gl_framebuffer_draw_to_texture (GstGLFramebuffer * fb, GstGLMemory * mem,
+   if (gst_gl_context_get_gl_api (fb->context) & (GST_GL_API_OPENGL |
+           GST_GL_API_OPENGL3))
+     gl->DrawBuffer (GL_COLOR_ATTACHMENT0);
+-  gl->Viewport (viewport_dim[0], viewport_dim[1], viewport_dim[2],
+-      viewport_dim[3]);
+   gst_gl_context_clear_framebuffer (fb->context);
+ 
+   return ret;
+diff --git a/gst-libs/gst/gl/gstglviewconvert.c b/gst-libs/gst/gl/gstglviewconvert.c
+index 9c0dc44d6b..35dc0aed3a 100644
+--- a/gst-libs/gst/gl/gstglviewconvert.c
++++ b/gst-libs/gst/gl/gstglviewconvert.c
+@@ -1877,7 +1877,6 @@ _do_view_convert_draw (GstGLContext * context, GstGLViewConvert * viewconvert)
+   GstGLFuncs *gl;
+   guint out_width, out_height;
+   gint out_views, i;
+-  GLint viewport_dim[4] = { 0 };
+   GLenum multipleRT[] = {
+     GL_COLOR_ATTACHMENT0,
+     GL_COLOR_ATTACHMENT1,
+@@ -1913,7 +1912,6 @@ _do_view_convert_draw (GstGLContext * context, GstGLViewConvert * viewconvert)
+ 
+   gst_gl_framebuffer_get_effective_dimensions (viewconvert->fbo, &out_width,
+       &out_height);
+-  gl->GetIntegerv (GL_VIEWPORT, viewport_dim);
+   gl->Viewport (0, 0, out_width, out_height);
+ 
+   gst_gl_shader_use (viewconvert->shader);
+@@ -1957,8 +1955,6 @@ _do_view_convert_draw (GstGLContext * context, GstGLViewConvert * viewconvert)
+     gl->DrawBuffer (GL_COLOR_ATTACHMENT0);
+   /* we are done with the shader */
+   gst_gl_context_clear_shader (context);
+-  gl->Viewport (viewport_dim[0], viewport_dim[1], viewport_dim[2],
+-      viewport_dim[3]);
+   gst_gl_context_clear_framebuffer (context);
+ 
+   return TRUE;
+diff --git a/gst-libs/gst/gl/gstglwindow.c b/gst-libs/gst/gl/gstglwindow.c
+index f7237a4976..34cd425d39 100644
+--- a/gst-libs/gst/gl/gstglwindow.c
++++ b/gst-libs/gst/gl/gstglwindow.c
+@@ -979,6 +979,20 @@ gst_gl_window_resize (GstGLWindow * window, guint width, guint height)
+   window->queue_resize = FALSE;
+ }
+ 
++gboolean
++gst_gl_window_controls_viewport (GstGLWindow * window)
++{
++  GstGLWindowClass *window_class;
++
++  g_return_val_if_fail (GST_IS_GL_WINDOW (window), FALSE);
++  window_class = GST_GL_WINDOW_GET_CLASS (window);
++
++  if (!window_class->controls_viewport)
++    return FALSE;
++
++  return window_class->controls_viewport (window);
++}
++
+ static GType gst_gl_dummy_window_get_type (void);
+ 
+ G_DEFINE_TYPE (GstGLDummyWindow, gst_gl_dummy_window, GST_TYPE_GL_WINDOW);
+diff --git a/gst-libs/gst/gl/gstglwindow.h b/gst-libs/gst/gl/gstglwindow.h
+index ece8d315b0..9d68a244c0 100644
+--- a/gst-libs/gst/gl/gstglwindow.h
++++ b/gst-libs/gst/gl/gstglwindow.h
+@@ -148,6 +148,8 @@ struct _GstGLWindow {
+  * @show: request that the window be shown to the user
+  * @set_render_rectangle: request a rectangle to render into.  See #GstVideoOverlay
+  * @queue_resize: request a resize to occur when possible
++ * @controls_viewport: Whether the window takes care of glViewport setup.
++ *                     and the user does not need to deal with viewports
+  */
+ struct _GstGLWindowClass {
+   GstObjectClass parent_class;
+@@ -168,9 +170,10 @@ struct _GstGLWindowClass {
+   void     (*show)               (GstGLWindow *window);
+   gboolean (*set_render_rectangle)(GstGLWindow *window, gint x, gint y, gint width, gint height);
+   void     (*queue_resize)       (GstGLWindow *window);
++  gboolean (*controls_viewport)  (GstGLWindow *window);
+ 
+   /*< private >*/
+-  gpointer _reserved[GST_PADDING];
++  gpointer _reserved[GST_PADDING-1];
+ };
+ 
+ GST_GL_API
+@@ -250,6 +253,8 @@ gboolean gst_gl_window_set_render_rectangle   (GstGLWindow * window,
+                                                gint y,
+                                                gint width,
+                                                gint height);
++GST_GL_API
++gboolean gst_gl_window_controls_viewport      (GstGLWindow * window);
+ 
+ /* subclass usage only */
+ GST_GL_API
+diff --git a/gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.c b/gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.c
+index 8d6fceb80b..40b8c73a48 100644
+--- a/gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.c
++++ b/gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.c
+@@ -46,6 +46,8 @@ static void gst_gl_window_viv_fb_egl_draw (GstGLWindow * window);
+ static gboolean
+ gst_gl_window_viv_fb_egl_set_render_rectangle (GstGLWindow * window,
+     gint x, gint y, gint width, gint height);
++static gboolean gst_gl_window_viv_fb_egl_controls_viewport (GstGLWindow *
++    window);
+ 
+ static void
+ gst_gl_window_viv_fb_egl_class_init (GstGLWindowVivFBEGLClass * klass)
+@@ -63,6 +65,8 @@ gst_gl_window_viv_fb_egl_class_init (GstGLWindowVivFBEGLClass * klass)
+   window_class->draw = GST_DEBUG_FUNCPTR (gst_gl_window_viv_fb_egl_draw);
+   window_class->set_render_rectangle =
+       GST_DEBUG_FUNCPTR (gst_gl_window_viv_fb_egl_set_render_rectangle);
++  window_class->controls_viewport =
++      GST_DEBUG_FUNCPTR (gst_gl_window_viv_fb_egl_controls_viewport);
+ }
+ 
+ static void
+@@ -179,12 +183,15 @@ draw_cb (gpointer data)
+     gst_gl_window_resize (window, width, height);
+ 
+     gl->GetIntegerv (GL_VIEWPORT, viewport_dim);
+-    viewport_dim[0] += window_egl->render_rectangle.x;
+-    viewport_dim[1] += window_egl->render_rectangle.y;
+-    gl->Viewport (viewport_dim[0],
+-        viewport_dim[1], viewport_dim[2], viewport_dim[3]);
++    window_egl->viewport.x = viewport_dim[0] + window_egl->render_rectangle.x;
++    window_egl->viewport.y = viewport_dim[1] + window_egl->render_rectangle.y;
++    window_egl->viewport.w = viewport_dim[2];
++    window_egl->viewport.h = viewport_dim[2];
+   }
+ 
++  gl->Viewport (window_egl->viewport.x, window_egl->viewport.y,
++      window_egl->viewport.w, window_egl->viewport.h);
++
+   if (window->draw)
+     window->draw (window->draw_data);
+ 
+@@ -263,3 +270,9 @@ gst_gl_window_viv_fb_egl_set_render_rectangle (GstGLWindow * window,
+ 
+   return TRUE;
+ }
++
++static gboolean
++gst_gl_window_viv_fb_egl_controls_viewport (GstGLWindow * window)
++{
++  return TRUE;
++}
+diff --git a/gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.h b/gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.h
+index 60205e0dcb..244e66368f 100644
+--- a/gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.h
++++ b/gst-libs/gst/gl/viv-fb/gstglwindow_viv_fb_egl.h
+@@ -47,6 +47,7 @@ struct _GstGLWindowVivFBEGL {
+   gint window_width, window_height;
+ 
+   GstVideoRectangle render_rectangle;
++  GstVideoRectangle viewport;
+ };
+ 
+ struct _GstGLWindowVivFBEGLClass {
+-- 
+2.11.0
+

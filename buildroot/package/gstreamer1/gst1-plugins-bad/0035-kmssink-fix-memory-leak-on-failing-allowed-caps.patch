@@ -1,0 +1,43 @@
+From 00e9621f1a8832b28075f1ebcc03e323107a2c6d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?St=C3=A9phane=20Cerveau?= <scerveau@collabora.com>
+Date: Thu, 16 Apr 2020 15:35:44 +0200
+Subject: [PATCH 35/60] kmssink: fix memory leak on failing allowed caps
+
+When drm does not find any format, the allowed_caps is
+empty one and need to be unref by the caller.
+
+Fix #1268
+
+(cherry picked from commit 040077dbc8bf83e0669bb870ebcb3f007731878c)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ sys/kms/gstkmssink.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/sys/kms/gstkmssink.c b/sys/kms/gstkmssink.c
+index b32fd841d..44067a539 100644
+--- a/sys/kms/gstkmssink.c
++++ b/sys/kms/gstkmssink.c
+@@ -563,12 +563,18 @@ ensure_allowed_caps (GstKMSSink * self, drmModeConnector * conn,
+     out_caps = gst_caps_merge (out_caps, gst_caps_simplify (tmp_caps));
+   }
+ 
++  if (gst_caps_is_empty (out_caps)) {
++    GST_DEBUG_OBJECT (self, "allowed caps is empty");
++    gst_caps_unref (out_caps);
++    return FALSE;
++  }
++
+   self->allowed_caps = gst_caps_simplify (out_caps);
+ 
+   GST_DEBUG_OBJECT (self, "allowed caps = %" GST_PTR_FORMAT,
+       self->allowed_caps);
+ 
+-  return (self->allowed_caps && !gst_caps_is_empty (self->allowed_caps));
++  return TRUE;
+ }
+ 
+ static gboolean
+-- 
+2.20.1
+

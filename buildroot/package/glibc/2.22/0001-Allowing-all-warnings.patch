@@ -1,0 +1,37 @@
+From d7eba2f000b39b7c9f3c06996d11fb4fc252582c Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Fri, 16 Nov 2018 19:19:51 +0800
+Subject: [PATCH] Allowing all warnings
+
+---
+ Makeconfig | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/Makeconfig b/Makeconfig
+index f136b88..729dba4 100644
+--- a/Makeconfig
++++ b/Makeconfig
+@@ -744,15 +744,15 @@ endif
+ 
+ # Extra flags to pass to GCC.
+ ifeq ($(all-warnings),yes)
+-+gccwarn := -Wall -Wwrite-strings -Wcast-qual -Wbad-function-cast -Wmissing-noreturn -Wmissing-prototypes -Wmissing-declarations -Wcomment -Wcomments -Wtrigraphs -Wsign-compare -Wfloat-equal -Wmultichar
+++gccwarn := 
+ else
+-+gccwarn := -Wall -Wwrite-strings
+++gccwarn := 
+ endif
+-+gccwarn += -Wundef
+++gccwarn += 
+ ifeq ($(enable-werror),yes)
+-+gccwarn += -Werror -Wno-error=undef
+++gccwarn += 
+ endif
+-+gccwarn-c = -Wstrict-prototypes
+++gccwarn-c = 
+ 
+ # We do not depend on the address of constants in different files to be
+ # actually different, so allow the compiler to merge them all.
+-- 
+2.11.0
+

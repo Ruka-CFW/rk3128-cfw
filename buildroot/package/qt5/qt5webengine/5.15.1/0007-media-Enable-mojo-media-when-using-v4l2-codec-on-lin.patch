@@ -1,0 +1,59 @@
+From 7cc050aabde616da99c36bd3e6e11e5f1b6665e8 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Thu, 19 Dec 2019 14:22:32 +0800
+Subject: [PATCH 07/12] media: Enable mojo media when using v4l2 codec on linux
+
+The newest chromium turns to use mojo video decoder instead of gpu video
+decoder.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/3rdparty/chromium/media/media_options.gni     |  6 ++++--
+ src/3rdparty/chromium/media/media_options.gni.rej | 11 +++++++++++
+ 2 files changed, 15 insertions(+), 2 deletions(-)
+ create mode 100644 src/3rdparty/chromium/media/media_options.gni.rej
+
+diff --git a/src/3rdparty/chromium/media/media_options.gni b/src/3rdparty/chromium/media/media_options.gni
+index 96cc9af99..0b0bc9692 100644
+--- a/src/3rdparty/chromium/media/media_options.gni
++++ b/src/3rdparty/chromium/media/media_options.gni
+@@ -158,7 +158,8 @@ declare_args() {
+   enable_mojo_media =
+       !is_fuchsia &&
+       (is_android || is_chromeos || is_mac || is_win || enable_library_cdms ||
+-       (is_desktop_linux && use_vaapi) || is_chromecast)
++       (is_desktop_linux && use_vaapi) || is_chromecast ||
++       (is_linux && use_v4l2_codec))
+ 
+   # Enable the TestMojoMediaClient to be used in mojo MediaService. This is for
+   # testing only and will override the default platform MojoMediaClient, if any.
+@@ -223,7 +224,8 @@ if (enable_mojo_media) {
+     ]
+     _default_mojo_media_host = "gpu"
+   } else if (is_chromeos || is_mac || is_win ||
+-             (is_desktop_linux && use_vaapi)) {
++             (is_desktop_linux && use_vaapi) ||
++             (is_linux && use_v4l2_codec)) {
+     _default_mojo_media_services = [ "video_decoder" ]
+     _default_mojo_media_host = "gpu"
+   }
+diff --git a/src/3rdparty/chromium/media/media_options.gni.rej b/src/3rdparty/chromium/media/media_options.gni.rej
+new file mode 100644
+index 000000000..1f78eab5f
+--- /dev/null
++++ b/src/3rdparty/chromium/media/media_options.gni.rej
+@@ -0,0 +1,11 @@
++diff a/src/3rdparty/chromium/media/media_options.gni b/src/3rdparty/chromium/media/media_options.gni	(rejected hunks)
++@@ -149,7 +149,8 @@ declare_args() {
++   # remote process (e.g. "utility" process, see |mojo_media_host|).
++   enable_mojo_media =
++       is_android || is_chromeos || is_mac || is_win || enable_library_cdms ||
++-      (is_desktop_linux && use_vaapi) || (is_chromecast && !is_fuchsia)
+++      (is_desktop_linux && use_vaapi) || (is_chromecast && !is_fuchsia) ||
+++      (is_linux && use_v4l2_codec)
++ 
++   # Enable the TestMojoMediaClient to be used in mojo MediaService. This is for
++   # testing only and will override the default platform MojoMediaClient, if any.
+-- 
+2.20.1
+

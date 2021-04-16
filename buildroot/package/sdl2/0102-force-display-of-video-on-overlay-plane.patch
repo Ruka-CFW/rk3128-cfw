@@ -1,0 +1,306 @@
+From 5672f48fc04b95e7468f152508d7b356dda5e7db Mon Sep 17 00:00:00 2001
+From: Hertz Wang <wangh@rock-chips.com>
+Date: Fri, 16 Nov 2018 17:03:43 +0800
+Subject: [PATCH] force display of video on overlay plane
+
+note: control the video display layer according
+      to the SDL2_DISPLAY_PLANE_TYPE environment variable
+
+Signed-off-by: Hertz Wang <wangh@rock-chips.com>
+---
+ src/video/kmsdrm/SDL_kmsdrmopengles.c | 62 +++++++++++++++-----------
+ src/video/kmsdrm/SDL_kmsdrmsym.h      | 18 +++++++-
+ src/video/kmsdrm/SDL_kmsdrmvideo.c    | 83 ++++++++++++++++++++++++++++++++++-
+ src/video/kmsdrm/SDL_kmsdrmvideo.h    |  2 +
+ 4 files changed, 136 insertions(+), 29 deletions(-)
+
+diff --git a/src/video/kmsdrm/SDL_kmsdrmopengles.c b/src/video/kmsdrm/SDL_kmsdrmopengles.c
+index 7ba663f..ff0ce6c 100644
+--- a/src/video/kmsdrm/SDL_kmsdrmopengles.c
++++ b/src/video/kmsdrm/SDL_kmsdrmopengles.c
+@@ -140,36 +140,46 @@ KMSDRM_GLES_SwapWindow(_THIS, SDL_Window * window) {
+     if (fb_info == NULL) {
+         return 0;
+     }
+-    if (_this->egl_data->egl_swapinterval == 0) {
+-        /* Swap buffers instantly, possible tearing */
+-        /* SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "drmModeSetCrtc(%d, %u, %u, 0, 0, &%u, 1, &%ux%u@%u)",
++
++    if (!wdata->plane_id) {
++        if (_this->egl_data->egl_swapinterval == 0) {
++            /* Swap buffers instantly, possible tearing */
++            /* SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "drmModeSetCrtc(%d, %u, %u, 0, 0, &%u, 1, &%ux%u@%u)",
+             vdata->drm_fd, displaydata->crtc_id, fb_info->fb_id, vdata->saved_conn_id,
+             displaydata->cur_mode.hdisplay, displaydata->cur_mode.vdisplay, displaydata->cur_mode.vrefresh); */
+-        ret = KMSDRM_drmModeSetCrtc(vdata->drm_fd, displaydata->crtc_id, fb_info->fb_id,
+-                                    0, 0, &vdata->saved_conn_id, 1, &displaydata->cur_mode);
+-        if(ret != 0) {
+-            SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Could not pageflip with drmModeSetCrtc: %d", ret);
++            ret = KMSDRM_drmModeSetCrtc(vdata->drm_fd, displaydata->crtc_id, fb_info->fb_id,
++                0, 0, &vdata->saved_conn_id, 1, &displaydata->cur_mode);
++            if(ret != 0) {
++                SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Could not pageflip with drmModeSetCrtc: %d", ret);
++            }
++        } else {
++            /* Queue page flip at vsync */
++
++            /* Have we already setup the CRTC to one of the GBM buffers? Do so if we have not,
++            or FlipPage won't work in some cases. */
++            if (!wdata->crtc_ready) {
++                if(!KMSDRM_GLES_SetupCrtc(_this, window)) {
++                    SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Could not set up CRTC for doing vsync-ed pageflips");
++                    return 0;
++                }
++            }
++
++            /* SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "drmModePageFlip(%d, %u, %u, DRM_MODE_PAGE_FLIP_EVENT, &wdata->waiting_for_flip)",
++            vdata->drm_fd, displaydata->crtc_id, fb_info->fb_id); */
++            ret = KMSDRM_drmModePageFlip(vdata->drm_fd, displaydata->crtc_id, fb_info->fb_id,
++            DRM_MODE_PAGE_FLIP_EVENT, &wdata->waiting_for_flip);
++            if (ret == 0) {
++                wdata->waiting_for_flip = SDL_TRUE;
++            } else {
++                SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Could not queue pageflip: %d", ret);
++            }
+         }
+     } else {
+-        /* Queue page flip at vsync */
+-
+-	/* Have we already setup the CRTC to one of the GBM buffers? Do so if we have not,
+-           or FlipPage won't work in some cases. */
+-	if (!wdata->crtc_ready) {
+-            if(!KMSDRM_GLES_SetupCrtc(_this, window)) {
+-                SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Could not set up CRTC for doing vsync-ed pageflips");
+-                return 0;
+-            } 
+-	}
+-
+-        /* SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "drmModePageFlip(%d, %u, %u, DRM_MODE_PAGE_FLIP_EVENT, &wdata->waiting_for_flip)",
+-            vdata->drm_fd, displaydata->crtc_id, fb_info->fb_id); */
+-        ret = KMSDRM_drmModePageFlip(vdata->drm_fd, displaydata->crtc_id, fb_info->fb_id,
+-                                     DRM_MODE_PAGE_FLIP_EVENT, &wdata->waiting_for_flip);
+-        if (ret == 0) {
+-            wdata->waiting_for_flip = SDL_TRUE;
+-        } else {
+-            SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Could not queue pageflip: %d", ret);
++        ret = KMSDRM_drmModeSetPlane(vdata->drm_fd, wdata->plane_id, displaydata->crtc_id, fb_info->fb_id,
++            0, 0, 0, displaydata->cur_mode.hdisplay, displaydata->cur_mode.vdisplay,
++            0, 0, KMSDRM_gbm_bo_get_width(wdata->next_bo) << 16, KMSDRM_gbm_bo_get_height(wdata->next_bo) << 16);
++        if(ret != 0) {
++            SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "Could not drmModeSetPlane: %d", ret);
+         }
+     }
+ 
+diff --git a/src/video/kmsdrm/SDL_kmsdrmsym.h b/src/video/kmsdrm/SDL_kmsdrmsym.h
+index 72c07a9..87e9397 100644
+--- a/src/video/kmsdrm/SDL_kmsdrmsym.h
++++ b/src/video/kmsdrm/SDL_kmsdrmsym.h
+@@ -40,13 +40,23 @@ SDL_KMSDRM_SYM(void,drmModeFreeFB,(drmModeFBPtr ptr))
+ SDL_KMSDRM_SYM(void,drmModeFreeCrtc,(drmModeCrtcPtr ptr))
+ SDL_KMSDRM_SYM(void,drmModeFreeConnector,(drmModeConnectorPtr ptr))
+ SDL_KMSDRM_SYM(void,drmModeFreeEncoder,(drmModeEncoderPtr ptr))
++SDL_KMSDRM_SYM(void,drmModeFreePlane,(drmModePlanePtr ptr))
++SDL_KMSDRM_SYM(void,drmModeFreePlaneResources,(drmModePlaneResPtr ptr))
++SDL_KMSDRM_SYM(void,drmModeFreeProperty,(drmModePropertyPtr ptr))
++SDL_KMSDRM_SYM(void,drmModeFreeObjectProperties,(drmModeObjectPropertiesPtr ptr))
++
+ SDL_KMSDRM_SYM(drmModeResPtr,drmModeGetResources,(int fd))
++SDL_KMSDRM_SYM(drmModePlaneResPtr,drmModeGetPlaneResources,(int fd))
+ SDL_KMSDRM_SYM(int,drmModeAddFB,(int fd, uint32_t width, uint32_t height, uint8_t depth,
+                                  uint8_t bpp, uint32_t pitch, uint32_t bo_handle,
+                                  uint32_t *buf_id))
+ SDL_KMSDRM_SYM(int,drmModeRmFB,(int fd, uint32_t bufferId))
+ SDL_KMSDRM_SYM(drmModeFBPtr,drmModeGetFB,(int fd, uint32_t buf))
+ SDL_KMSDRM_SYM(drmModeCrtcPtr,drmModeGetCrtc,(int fd, uint32_t crtcId))
++SDL_KMSDRM_SYM(drmModePlanePtr,drmModeGetPlane,(int fd, uint32_t plane_id))
++SDL_KMSDRM_SYM(drmModePropertyPtr,drmModeGetProperty,(int fd, uint32_t propertyId))
++SDL_KMSDRM_SYM(drmModeObjectPropertiesPtr,drmModeObjectGetProperties,
++               (int fd, uint32_t object_id, uint32_t object_type))
+ SDL_KMSDRM_SYM(int,drmModeSetCrtc,(int fd, uint32_t crtcId, uint32_t bufferId,
+                                    uint32_t x, uint32_t y, uint32_t *connectors, int count,
+                                    drmModeModeInfoPtr mode))
+@@ -55,13 +65,19 @@ SDL_KMSDRM_SYM(int,drmModeSetCursor,(int fd, uint32_t crtcId, uint32_t bo_handle
+ SDL_KMSDRM_SYM(int,drmModeSetCursor2,(int fd, uint32_t crtcId, uint32_t bo_handle,
+                                       uint32_t width, uint32_t height,
+                                       int32_t hot_x, int32_t hot_y))
++SDL_KMSDRM_SYM(int,drmModeSetPlane,(int fd, uint32_t plane_id, uint32_t crtc_id,
++                                    uint32_t fb_id, uint32_t flags,
++                                    int32_t crtc_x, int32_t crtc_y,
++                                    uint32_t crtc_w, uint32_t crtc_h,
++                                    uint32_t src_x, uint32_t src_y,
++                                    uint32_t src_w, uint32_t src_h))
+ SDL_KMSDRM_SYM(int,drmModeMoveCursor,(int fd, uint32_t crtcId, int x, int y))
+ SDL_KMSDRM_SYM(drmModeEncoderPtr,drmModeGetEncoder,(int fd, uint32_t encoder_id))
+ SDL_KMSDRM_SYM(drmModeConnectorPtr,drmModeGetConnector,(int fd, uint32_t connector_id))
+ SDL_KMSDRM_SYM(int,drmHandleEvent,(int fd,drmEventContextPtr evctx))
+ SDL_KMSDRM_SYM(int,drmModePageFlip,(int fd, uint32_t crtc_id, uint32_t fb_id,
+                                     uint32_t flags, void *user_data))
+-
++SDL_KMSDRM_SYM(int,drmSetClientCap,(int fd, uint64_t capability, uint64_t value))
+ 
+ SDL_KMSDRM_MODULE(GBM)
+ SDL_KMSDRM_SYM(int,gbm_device_get_fd,(struct gbm_device *gbm))
+diff --git a/src/video/kmsdrm/SDL_kmsdrmvideo.c b/src/video/kmsdrm/SDL_kmsdrmvideo.c
+index ee3ac05..0e75156 100644
+--- a/src/video/kmsdrm/SDL_kmsdrmvideo.c
++++ b/src/video/kmsdrm/SDL_kmsdrmvideo.c
+@@ -224,12 +224,19 @@ KMSDRM_WaitPageFlip(_THIS, SDL_WindowData *wdata, int timeout) {
+     SDL_VideoData *vdata = ((SDL_VideoData *)_this->driverdata);
+ 
+     while (wdata->waiting_for_flip) {
++        int ret;
++
+         vdata->drm_pollfd.revents = 0;
+-        if (poll(&vdata->drm_pollfd, 1, timeout) < 0) {
++        ret = poll(&vdata->drm_pollfd, 1, timeout);
++        if (ret < 0) {
+             SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "DRM poll error");
+             return SDL_FALSE;
+         }
+ 
++        if (ret == 0) {
++            SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "DRM poll timeout");
++        }
++
+         if (vdata->drm_pollfd.revents & (POLLHUP | POLLERR)) {
+             SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "DRM poll hup or error");
+             return SDL_FALSE;
+@@ -268,6 +275,7 @@ KMSDRM_VideoInit(_THIS)
+     drmModeRes *resources = NULL;
+     drmModeConnector *connector = NULL;
+     drmModeEncoder *encoder = NULL;
++    drmModePlaneRes *plane_res = NULL;
+     SDL_DisplayMode current_mode;
+     SDL_VideoDisplay display;
+ 
+@@ -295,6 +303,9 @@ KMSDRM_VideoInit(_THIS)
+     }
+     SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "Opened DRM FD (%d)", vdata->drm_fd);
+ 
++    KMSDRM_drmSetClientCap(vdata->drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
++    KMSDRM_drmSetClientCap(vdata->drm_fd, DRM_CLIENT_CAP_ATOMIC, 1);
++
+     vdata->gbm = KMSDRM_gbm_create_device(vdata->drm_fd);
+     if (vdata->gbm == NULL) {
+         ret = SDL_SetError("Couldn't create gbm device.");
+@@ -362,6 +373,56 @@ KMSDRM_VideoInit(_THIS)
+     data->crtc_id = encoder->crtc_id;
+     data->cur_mode = vdata->saved_crtc->mode;
+ 
++    plane_res = KMSDRM_drmModeGetPlaneResources(vdata->drm_fd);
++    if (!plane_res) {
++        ret = SDL_SetError("drmModeGetPlaneResources(%d) failed", vdata->drm_fd);
++        goto cleanup;
++    }
++    for (i = 0; i < plane_res->count_planes; i++) {
++        int j;
++        drmModeObjectPropertiesPtr props;
++        uint32_t plane_id = plane_res->planes[i];
++        drmModePlane *plane = KMSDRM_drmModeGetPlane(vdata->drm_fd, plane_id);
++        if (!plane) {
++            ret = SDL_SetError("drmModeGetPlane(%d)(%d) failed", vdata->drm_fd, plane_id);
++            goto cleanup;
++        }
++        props = KMSDRM_drmModeObjectGetProperties(vdata->drm_fd, plane_id, DRM_MODE_OBJECT_PLANE);
++        if (!props) {
++            ret = SDL_SetError("drmModeObjectGetProperties(%d)(%d) failed", vdata->drm_fd, plane_id);
++            KMSDRM_drmModeFreePlane(plane);
++            goto cleanup;
++        }
++        for (j = 0; j < props->count_props; j++) {
++            int z;
++            drmModePropertyPtr p = KMSDRM_drmModeGetProperty(vdata->drm_fd, props->props[j]);
++            uint64_t value = props->prop_values[j];
++
++            if (!p) {
++                SDL_LogError(SDL_LOG_CATEGORY_VIDEO, "drmModeGetProperty(%d)(%d) failed\n",
++                             vdata->drm_fd, plane_id);
++                continue;
++            }
++            if (strcmp(p->name, "type"))
++                continue;
++            for (z = 0; z < p->count_enums; z++) {
++                int n;
++                static const char* names[3] = { "Overlay", "Primary", "Cursor" };
++                if (p->enums[z].value != value)
++                    continue;
++                for (n = 0; n < 3; n++) {
++                    if (!strcmp(p->enums[z].name, names[n])) {
++                        data->plane_ids[n] = plane_id;
++                        SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "%s : %d\n", names[n], plane_id);
++                        break;
++                    }
++                }
++            }
++            KMSDRM_drmModeFreeProperty(p);
++        }
++        KMSDRM_drmModeFreeObjectProperties(props);
++    }
++
+     SDL_zero(current_mode);
+ 
+     current_mode.w = vdata->saved_crtc->mode.hdisplay;
+@@ -404,6 +465,8 @@ cleanup:
+         KMSDRM_drmModeFreeConnector(connector);
+     if (resources != NULL)
+         KMSDRM_drmModeFreeResources(resources);
++    if (plane_res != NULL)
++        KMSDRM_drmModeFreePlaneResources(plane_res);
+ 
+     if (ret != 0) {
+         /* Error (complete) cleanup */
+@@ -482,6 +545,7 @@ KMSDRM_CreateWindow(_THIS, SDL_Window * window)
+     SDL_VideoDisplay *display;
+     SDL_VideoData *vdata = ((SDL_VideoData *)_this->driverdata);
+     Uint32 surface_fmt, surface_flags;
++    char *display_plane_type = NULL;
+ 
+     /* Allocate window internal data */
+     wdata = (SDL_WindowData *) SDL_calloc(1, sizeof(SDL_WindowData));
+@@ -526,7 +590,22 @@ KMSDRM_CreateWindow(_THIS, SDL_Window * window)
+        drmModePageFlip to work, and we can't do it until EGL is completely setup, because we
+        need to do eglSwapBuffers so we can get a valid GBM buffer object to call 
+        drmModeSetCrtc on it. */
+-    wdata->crtc_ready = SDL_FALSE;    
++    wdata->crtc_ready = SDL_FALSE;
++    display_plane_type = getenv("SDL2_DISPLAY_PLANE_TYPE");
++
++    if (!display_plane_type)
++        wdata->plane_id = 0;
++    else {
++        if (!strcmp(display_plane_type, "OVERLAY"))
++            wdata->plane_id = ((SDL_DisplayData *)display->driverdata)->plane_ids[0];
++        else if (!strcmp(display_plane_type, "PRIMARY"))
++            wdata->plane_id = ((SDL_DisplayData *)display->driverdata)->plane_ids[1];
++        else if (!strcmp(display_plane_type, "CURSOR"))
++            wdata->plane_id = ((SDL_DisplayData *)display->driverdata)->plane_ids[2];
++        else
++            wdata->plane_id = 0;
++    }
++    SDL_LogDebug(SDL_LOG_CATEGORY_VIDEO, "Window set to plane id : %d\n", wdata->plane_id);
+ 
+     /* Setup driver data for this window */
+     window->driverdata = wdata;
+diff --git a/src/video/kmsdrm/SDL_kmsdrmvideo.h b/src/video/kmsdrm/SDL_kmsdrmvideo.h
+index 71f0de7..df41115 100644
+--- a/src/video/kmsdrm/SDL_kmsdrmvideo.h
++++ b/src/video/kmsdrm/SDL_kmsdrmvideo.h
+@@ -53,6 +53,7 @@ typedef struct SDL_DisplayData
+     uint32_t encoder_id;
+     uint32_t crtc_id;
+     drmModeModeInfo cur_mode;
++    uint32_t plane_ids[3];  /* Overlay, Primary, Cursor */
+ } SDL_DisplayData;
+ 
+ 
+@@ -63,6 +64,7 @@ typedef struct SDL_WindowData
+     struct gbm_bo *next_bo;
+     SDL_bool waiting_for_flip;
+     SDL_bool crtc_ready;
++    uint32_t plane_id;
+ #if SDL_VIDEO_OPENGL_EGL
+     EGLSurface egl_surface;
+ #endif
+-- 
+2.7.4
+

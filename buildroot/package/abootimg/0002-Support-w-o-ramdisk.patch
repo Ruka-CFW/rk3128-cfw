@@ -1,0 +1,57 @@
+From 368952c8cd81a2a4f4873a4d452178c499be2576 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sat, 15 Dec 2018 15:57:16 +0800
+Subject: [PATCH 2/3] Support w/o ramdisk
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ abootimg.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/abootimg.c b/abootimg.c
+index 1ad03f1..b7b9b4b 100644
+--- a/abootimg.c
++++ b/abootimg.c
+@@ -289,10 +289,8 @@ int check_boot_img_header(t_abootimg* img)
+     return 1;
+   }
+ 
+-  if (!(img->header.ramdisk_size)) {
++  if (!(img->header.ramdisk_size))
+     fprintf(stderr, "%s: ramdisk size is null\n", img->fname);
+-    return 1;
+-  }
+ 
+   unsigned page_size = img->header.page_size;
+   if (!page_size) {
+@@ -566,7 +564,7 @@ void update_images(t_abootimg *img)
+     img->header.ramdisk_size = rsize;
+     img->ramdisk = r;
+   }
+-  else if (img->kernel) {
++  else if (img->kernel && rsize) {
+     // if kernel is updated, copy the ramdisk from original image
+     char* r = malloc(rsize);
+     if (!r)
+@@ -806,6 +804,9 @@ void extract_ramdisk(t_abootimg* img)
+   unsigned n = (ksize + psize - 1) / psize;
+   unsigned roffset = (1+n)*psize;
+ 
++  if (!rsize)
++    return;
++
+   printf ("extracting ramdisk in %s\n", img->ramdisk_fname);
+ 
+   void* r = malloc(rsize);
+@@ -934,7 +935,7 @@ int main(int argc, char** argv)
+       break;
+ 
+     case create:
+-      if (!bootimg->kernel_fname || !bootimg->ramdisk_fname) {
++      if (!bootimg->kernel_fname) {
+         print_usage();
+         break;
+       }
+-- 
+2.11.0
+

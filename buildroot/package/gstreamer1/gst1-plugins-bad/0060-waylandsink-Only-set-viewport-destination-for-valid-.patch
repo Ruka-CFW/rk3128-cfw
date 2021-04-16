@@ -1,0 +1,37 @@
+From 36663defe1a2781e5c0cb45e4882c678ac83bc14 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Wed, 25 Nov 2020 17:02:56 +0800
+Subject: [PATCH 60/60] waylandsink: Only set viewport destination for valid
+ size
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ ext/wayland/wlwindow.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/ext/wayland/wlwindow.c b/ext/wayland/wlwindow.c
+index ff440cf35..8228f0109 100644
+--- a/ext/wayland/wlwindow.c
++++ b/ext/wayland/wlwindow.c
+@@ -417,7 +417,8 @@ gst_wl_window_resize_video_surface (GstWlWindow * window, gboolean commit)
+ 
+   if (window->video_viewport) {
+     gst_video_sink_center_rect (src, dst, &res, TRUE);
+-    wp_viewport_set_destination (window->video_viewport, res.w, res.h);
++    if (res.w > 0 && res.h > 0)
++      wp_viewport_set_destination (window->video_viewport, res.w, res.h);
+   } else {
+     gst_video_sink_center_rect (src, dst, &res, FALSE);
+   }
+@@ -571,7 +572,7 @@ gst_wl_window_set_render_rectangle (GstWlWindow * window, gint x, gint y,
+     wl_subsurface_set_position (window->area_subsurface, x, y);
+ 
+   /* change the size of the area */
+-  if (window->area_viewport)
++  if (window->area_viewport && w > 0 && h > 0)
+     wp_viewport_set_destination (window->area_viewport, w, h);
+ 
+   gst_wl_window_update_borders (window);
+-- 
+2.20.1
+

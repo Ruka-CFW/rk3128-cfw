@@ -1,0 +1,54 @@
+From fbfdba04d96ff5d0ae2822ac05e6b95a09fef953 Mon Sep 17 00:00:00 2001
+From: Hertz Wang <wangh@rock-chips.com>
+Date: Tue, 13 Nov 2018 20:39:44 +0800
+Subject: [PATCH 1/1] opengles2: expand more support format
+
+Signed-off-by: Hertz Wang <wangh@rock-chips.com>
+---
+ src/render/opengles2/SDL_render_gles2.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/src/render/opengles2/SDL_render_gles2.c b/src/render/opengles2/SDL_render_gles2.c
+index bd343cf..532f47f 100644
+--- a/src/render/opengles2/SDL_render_gles2.c
++++ b/src/render/opengles2/SDL_render_gles2.c
+@@ -42,7 +42,7 @@
+ #endif
+ 
+ /* To prevent unnecessary window recreation,
+- * these should match the defaults selected in SDL_GL_ResetAttributes 
++ * these should match the defaults selected in SDL_GL_ResetAttributes
+  */
+ #define RENDERER_CONTEXT_MAJOR 2
+ #define RENDERER_CONTEXT_MINOR 0
+@@ -61,12 +61,16 @@ SDL_RenderDriver GLES2_RenderDriver = {
+     {
+         "opengles2",
+         (SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE),
+-        4,
++        8,
+         {
+         SDL_PIXELFORMAT_ARGB8888,
+         SDL_PIXELFORMAT_ABGR8888,
+         SDL_PIXELFORMAT_RGB888,
+-        SDL_PIXELFORMAT_BGR888
++        SDL_PIXELFORMAT_BGR888,
++        SDL_PIXELFORMAT_IYUV,
++        SDL_PIXELFORMAT_YV12,
++        SDL_PIXELFORMAT_NV12,
++        SDL_PIXELFORMAT_NV21
+         },
+         0,
+         0
+@@ -1365,7 +1369,7 @@ GLES2_RenderClear(SDL_Renderer * renderer)
+        /* Select the color to clear with */
+        g = renderer->g;
+        a = renderer->a;
+-   
++
+        if (renderer->target &&
+             (renderer->target->format == SDL_PIXELFORMAT_ARGB8888 ||
+              renderer->target->format == SDL_PIXELFORMAT_RGB888)) {
+-- 
+2.7.4
+

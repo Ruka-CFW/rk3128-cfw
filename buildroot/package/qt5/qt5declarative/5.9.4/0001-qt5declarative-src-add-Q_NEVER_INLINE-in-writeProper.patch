@@ -1,0 +1,29 @@
+From 9de89ec87426e3344b5ade8755a1908cd77ed1c5 Mon Sep 17 00:00:00 2001
+From: Nickey Yang <nickey.yang@rock-chips.com>
+Date: Thu, 2 Aug 2018 17:06:51 +0800
+Subject: [PATCH 1/5] qt5declarative: src: add Q_NEVER_INLINE in writeProperty
+
+gcc compiler optimizations will cause crash on cortex_a17 platform
+So fix it.
+
+Signed-off-by: Nickey Yang <nickey.yang@rock-chips.com>
+---
+ src/qml/qml/qqmlpropertycache_p.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/qml/qml/qqmlpropertycache_p.h b/src/qml/qml/qqmlpropertycache_p.h
+index a841570f1d..a73522fa12 100644
+--- a/src/qml/qml/qqmlpropertycache_p.h
++++ b/src/qml/qml/qqmlpropertycache_p.h
+@@ -312,7 +312,7 @@ public:
+             QMetaObject::metacall(target, QMetaObject::ReadProperty, coreIndex(), args);
+     }
+ 
+-    bool writeProperty(QObject *target, void *value, WriteFlags flags) const
++    Q_NEVER_INLINE bool writeProperty(QObject *target, void *value, WriteFlags flags) const
+     {
+         int status = -1;
+         void *argv[] = { value, 0, &status, &flags };
+-- 
+2.20.1
+

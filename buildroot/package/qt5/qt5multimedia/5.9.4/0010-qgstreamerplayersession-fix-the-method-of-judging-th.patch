@@ -1,0 +1,41 @@
+From 3c51b8c480214570ba8439a93cc8a77ea4b8f931 Mon Sep 17 00:00:00 2001
+From: Francis Fan <francis.fan@rock-chips.com>
+Date: Thu, 5 Sep 2019 07:51:23 +0000
+Subject: [PATCH 10/13] qgstreamerplayersession: fix the method of judging the
+ video seekable attribute
+
+Signed-off-by: Francis Fan <francis.fan@rock-chips.com>
+---
+ .../gstreamer/mediaplayer/qgstreamerplayersession.cpp      | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp b/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
+index 5972041..3f6812a 100755
+--- a/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
++++ b/src/plugins/gstreamer/mediaplayer/qgstreamerplayersession.cpp
+@@ -1472,6 +1472,7 @@ void QGstreamerPlayerSession::updateDuration()
+ {
+     gint64 gstDuration = 0;
+     int duration = -1;
++    gint64 dur = -1;
+ 
+     if (m_playbin && qt_gst_element_query_duration(m_playbin, GST_FORMAT_TIME, &gstDuration))
+         duration = gstDuration / 1000000;
+@@ -1486,9 +1487,13 @@ void QGstreamerPlayerSession::updateDuration()
+         m_durationQueries = 0;
+         GstQuery *query = gst_query_new_seeking(GST_FORMAT_TIME);
+         if (gst_element_query(m_playbin, query))
+-            gst_query_parse_seeking(query, 0, &seekable, 0, 0);
++            gst_query_parse_seeking(query, 0, &seekable, 0, &dur);
+         gst_query_unref(query);
+     }
++    /* Fix seekable value by dur value */
++    if (seekable && (dur <= 0))
++        seekable = false;
++
+     setSeekable(seekable);
+ 
+     if (m_durationQueries > 0) {
+-- 
+2.20.1
+

@@ -1,0 +1,43 @@
+From c179f4f231fbe396e504edac91b2f11ff333b35a Mon Sep 17 00:00:00 2001
+From: "olivier.crete@collabora.com" <olivier.crete@collabora.com>
+Date: Tue, 6 Aug 2019 21:08:12 +0100
+Subject: [PATCH 23/60] wayland: Add more DRM formats
+
+Add DRM format equivalents that we were missing compared
+to our caps.
+
+(cherry picked from commit fd9dfb9d0cd659362a9b7224e9131b7b2b028a48)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ ext/wayland/wlvideoformat.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/ext/wayland/wlvideoformat.c b/ext/wayland/wlvideoformat.c
+index e82b46941..1aac624a6 100644
+--- a/ext/wayland/wlvideoformat.c
++++ b/ext/wayland/wlvideoformat.c
+@@ -84,8 +84,20 @@ static const wl_DmabufVideoFormat dmabuf_formats[] = {
+   {DRM_FORMAT_RGB888, GST_VIDEO_FORMAT_BGR},
+   {DRM_FORMAT_BGR888, GST_VIDEO_FORMAT_RGB},
+   {DRM_FORMAT_RGB565, GST_VIDEO_FORMAT_RGB16},
++
+   {DRM_FORMAT_YUYV, GST_VIDEO_FORMAT_YUY2},
+-  {DRM_FORMAT_NV12, GST_VIDEO_FORMAT_NV12},
++  {DRM_FORMAT_YVYU, GST_VIDEO_FORMAT_YVYU},
++  {DRM_FORMAT_UYVY, GST_VIDEO_FORMAT_UYVY},
++  {DRM_FORMAT_AYUV, GST_VIDEO_FORMAT_AYUV},
++  {DRM_FORMAT_NV21, GST_VIDEO_FORMAT_NV21},
++  {DRM_FORMAT_NV16, GST_VIDEO_FORMAT_NV16},
++  {DRM_FORMAT_YUV410, GST_VIDEO_FORMAT_YUV9},
++  {DRM_FORMAT_YVU410, GST_VIDEO_FORMAT_YVU9},
++  {DRM_FORMAT_YUV411, GST_VIDEO_FORMAT_Y41B},
++  {DRM_FORMAT_YUV420, GST_VIDEO_FORMAT_I420},
++  {DRM_FORMAT_YVU420, GST_VIDEO_FORMAT_YV12},
++  {DRM_FORMAT_YUV422, GST_VIDEO_FORMAT_Y42B},
++  {DRM_FORMAT_YUV444, GST_VIDEO_FORMAT_v308},
+ };
+ 
+ enum wl_shm_format
+-- 
+2.20.1
+

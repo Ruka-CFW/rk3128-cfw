@@ -1,0 +1,77 @@
+From 468f944d5fc05fd3c6180a215ac9cf5401cac282 Mon Sep 17 00:00:00 2001
+From: Philipp Zabel <p.zabel@pengutronix.de>
+Date: Fri, 17 Aug 2018 11:12:26 +0200
+Subject: [PATCH 04/60] kmssink: configure mode setting from video info
+
+drmModeGetFB returns -EINVAL for multi-planar framebuffers. Instead of
+depending on the framebuffer dimensions to select the mode, use width
+and height from GstVideoInfo, which was used to create the framebuffer
+in the first place.  This enables kmssink to display multi-planar
+formats such as I420 or NV12 with modesetting enabled.
+
+https://bugzilla.gnome.org/show_bug.cgi?id=796985
+---
+ sys/kms/gstkmssink.c | 18 ++----------------
+ 1 file changed, 2 insertions(+), 16 deletions(-)
+
+diff --git a/sys/kms/gstkmssink.c b/sys/kms/gstkmssink.c
+index 1331883ce..3400d3244 100644
+--- a/sys/kms/gstkmssink.c
++++ b/sys/kms/gstkmssink.c
+@@ -414,7 +414,6 @@ configure_mode_setting (GstKMSSink * self, GstVideoInfo * vinfo)
+   gboolean ret;
+   drmModeConnector *conn;
+   int err;
+-  drmModeFB *fb;
+   gint i;
+   drmModeModeInfo *mode;
+   guint32 fb_id;
+@@ -422,7 +421,6 @@ configure_mode_setting (GstKMSSink * self, GstVideoInfo * vinfo)
+ 
+   ret = FALSE;
+   conn = NULL;
+-  fb = NULL;
+   mode = NULL;
+   kmsmem = NULL;
+ 
+@@ -440,13 +438,9 @@ configure_mode_setting (GstKMSSink * self, GstVideoInfo * vinfo)
+   if (!conn)
+     goto connector_failed;
+ 
+-  fb = drmModeGetFB (self->fd, fb_id);
+-  if (!fb)
+-    goto framebuffer_failed;
+-
+   for (i = 0; i < conn->count_modes; i++) {
+-    if (conn->modes[i].vdisplay == fb->height &&
+-        conn->modes[i].hdisplay == fb->width) {
++    if (conn->modes[i].vdisplay == GST_VIDEO_INFO_HEIGHT (vinfo) &&
++        conn->modes[i].hdisplay == GST_VIDEO_INFO_WIDTH (vinfo)) {
+       mode = &conn->modes[i];
+       break;
+     }
+@@ -464,8 +458,6 @@ configure_mode_setting (GstKMSSink * self, GstVideoInfo * vinfo)
+   ret = TRUE;
+ 
+ bail:
+-  if (fb)
+-    drmModeFreeFB (fb);
+   if (conn)
+     drmModeFreeConnector (conn);
+ 
+@@ -483,12 +475,6 @@ connector_failed:
+     GST_ERROR_OBJECT (self, "Could not find a valid monitor connector");
+     goto bail;
+   }
+-framebuffer_failed:
+-  {
+-    GST_ERROR_OBJECT (self, "drmModeGetFB failed: %s (%d)",
+-        strerror (errno), errno);
+-    goto bail;
+-  }
+ mode_failed:
+   {
+     GST_ERROR_OBJECT (self, "cannot find appropriate mode");
+-- 
+2.20.1
+

@@ -1,0 +1,75 @@
+From 99e31c88ffda477147338febf9b493001eacb588 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Sat, 30 Jan 2021 08:48:18 +0800
+Subject: [PATCH 2/2] Support building with QT 5.14
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ src/core/compositor/delegated_frame_node.cpp              | 8 +++++++-
+ .../render_widget_host_view_qt_delegate_quick.cpp         | 4 ++++
+ .../render_widget_host_view_qt_delegate_widget.cpp        | 4 ++++
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/src/core/compositor/delegated_frame_node.cpp b/src/core/compositor/delegated_frame_node.cpp
+index 5f474cbfb..66c82f32a 100644
+--- a/src/core/compositor/delegated_frame_node.cpp
++++ b/src/core/compositor/delegated_frame_node.cpp
+@@ -281,6 +281,7 @@ public:
+                              QSGNode *layerChain) override
+     {
+         Q_ASSERT(layer);
++#if QT_VERSION <= QT_VERSION_CHECK(5, 13, 0)
+         // Only QSGInternalImageNode currently supports QSGLayer textures.
+         QSGInternalImageNode *imageNode = m_apiDelegate->createInternalImageNode();
+         imageNode->setTargetRect(rect);
+@@ -288,7 +289,12 @@ public:
+         imageNode->setSubSourceRect(layer->convertToNormalizedSourceRect(sourceRect));
+         imageNode->setTexture(layer);
+         imageNode->update();
+-
++#else
++        QSGImageNode *imageNode = m_apiDelegate->createImageNode();
++        imageNode->setRect(rect);
++        imageNode->setSourceRect(sourceRect);
++        imageNode->setTexture(layer);
++#endif
+         layerChain->appendChildNode(imageNode);
+         m_sceneGraphNodes->append(imageNode);
+     }
+diff --git a/src/webengine/render_widget_host_view_qt_delegate_quick.cpp b/src/webengine/render_widget_host_view_qt_delegate_quick.cpp
+index 55ec19fc9..35ddc2ab3 100644
+--- a/src/webengine/render_widget_host_view_qt_delegate_quick.cpp
++++ b/src/webengine/render_widget_host_view_qt_delegate_quick.cpp
+@@ -176,8 +176,12 @@ QSGLayer *RenderWidgetHostViewQtDelegateQuick::createLayer()
+ 
+ QSGInternalImageNode *RenderWidgetHostViewQtDelegateQuick::createInternalImageNode()
+ {
++#if QT_VERSION <= QT_VERSION_CHECK(5, 13, 0)
+     QSGRenderContext *renderContext = QQuickWindowPrivate::get(QQuickItem::window())->context;
+     return renderContext->sceneGraphContext()->createInternalImageNode();
++#else
++    return nullptr;
++#endif
+ }
+ 
+ QSGImageNode *RenderWidgetHostViewQtDelegateQuick::createImageNode()
+diff --git a/src/webenginewidgets/render_widget_host_view_qt_delegate_widget.cpp b/src/webenginewidgets/render_widget_host_view_qt_delegate_widget.cpp
+index 88eb9843b..304d8cd00 100644
+--- a/src/webenginewidgets/render_widget_host_view_qt_delegate_widget.cpp
++++ b/src/webenginewidgets/render_widget_host_view_qt_delegate_widget.cpp
+@@ -303,8 +303,12 @@ QSGLayer *RenderWidgetHostViewQtDelegateWidget::createLayer()
+ 
+ QSGInternalImageNode *RenderWidgetHostViewQtDelegateWidget::createInternalImageNode()
+ {
++#if QT_VERSION <= QT_VERSION_CHECK(5, 13, 0)
+     QSGRenderContext *renderContext = QQuickWindowPrivate::get(quickWindow())->context;
+     return renderContext->sceneGraphContext()->createInternalImageNode();
++#else
++    return nullptr;
++#endif
+ }
+ 
+ QSGImageNode *RenderWidgetHostViewQtDelegateWidget::createImageNode()
+-- 
+2.20.1
+

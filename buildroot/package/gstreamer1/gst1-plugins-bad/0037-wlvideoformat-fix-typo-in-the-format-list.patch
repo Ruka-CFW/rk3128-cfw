@@ -1,0 +1,31 @@
+From 6b57ebb15a39dcedab44d351cecb709b2e0f927f Mon Sep 17 00:00:00 2001
+From: Michael Olbrich <m.olbrich@pengutronix.de>
+Date: Sun, 28 Jun 2020 18:54:54 +0200
+Subject: [PATCH 37/60] wlvideoformat: fix typo in the format list
+
+DRM_FORMAT_ARGB8888 was actually used twice in the list for different SHM /
+Gstreamer formats. In this case DRM_FORMAT_ABGR8888 is the correct format.
+
+Part-of: <https://gitlab.freedesktop.org/gstreamer/gst-plugins-bad/-/merge_requests/1382>
+(cherry picked from commit 76411205c8009545a83dc599297ace7fdfdcd427)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ ext/wayland/wlvideoformat.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ext/wayland/wlvideoformat.c b/ext/wayland/wlvideoformat.c
+index bc8c5532a..e1d6271ea 100644
+--- a/ext/wayland/wlvideoformat.c
++++ b/ext/wayland/wlvideoformat.c
+@@ -43,7 +43,7 @@ static const wl_VideoFormat wl_formats[] = {
+   {WL_SHM_FORMAT_XBGR8888, DRM_FORMAT_XBGR8888, GST_VIDEO_FORMAT_RGBx},
+   {WL_SHM_FORMAT_RGBX8888, DRM_FORMAT_RGBX8888, GST_VIDEO_FORMAT_xBGR},
+   {WL_SHM_FORMAT_BGRX8888, DRM_FORMAT_BGRX8888, GST_VIDEO_FORMAT_xRGB},
+-  {WL_SHM_FORMAT_ABGR8888, DRM_FORMAT_ARGB8888, GST_VIDEO_FORMAT_RGBA},
++  {WL_SHM_FORMAT_ABGR8888, DRM_FORMAT_ABGR8888, GST_VIDEO_FORMAT_RGBA},
+   {WL_SHM_FORMAT_RGBA8888, DRM_FORMAT_RGBA8888, GST_VIDEO_FORMAT_ABGR},
+   {WL_SHM_FORMAT_BGRA8888, DRM_FORMAT_BGRA8888, GST_VIDEO_FORMAT_ARGB},
+   {WL_SHM_FORMAT_RGB888, DRM_FORMAT_RGB888, GST_VIDEO_FORMAT_RGB},
+-- 
+2.20.1
+

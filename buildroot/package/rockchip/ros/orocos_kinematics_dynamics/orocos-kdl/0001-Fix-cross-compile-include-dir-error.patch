@@ -1,0 +1,26 @@
+From 6935d415c6d20fb2772caed433d0b02e96a7585b Mon Sep 17 00:00:00 2001
+From: "Zain.Wang" <wzz@rock-chips.com>
+Date: Mon, 17 Sep 2018 14:09:50 +0800
+Subject: [PATCH] Fix cross compile include dir error
+
+Signed-off-by: Zain.Wang <wzz@rock-chips.com>
+---
+ orocos_kdl/KDLConfig.cmake.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/orocos_kdl/KDLConfig.cmake.in b/orocos_kdl/KDLConfig.cmake.in
+index 13a476b..4c161b6 100644
+--- a/orocos_kdl/KDLConfig.cmake.in
++++ b/orocos_kdl/KDLConfig.cmake.in
+@@ -6,7 +6,7 @@
+ 
+ # Compute paths
+ get_filename_component(SELF_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+-set(orocos_kdl_INCLUDE_DIRS "@KDL_INCLUDE_DIRS@;@CMAKE_INSTALL_PREFIX@/include")
++set(orocos_kdl_INCLUDE_DIRS "@KDL_INCLUDE_DIRS@;@STAGING_DIR@@CMAKE_INSTALL_PREFIX@/include")
+ 
+ if(NOT TARGET orocos-kdl)
+   include("${SELF_DIR}/OrocosKDLTargets.cmake")
+-- 
+2.7.4
+

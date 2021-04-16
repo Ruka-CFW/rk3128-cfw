@@ -1,0 +1,17 @@
+config BR2_PACKAGE_MINIGUI_DESKTOP
+	bool "Minigui demo desktop"
+	depends on BR2_PACKAGE_MINIGUI
+	select BR2_PACKAGE_RTC_DEMO
+	select BR2_PACKAGE_TSLIB
+	select BR2_PACKAGE_LIBPNG12
+	select BR2_PACKAGE_JPEG
+	select BR2_PACKAGE_FREETYPE
+	help
+	  Minigui demo desktop
+
+config BR2_PACKAGE_MINIGUI_RKKEYBOARD_EVENT
+	string "RK KEY BOARD EVENT"
+	default "event0"
+	depends on BR2_PACKAGE_MINIGUI_DESKTOP
+	help
+		RK KEY BOARD EVENT

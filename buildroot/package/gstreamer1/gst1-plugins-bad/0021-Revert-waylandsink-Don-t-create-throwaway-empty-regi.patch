@@ -1,0 +1,50 @@
+From d9ea60329f5363b02a07821636e71e7b791cf2b3 Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Mon, 2 Sep 2019 09:22:10 +0800
+Subject: [PATCH 21/60] Revert "waylandsink: Don't create throwaway empty
+ regions"
+
+This reverts commit 68fa80e83118a7a2be037eb235e5d211912dee0e.
+
+Some wayland servers, especially weston, only expect empty input
+region as a request to disable input.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+(cherry picked from commit b8946d06c78c291def3f11328a642d63e7eb2153)
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
+ ext/wayland/wlwindow.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/ext/wayland/wlwindow.c b/ext/wayland/wlwindow.c
+index 77b2d81d4..7deba34ca 100644
+--- a/ext/wayland/wlwindow.c
++++ b/ext/wayland/wlwindow.c
+@@ -190,6 +190,7 @@ static GstWlWindow *
+ gst_wl_window_new_internal (GstWlDisplay * display, GMutex * render_lock)
+ {
+   GstWlWindow *window;
++  struct wl_region *region;
+ 
+   window = g_object_new (GST_TYPE_WL_WINDOW, NULL);
+   window->display = g_object_ref (display);
+@@ -222,8 +223,13 @@ gst_wl_window_new_internal (GstWlDisplay * display, GMutex * render_lock)
+   }
+ 
+   /* do not accept input */
+-  wl_surface_set_input_region (window->area_surface, NULL);
+-  wl_surface_set_input_region (window->video_surface, NULL);
++  region = wl_compositor_create_region (display->compositor);
++  wl_surface_set_input_region (window->area_surface, region);
++  wl_region_destroy (region);
++
++  region = wl_compositor_create_region (display->compositor);
++  wl_surface_set_input_region (window->video_surface, region);
++  wl_region_destroy (region);
+ 
+   return window;
+ }
+-- 
+2.20.1
+

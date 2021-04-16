@@ -1,0 +1,4 @@
+source "package/emulators/openbor/openbor4432/Config.in"
+source "package/emulators/openbor/openbor6330/Config.in"
+source "package/emulators/openbor/openbor6412/Config.in"
+source "package/emulators/openbor/openbor6510/Config.in"

@@ -1,0 +1,33 @@
+From 741aa611a4d0d89ac21997d0f7b91b2ba3da4e15 Mon Sep 17 00:00:00 2001
+From: Ziyuan Xu <xzy.xu@rock-chips.com>
+Date: Fri, 12 Jul 2019 17:02:45 +0800
+Subject: [PATCH 01/13] GStreamer: change playbin to playbin3
+
+Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
+---
+ src/gsttools/qgstutils_p.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/gsttools/qgstutils_p.h b/src/gsttools/qgstutils_p.h
+index 5a2feec..416a05a 100644
+--- a/src/gsttools/qgstutils_p.h
++++ b/src/gsttools/qgstutils_p.h
+@@ -64,13 +64,13 @@
+ #include <QDebug>
+ 
+ #if GST_CHECK_VERSION(1,0,0)
+-# define QT_GSTREAMER_PLAYBIN_ELEMENT_NAME "playbin"
++# define QT_GSTREAMER_PLAYBIN_ELEMENT_NAME "playbin3"
+ # define QT_GSTREAMER_CAMERABIN_ELEMENT_NAME "camerabin"
+ # define QT_GSTREAMER_COLORCONVERSION_ELEMENT_NAME "videoconvert"
+ # define QT_GSTREAMER_RAW_AUDIO_MIME "audio/x-raw"
+ # define QT_GSTREAMER_VIDEOOVERLAY_INTERFACE_NAME "GstVideoOverlay"
+ #else
+-# define QT_GSTREAMER_PLAYBIN_ELEMENT_NAME "playbin2"
++# define QT_GSTREAMER_PLAYBIN_ELEMENT_NAME "playbin3"
+ # define QT_GSTREAMER_CAMERABIN_ELEMENT_NAME "camerabin2"
+ # define QT_GSTREAMER_COLORCONVERSION_ELEMENT_NAME "ffmpegcolorspace"
+ # define QT_GSTREAMER_RAW_AUDIO_MIME "audio/x-raw-int"
+-- 
+2.20.1
+

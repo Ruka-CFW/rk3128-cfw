@@ -6,33 +6,19 @@
 case "$1" in
   start)
 		printf "Starting launcher: "
-		export LC_ALL='zh_CN.utf8'
-		export QT_QPA_PLATFORM=wayland
+		export LC_ALL='en_US.utf8'
 
-                # music
-                /usr/bin/audioservice &
-
-		# bt
-		/usr/libexec/bluetooth/bluetoothd --compat &
-
-		export QT_GSTREAMER_WINDOW_VIDEOSINK=kmssink
-
-		#for rkisp plugin
-		export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/gstreamer-1.0
-
-		#for waylandsink
-		#export QT_GSTREAMER_WINDOW_VIDEOSINK=waylandsink
+		export WESTON_DRM_MIRROR=0
+		export WESTON_DRM_PREFER_EXTERNAL=1
 
 		#for QLauncher wayland
 		mkdir -p /tmp/.xdg &&  chmod 0700 /tmp/.xdg
 		export XDG_RUNTIME_DIR=/tmp/.xdg
 		weston --tty=2 --idle-time=0&
-		sleep 1
-		/usr/local/QLauncher/QLauncher &
+		/usr/local/share/scripts/bc.sh
+		retroarch -c /sdcard/settings/retroarch/retroarch.cfg &
 	;;
   stop)
-		killall QLauncher
-		#killall CarMachine
 		killall weston
 		printf "stop finished"
         ;;

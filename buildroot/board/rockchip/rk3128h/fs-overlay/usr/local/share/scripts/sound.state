@@ -1,0 +1,108 @@
+state.rockchiprk312xc {
+	control.1 {
+		iface MIXER
+		name 'Playback Path'
+		value SPK_HP
+		comment {
+			access 'read write'
+			type ENUMERATED
+			count 1
+			item.0 OFF
+			item.1 RCV
+			item.2 SPK
+			item.3 HP
+			item.4 HP_NO_MIC
+			item.5 BT
+			item.6 SPK_HP
+			item.7 RING_SPK
+			item.8 RING_HP
+			item.9 RING_HP_NO_MIC
+			item.10 RING_SPK_HP
+		}
+	}
+	control.2 {
+		iface MIXER
+		name 'Capture MIC Path'
+		value 'MIC OFF'
+		comment {
+			access 'read write'
+			type ENUMERATED
+			count 1
+			item.0 'MIC OFF'
+			item.1 'Main Mic'
+			item.2 'Hands Free Mic'
+			item.3 'BT Sco Mic'
+		}
+	}
+	control.3 {
+		iface MIXER
+		name 'Voice Call Path'
+		value OFF
+		comment {
+			access 'read write'
+			type ENUMERATED
+			count 1
+			item.0 OFF
+			item.1 RCV
+			item.2 SPK
+			item.3 HP
+			item.4 HP_NO_MIC
+			item.5 BT
+		}
+	}
+	control.4 {
+		iface PCM
+		name ELD
+		value '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+		comment {
+			access 'read volatile'
+			type BYTES
+			count 128
+		}
+	}
+	control.5 {
+		iface PCM
+		name 'AUDIO MODE'
+		value 0
+		comment {
+			access 'read write volatile'
+			type INTEGER
+			count 1
+			range '0 - 2'
+		}
+	}
+	control.6 {
+		iface MIXER
+		name 'Master Playback Volume'
+		value.0 57
+		value.1 57
+		comment {
+			access 'read write user'
+			type INTEGER
+			count 2
+			range '0 - 99'
+			tlv '0000000100000008fffff06000000028'
+			dbmin -4000
+			dbmax -40
+			dbvalue.0 -1720
+			dbvalue.1 -1720
+		}
+	}
+	control.7 {
+		iface MIXER
+		name 'HDMI Playback Volume'
+		value.0 99
+		value.1 99
+		comment {
+			access 'read write user'
+			type INTEGER
+			count 2
+			range '0 - 99'
+			tlv '0000000100000008fffff06000000028'
+			dbmin -4000
+			dbmax -40
+			dbvalue.0 -40
+			dbvalue.1 -40
+		}
+	}
+}

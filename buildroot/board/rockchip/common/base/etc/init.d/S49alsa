@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+
+case "$1" in
+  start)
+    alsactl restore -f /userdata/asound.state
+    ;;
+  stop)
+    #alsactl store -f /userdata/asound.state
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+esac

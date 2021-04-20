@@ -1,0 +1,126 @@
+################################################################################
+#
+# Batocera Emulation Station
+#
+################################################################################
+
+BATOCERA_EMULATIONSTATION_VERSION = 17af14095e272e77b0d6cfa071e94c90fb0279d2
+BATOCERA_EMULATIONSTATION_SITE = https://github.com/batocera-linux/batocera-emulationstation
+BATOCERA_EMULATIONSTATION_SITE_METHOD = git
+BATOCERA_EMULATIONSTATION_LICENSE = MIT
+BATOCERA_EMULATIONSTATION_GIT_SUBMODULES = YES
+BATOCERA_EMULATIONSTATION_LICENSE = MIT, Apache-2.0
+BATOCERA_EMULATIONSTATION_DEPENDENCIES = sdl2 sdl2_mixer libfreeimage freetype alsa-lib libcurl vlc rapidjson
+# install in staging for debugging (gdb)
+BATOCERA_EMULATIONSTATION_INSTALL_STAGING = YES
+# BATOCERA_EMULATIONSTATION_OVERRIDE_SRCDIR = /sources/batocera-emulationstation
+
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DCMAKE_CXX_FLAGS=-DORANGEPI_PC
+
+ifeq ($(BR2_PACKAGE_LIBMALI)$(BR2_PACKAGE_MALI_T760)$(BR2_PACKAGE_MALI_T860),y)
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DCMAKE_EXE_LINKER_FLAGS=-lmali -DCMAKE_SHARED_LINKER_FLAGS=-lmali
+endif
+
+ifeq ($(BR2_PACKAGE_HAS_LIBGLES),y)
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DGLES=ON
+endif
+
+ifeq ($(BR2_PACKAGE_HAS_LIBEGL),y)
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DEGL=ON
+endif
+
+ifeq ($(BR2_PACKAGE_RPI_USERLAND),y)
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DBCM=ON
+endif
+
+ifneq ($(BR2_PACKAGE_KODI)$(BR2_PACKAGE_KODI),)
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DDISABLE_KODI=0
+else
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DDISABLE_KODI=1
+endif
+
+
+ifeq ($(BR2_PACKAGE_XORG7),y)
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DENABLE_FILEMANAGER=1
+else
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DENABLE_FILEMANAGER=0
+endif
+
+# cec is causing issues with es on xu4 and vim3
+#ifeq ($(BR2_PACKAGE_LIBCEC_EXYNOS_API)$(BR2_PACKAGE_BATOCERA_TARGET_VIM3),y)
+BATOCERA_EMULATIONSTATION_CONF_OPTS += -DCEC=OFF
+#endif
+
+define BATOCERA_EMULATIONSTATION_RPI_FIXUP
+	$(SED) 's|.{CMAKE_FIND_ROOT_PATH}/opt/vc|$(STAGING_DIR)/usr|g' $(@D)/CMakeLists.txt
+	$(SED) 's|.{CMAKE_FIND_ROOT_PATH}/usr|$(STAGING_DIR)/usr|g'    $(@D)/CMakeLists.txt
+endef
+
+define BATOCERA_EMULATIONSTATION_RESOURCES
+	$(INSTALL) -m 0755 -d $(TARGET_DIR)/usr/share/emulationstation/resources/help
+	$(INSTALL) -m 0755 -d $(TARGET_DIR)/usr/share/emulationstation/resources/flags
+	$(INSTALL) -m 0755 -d $(TARGET_DIR)/usr/share/emulationstation/resources/battery
+	$(INSTALL) -m 0644 -D $(@D)/resources/*.* $(TARGET_DIR)/usr/share/emulationstation/resources
+	$(INSTALL) -m 0644 -D $(@D)/resources/help/*.* $(TARGET_DIR)/usr/share/emulationstation/resources/help
+	$(INSTALL) -m 0644 -D $(@D)/resources/flags/*.* $(TARGET_DIR)/usr/share/emulationstation/resources/flags
+	$(INSTALL) -m 0644 -D $(@D)/resources/battery/*.* $(TARGET_DIR)/usr/share/emulationstation/resources/battery
+
+	# es_input.cfg
+	mkdir -p $(TARGET_DIR)/usr/share/batocera/datainit/system/configs/emulationstation
+	cp /opt/data/a12/dev/github/rk3128-cfw/buildroot/package/emulationstation/batocera-emulationstation/controllers/es_input.cfg \
+		$(TARGET_DIR)/usr/share/batocera/datainit/system/configs/emulationstation
+endef
+
+### S31emulationstation
+# default for most of architectures
+BATOCERA_EMULATIONSTATION_PREFIX = SDL_NOMOUSE=1
+BATOCERA_EMULATIONSTATION_CMD = /usr/bin/emulationstation
+BATOCERA_EMULATIONSTATION_ARGS = --no-splash $${EXTRA_OPTS}
+BATOCERA_EMULATIONSTATION_POSTFIX = \&
+
+# on rpi1: dont load ES in background
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RPI1),y)
+	BATOCERA_EMULATIONSTATION_POSTFIX = \& sleep 5
+endif
+
+# on rpi 1 2 3, the splash with video + es splash is ok
+ifeq ($(BR2_PACKAGE_RPI_USERLAND),y)
+	BATOCERA_EMULATIONSTATION_ARGS = $${EXTRA_OPTS}
+endif
+
+#on N2, the splash with video + es splash is ok
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_ODROIDN2),y)
+	BATOCERA_EMULATIONSTATION_ARGS = $${EXTRA_OPTS}
+endif
+
+# es splash is ok when there is no video
+ifeq ($(BR2_PACKAGE_BATOCERA_SPLASH_IMAGE)$(BR2_PACKAGE_BATOCERA_SPLASH_ROTATE_IMAGE),y)
+	BATOCERA_EMULATIONSTATION_ARGS = $${EXTRA_OPTS}
+endif
+
+# # on x86/x86_64: startx runs ES
+ifeq ($(BR2_PACKAGE_XSERVER_XORG_SERVER),y)
+	BATOCERA_EMULATIONSTATION_PREFIX =
+	BATOCERA_EMULATIONSTATION_CMD = startx
+	BATOCERA_EMULATIONSTATION_ARGS =
+endif
+
+# # on odroidga: set resolution and EGL/GL hack
+#ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_ODROIDGOA),y)
+#	BATOCERA_EMULATIONSTATION_PREFIX += SDL_VIDEO_GL_DRIVER=/usr/lib/libGLESv2.so SDL_VIDEO_EGL_DRIVER=/usr/lib/libGLESv2.so
+#endif
+
+define BATOCERA_EMULATIONSTATION_BOOT
+	$(INSTALL) -D -m 0755 package/emulationstation/batocera-emulationstation/S31emulationstation $(TARGET_DIR)/etc/init.d/S31emulationstation
+	sed -i -e 's;%BATOCERA_EMULATIONSTATION_PREFIX%;${BATOCERA_EMULATIONSTATION_PREFIX};g' \
+		-e 's;%BATOCERA_EMULATIONSTATION_CMD%;${BATOCERA_EMULATIONSTATION_CMD};g' \
+		-e 's;%BATOCERA_EMULATIONSTATION_ARGS%;${BATOCERA_EMULATIONSTATION_ARGS};g' \
+		-e 's;%BATOCERA_EMULATIONSTATION_POSTFIX%;${BATOCERA_EMULATIONSTATION_POSTFIX};g' \
+		$(TARGET_DIR)/etc/init.d/S31emulationstation
+endef
+
+BATOCERA_EMULATIONSTATION_PRE_CONFIGURE_HOOKS += BATOCERA_EMULATIONSTATION_RPI_FIXUP
+BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_RESOURCES
+BATOCERA_EMULATIONSTATION_POST_INSTALL_TARGET_HOOKS += BATOCERA_EMULATIONSTATION_BOOT
+
+$(eval $(cmake-package))

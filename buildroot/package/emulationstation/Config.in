@@ -1,0 +1,7 @@
+# Emulation Station
+
+source "package/emulationstation/batocera-emulationstation/Config.in"
+source "package/emulationstation/batocera-es-system/Config.in"
+source "package/emulationstation/es-background-musics/Config.in"
+source "package/emulationstation/es-theme-carbon/Config.in"
+source "package/emulationstation/emulationstation-fcamod/Config.in"

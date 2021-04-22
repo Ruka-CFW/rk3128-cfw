@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-FFMPEG_VERSION = 4.1.3
+FFMPEG_VERSION = 4.3.1
 FFMPEG_SOURCE = ffmpeg-$(FFMPEG_VERSION).tar.xz
 FFMPEG_SITE = http://ffmpeg.org/releases
 FFMPEG_INSTALL_STAGING = YES
@@ -19,7 +19,7 @@ endif
 FFMPEG_CONF_OPTS = \
 	--prefix=/usr \
 	--enable-avfilter \
-	--enable-version3 \
+	--disable-version3 \
 	--enable-logging \
 	--enable-optimizations \
 	--disable-extra-warnings \
@@ -29,6 +29,7 @@ FFMPEG_CONF_OPTS = \
 	--enable-network \
 	--disable-gray \
 	--enable-swscale-alpha \
+	--disable-small \
 	--enable-dct \
 	--enable-fft \
 	--enable-mdct \
@@ -57,6 +58,11 @@ FFMPEG_CONF_OPTS = \
 
 FFMPEG_DEPENDENCIES += host-pkgconf
 
+ifeq ($(BR2_PACKAGE_ROCKCHIP_MPP),y)
+FFMPEG_CONF_OPTS += --enable-rkmpp --enable-libdrm --enable-version3
+FFMPEG_DEPENDENCIES += rockchip-mpp
+endif
+
 ifeq ($(BR2_PACKAGE_FFMPEG_GPL),y)
 FFMPEG_CONF_OPTS += --enable-gpl
 else
@@ -67,18 +73,6 @@ ifeq ($(BR2_PACKAGE_FFMPEG_NONFREE),y)
 FFMPEG_CONF_OPTS += --enable-nonfree
 else
 FFMPEG_CONF_OPTS += --disable-nonfree
-endif
-
-ifeq ($(BR2_PACKAGE_FFMPEG_DEBUG),y)
-FFMPEG_CONF_OPTS += --enable-debug
-else
-FFMPEG_CONF_OPTS += --disable-debug
-endif
-
-ifeq ($(BR2_PACKAGE_FFMPEG_SMALL),y)
-FFMPEG_CONF_OPTS += --enable-small
-else
-FFMPEG_CONF_OPTS += --disable-small
 endif
 
 ifeq ($(BR2_PACKAGE_FFMPEG_FFMPEG),y)
@@ -107,6 +101,17 @@ else
 FFMPEG_CONF_OPTS += --disable-ffprobe
 endif
 
+ifeq ($(BR2_PACKAGE_FFMPEG_XCBGRAB),y)
+FFMPEG_CONF_OPTS += \
+	--enable-libxcb \
+	--enable-libxcb-shape \
+	--enable-libxcb-shm \
+	--enable-libxcb-xfixes
+FFMPEG_DEPENDENCIES += libxcb
+else
+FFMPEG_CONF_OPTS += --disable-libxcb
+endif
+
 ifeq ($(BR2_PACKAGE_FFMPEG_POSTPROC),y)
 FFMPEG_CONF_OPTS += --enable-postproc
 else
@@ -119,20 +124,9 @@ else
 FFMPEG_CONF_OPTS += --disable-swscale
 endif
 
-ifeq ($(BR2_PACKAGE_LINUX_RGA),y)
-FFMPEG_CONF_OPTS += --enable-librga
-FFMPEG_DEPENDENCIES += linux-rga
-else
-FFMPEG_CONF_OPTS += --disable-librga
-endif
-
 ifneq ($(call qstrip,$(BR2_PACKAGE_FFMPEG_ENCODERS)),all)
 FFMPEG_CONF_OPTS += --disable-encoders \
 	$(foreach x,$(call qstrip,$(BR2_PACKAGE_FFMPEG_ENCODERS)),--enable-encoder=$(x))
-endif
-
-ifneq ($(call qstrip,$(BR2_PACKAGE_FFMPEG_DISABLE_DECODERS)),)
-FFMPEG_CONF_OPTS += $(foreach x,$(call qstrip,$(BR2_PACKAGE_FFMPEG_DISABLE_DECODERS)),--disable-encoder=$(x))
 endif
 
 ifneq ($(call qstrip,$(BR2_PACKAGE_FFMPEG_DECODERS)),all)
@@ -252,11 +246,6 @@ FFMPEG_CONF_OPTS += --enable-libdrm
 FFMPEG_DEPENDENCIES += libdrm
 else
 FFMPEG_CONF_OPTS += --disable-libdrm
-
-ifeq ($(BR2_PACKAGE_LIBION),y)
-FFMPEG_CONF_OPTS += --enable-libion
-FFMPEG_DEPENDENCIES += libion
-endif
 endif
 
 ifeq ($(BR2_PACKAGE_LIBOPENH264),y)
@@ -288,29 +277,6 @@ else
 FFMPEG_CONF_OPTS += --disable-vdpau
 endif
 
-ifeq ($(BR2_PACKAGE_MPP),y)
-ifeq ($(BR2_PACKAGE_RV1108),y)
-FFMPEG_DEPENDENCIES += mpp libion
-FFMPEG_CONF_OPTS += --enable-rkmpp --extra-cflags="-D CONFIG_ION"
-else
-FFMPEG_DEPENDENCIES += mpp libdrm
-FFMPEG_CONF_OPTS += --enable-rkmpp --enable-libdrm
-endif
-# --disable-v4l2-m2m seems no effect, disable each v4l2m2m
-FFMPEG_CONF_OPTS += \
-	--disable-decoder=h264_v4l2m2m \
-	--disable-decoder=vp8_v4l2m2m \
-	--disable-decoder=mpeg2_v4l2m2m \
-	--disable-decoder=mpeg4_v4l2m2m
-FFMPEG_CONF_OPTS += \
-	--disable-encoder=h264_v4l2m2m \
-	--disable-encoder=vp8_v4l2m2m \
-	--disable-encoder=mpeg2_v4l2m2m \
-	--disable-encoder=mpeg4_v4l2m2m
-else
-FFMPEG_CONF_OPTS += --disable-rkmpp
-endif
-
 ifeq ($(BR2_PACKAGE_RPI_USERLAND),y)
 FFMPEG_CONF_OPTS += --enable-mmal --enable-omx --enable-omx-rpi \
 	--extra-cflags=-I$(STAGING_DIR)/usr/include/IL
@@ -321,10 +287,7 @@ endif
 
 # To avoid a circular dependency only use opencv if opencv itself does
 # not depend on ffmpeg.
-ifeq ($(BR2_PACKAGE_OPENCV_LIB_IMGPROC)x$(BR2_PACKAGE_OPENCV_WITH_FFMPEG),yx)
-FFMPEG_CONF_OPTS += --enable-libopencv
-FFMPEG_DEPENDENCIES += opencv
-else ifeq ($(BR2_PACKAGE_OPENCV3_LIB_IMGPROC)x$(BR2_PACKAGE_OPENCV3_WITH_FFMPEG),yx)
+ifeq ($(BR2_PACKAGE_OPENCV3_LIB_IMGPROC)x$(BR2_PACKAGE_OPENCV3_WITH_FFMPEG),yx)
 FFMPEG_CONF_OPTS += --enable-libopencv
 FFMPEG_DEPENDENCIES += opencv3
 else
@@ -451,6 +414,13 @@ FFMPEG_CONF_OPTS += --enable-libx265
 FFMPEG_DEPENDENCIES += x265
 else
 FFMPEG_CONF_OPTS += --disable-libx265
+endif
+
+ifeq ($(BR2_PACKAGE_DAV1D),y)
+FFMPEG_CONF_OPTS += --enable-libdav1d
+FFMPEG_DEPENDENCIES += dav1d
+else
+FFMPEG_CONF_OPTS += --disable-libdav1d
 endif
 
 ifeq ($(BR2_X86_CPU_HAS_MMX),y)

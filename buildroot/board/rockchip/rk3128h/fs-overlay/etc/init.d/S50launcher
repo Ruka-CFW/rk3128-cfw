@@ -16,7 +16,9 @@ case "$1" in
 		export XDG_RUNTIME_DIR=/tmp/.xdg
 		weston --tty=2 --idle-time=0&
 		/usr/local/share/scripts/bc.sh
-		retroarch -c /sdcard/settings/retroarch/retroarch.cfg &
+		export HOME=/userdata/system
+		emulationstation &
+#		retroarch -c /sdcard/settings/retroarch/retroarch.cfg &
 	;;
   stop)
 		killall weston

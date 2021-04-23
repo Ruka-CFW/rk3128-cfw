@@ -1,0 +1,22 @@
+--- advancemame-v3.9/src/drivers/cavepgm.c	2020-11-26 22:33:50.032416258 +0100
++++ advancemame-v3.9/src/drivers/cavepgm.c	2020-11-26 22:34:44.223447325 +0100
+@@ -287,7 +287,7 @@
+ #include "timer.h"
+ 
+ 
+-UINT16 *pgm_mainram, *pgm_bg_videoram, *pgm_tx_videoram, *pgm_videoregs, *pgm_rowscrollram;
++extern UINT16 *pgm_mainram, *pgm_bg_videoram, *pgm_tx_videoram, *pgm_videoregs, *pgm_rowscrollram;
+ static UINT8 *z80_mainram;
+ static UINT32 *arm7_shareram;
+ static UINT32 arm7_latch;
+@@ -852,8 +852,8 @@
+ /* This function expands the sprite colour data (in the A Roms) from 3 pixels
+    in each word to a byte per pixel making it easier to use */
+ 
+-UINT8 *pgm_sprite_a_region;
+-size_t	pgm_sprite_a_region_allocate;
++extern UINT8 *pgm_sprite_a_region;
++extern size_t	pgm_sprite_a_region_allocate;
+ 
+ static void expand_colourdata(void)
+ {

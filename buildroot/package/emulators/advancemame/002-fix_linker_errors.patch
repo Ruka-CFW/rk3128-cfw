@@ -1,0 +1,20 @@
+--- a/advance/cfg.mak	2020-04-13 19:54:45.353041154 +0200
++++ b/advance/cfg.mak	2020-04-13 22:33:00.665124855 +0200
+@@ -36,6 +36,7 @@
+ 	$(CFGOBJ)/lib/inputdrv.o \
+ 	$(CFGOBJ)/lib/videoall.o \
+ 	$(CFGOBJ)/lib/error.o \
++	$(CFGOBJ)/blit/interp.o \
+ 	$(CFGOBJ)/blit/blit.o \
+ 	$(CFGOBJ)/blit/clear.o \
+ 	$(CFGOBJ)/blit/slice.o \
+--- a/advance/v.mak	2020-04-13 19:54:45.405041212 +0200
++++ b/advance/v.mak	2020-04-13 22:32:27.741055312 +0200
+@@ -30,6 +30,7 @@
+ 	$(VOBJ)/lib/inputdrv.o \
+ 	$(VOBJ)/lib/videoall.o \
+ 	$(VOBJ)/lib/error.o \
++	$(VOBJ)/blit/interp.o \
+ 	$(VOBJ)/blit/blit.o \
+ 	$(VOBJ)/blit/clear.o \
+ 	$(VOBJ)/blit/slice.o \

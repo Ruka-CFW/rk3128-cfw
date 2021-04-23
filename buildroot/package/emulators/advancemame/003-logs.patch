@@ -1,0 +1,11 @@
+--- a/advance/osd/emu.c	2018-09-08 14:21:24.000000000 +0200
++++ b/advance/osd/emu.c2	2020-10-24 18:09:45.978155216 +0200
+@@ -759,7 +759,7 @@
+ 	}
+ 
+ 	if (opt_log || opt_logsync) {
+-		if (log_init(ADV_NAME ".log", opt_logsync) != 0) {
++		if (log_init("/tmp/" ADV_NAME ".log", opt_logsync) != 0) {
+ 			target_err("Error opening the log file '" ADV_NAME ".log'.\n");
+ 			goto err_os;
+ 		}

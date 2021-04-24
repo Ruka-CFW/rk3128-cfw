@@ -5,28 +5,47 @@
 
 case "$1" in
   start)
-		printf "Starting launcher: "
-		export LC_ALL='en_US.utf8'
+    printf "Starting launcher: "
+    export LC_ALL='en_US.utf8'
 
-		export WESTON_DRM_MIRROR=0
-		export WESTON_DRM_PREFER_EXTERNAL=1
+    export WESTON_DRM_MIRROR=0
+    export WESTON_DRM_PREFER_EXTERNAL=1
 
-		#for QLauncher wayland
-		mkdir -p /tmp/.xdg &&  chmod 0700 /tmp/.xdg
-		export XDG_RUNTIME_DIR=/tmp/.xdg
-		weston --tty=2 --idle-time=0&
-		/usr/local/share/scripts/bc.sh
-		export HOME=/userdata/system
-		emulationstation &
-#		retroarch -c /sdcard/settings/retroarch/retroarch.cfg &
-	;;
+    # for QLauncher wayland
+    mkdir -p /tmp/.xdg &&  chmod 0700 /tmp/.xdg
+    export XDG_RUNTIME_DIR=/tmp/.xdg
+    weston --tty=2 --idle-time=0 &
+
+    # start brightness control
+    /usr/local/share/scripts/bc.sh
+
+    # select display, appropriate resolution and sound path
+    if [ `cat /sys/class/drm/card0-HDMI-A-1/status` == "connected" ]; then
+      ra_config="/sdcard/settings/retroarch/retroarch_hdmi.cfg"
+      amixer cset name='Playback Path' 'OFF'
+
+    else
+      case `cat /sys/class/drm/card0-LVDS-1/mode` in
+        1024x600*)
+          ra_config="/sdcard/settings/retroarch/retroarch.cfg" ;;
+        800x480*)
+          ra_config="/sdcard/settings/retroarch/retroarchi_v3.cfg" ;;
+      esac
+      amixer cset name='Playback Path' 'SPK'
+
+    fi
+
+    echo ${ra_config} >> /sdcard/config.log
+    sync
+    retroarch -c ${ra_config} &
+    ;;
   stop)
-		killall weston
-		printf "stop finished"
-        ;;
+    killall weston
+    printf "stop finished"
+    ;;
   *)
-        echo "Usage: $0 {start|stop}"
-        exit 1
-        ;;
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
 esac
 exit 0

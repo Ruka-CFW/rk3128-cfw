@@ -1,0 +1,5 @@
+dist/
+external/
+kernel/
+buildroot/dl/
+buildroot/output/

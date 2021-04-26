@@ -35,9 +35,7 @@ case "$1" in
 
     fi
 
-    echo ${ra_config} >> /sdcard/config.log
-    sync
-    retroarch -c ${ra_config} &
+    ( retroarch -c ${ra_config}; poweroff; ) &
     ;;
   stop)
     killall weston

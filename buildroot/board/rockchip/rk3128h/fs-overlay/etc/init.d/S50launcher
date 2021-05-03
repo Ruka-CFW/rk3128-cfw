@@ -29,7 +29,7 @@ case "$1" in
         1024x600*)
           ra_config="/sdcard/settings/retroarch/retroarch.cfg" ;;
         800x480*)
-          ra_config="/sdcard/settings/retroarch/retroarchi_v3.cfg" ;;
+          ra_config="/sdcard/settings/retroarch/retroarch_v3.cfg" ;;
       esac
       amixer cset name='Playback Path' 'SPK'
 

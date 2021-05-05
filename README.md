@@ -33,14 +33,14 @@ and you will need to use tools that are not available here.
 * IPS Screens are not supported 
 ## Retroarch.cfg files
 * retroarch.cfg
-  *video_fullscreen_x = "1024"
-  *video_fullscreen_y = "600"
-  *video_fullscreen = "true"
+  * video_fullscreen_x = "1024"
+  * video_fullscreen_y = "600"
+  * video_fullscreen = "true"
 * retroarch_v3.cfg
-  *video_fullscreen_x = "800"
-  *video_fullscreen_y = "480"
-  *video_fullscreen = "true"
+  * video_fullscreen_x = "800"
+  * video_fullscreen_y = "480"
+  * video_fullscreen = "true"
 * retroarch_hdmi.cfg
-  *video_fullscreen_x = "1280"
-  *video_fullscreen_y = "720"
-  *video_fullscreen = "true"
+  * video_fullscreen_x = "1280"
+  * video_fullscreen_y = "720"
+  * video_fullscreen = "true"

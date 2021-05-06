@@ -47,7 +47,7 @@ Support Type:RK312A	FW Ver:8.1.00	FW Time:2021-05-04 13:50:23
 Loader ver:2.52	Loader Time:2020-05-26 18:26:07
 Upgrade firmware ok.
 ```
-* After the ```Upgrade firmware ok.``` message is displaed, the console will restart automatically with the new firmware.
+* After the ```Upgrade firmware ok.``` message is displayed, the console will restart automatically with the new firmware.
 
 # Editing existing images to enable hdmi compatibility **
 * All images should have 3 retroarch files on the retroarch.cfg folder (retroarch.cfg,retroarch_hdmi.cfg and retroarch_v3.cfg)

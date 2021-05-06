@@ -36,7 +36,7 @@ Install it at your own responsability. **This firmware is ONLY for A12 and A13 a
  * Set your Powkiddy A12/12 in flash mode (LOADER):
   * Press and hold SELECT + HOME + VOL+ while you power up your device
  * Connect a USB-A to USB-A cable to your computer
- * Flash the firmware with: ```sudo Linux_Upgrade_Tool_v1.49/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img```
+ * Flash the firmware with: ```sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img```
  * You should observe a console output similar to this:
  ```
  $ sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img 

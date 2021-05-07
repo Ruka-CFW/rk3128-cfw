@@ -11,5 +11,5 @@ Rockchip RK3128 Custom Firmware para Powkiddy A12/A13
 
 # Documentación
 
-* [Guía de instalación del Custom Firmware del Team Ruka](doc/install_es.md)
-* [How to Contribute](CONTRIBUTING.md)
+* [Guía de instalación del Custom Firmware del Team Ruka](install_es.md)
+* [How to Contribute](../CONTRIBUTING.md)

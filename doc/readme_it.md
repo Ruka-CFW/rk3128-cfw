@@ -15,3 +15,7 @@
 
 * [Installazione Ruka Custom Firmware](install_it.md)
 * [How to Contribute](CONTRIBUTING.md)
+
+## Ultima versione
+
+* [RUKA CFW v3.0 alpha](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_alpha_1)

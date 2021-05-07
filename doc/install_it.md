@@ -20,7 +20,7 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
 * [Installazione windows](#windows-installation)
 * [Installazione Linux](#linux-installation)
 * [Modificare le configurazioni esistenti per abilitare la modalità HDMI](#editing-existing-images-to-enable-hdmi-compatibility)
-  - [Configurazione Retroarch.cfg](#retroarchcfg-files)
+  - [Configurazione Retroarch.cfg](#configurazione-retroarch)
 * [Changelog](#changelog)
 
 ## Installazione windows

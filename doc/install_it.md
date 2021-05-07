@@ -17,9 +17,9 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
 
 ## Document TOC
 
-* [Installazione windows](#Installazione windows)
-* [Installazione Linux](#Installazione linux)
-* [Editing existing images to enable hdmi compatibility](#editing-existing-images-to-enable-hdmi-compatibility)
+* [Installazione windows](#windows-installation)
+* [Installazione Linux](#linux-installation)
+* [Modificare le configurazioni esistenti per abilitare la modalità HDMI](#editing-existing-images-to-enable-hdmi-compatibility)
   - [Retroarch.cfg files](#retroarchcfg-files)
 * [Changelog](#changelog)
 
@@ -72,6 +72,7 @@ Upgrade firmware ok.
 * Il sistema configurerà automaticamente la versione necessaria e farà il boot nella modalità video più consona 
 * Connettere e disconnettere il cavo HDMI non è possibile. Per avere l'HDMI funzionante bisogna connetterlo prima di accedere il device
 * Gli schermi IPS non sono ufficialmente supportati
+
 ## Files Retroarch.cfg
 * retroarch.cfg
   * video_fullscreen_x = "1024"
@@ -85,3 +86,11 @@ Upgrade firmware ok.
   * video_fullscreen_x = "1280"
   * video_fullscreen_y = "720"
   * video_fullscreen = "true"
+
+## Changelog
+
+| Modified at | Comments |Contributor |
+| ----------- | -------- | ---------- |
+| 2021-05-07  | Spostati i documenti nella cartella `doc` e formattati seguendo il template. | alpgarcia |
+| 2021-05-06  | Aggiunta installazione linux, corretti errori di ortografia. | acmeplus |
+| 2021-05-06  | Versione iniziale. | fakemaria |

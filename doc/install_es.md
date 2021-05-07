@@ -1,11 +1,11 @@
 
 ![image](https://user-images.githubusercontent.com/67930710/117461690-22bc2e80-af4e-11eb-8ac5-240f600ebe39.png)
 
-**Este documento está disponible también en Inglés**
+**Este documento está disponible en [ [en](install.md) | [es](install_es.md) ]**
 
 ------
 
-# Guia de instalación del Custom Firmware del Team Ruka 
+# Guía de instalación del Custom Firmware del Team Ruka 
 **DESCARGA DE RESPONSABILIDAD:**
 
 Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para las powkiddys A12 Y A13, todas las revisiones (la rev1, rev2 y rev3) a excepción de las pantallas IPS**. Instalando el firmware en otros dispositivos distinto a los mencionados causará un brick permanente que necesitará de herramientas y ficheros que no están aquí y tampoco tiene el equipo ni da soporte. 

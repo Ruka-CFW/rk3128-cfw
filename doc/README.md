@@ -1,6 +1,6 @@
 ![image](https://user-images.githubusercontent.com/67930710/117461690-22bc2e80-af4e-11eb-8ac5-240f600ebe39.png)
 
-**This document is available in [ [en](README.md) | [es](doc/README_ESs.md) | [it](doc/README_IT.md) ] **
+**This document is available in [ [en](README.md) | [es](README_ES.md) | [it](README_IT.md) ] **
 
 ---
 
@@ -13,5 +13,5 @@
 
 ## Documentation
 
-* [Ruka Custom Firmware Installation Guide](doc/install_it.md)
+* [Ruka Custom Firmware Installation Guide](install_it.md)
 * [How to Contribute](CONTRIBUTING.md)

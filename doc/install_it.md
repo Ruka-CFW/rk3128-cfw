@@ -34,7 +34,7 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
 
 # Modificare le configurazioni esistenti per abilitare la modalità HDMI **
 * Tutte le immagini dovrebbero avere 3 file di configurazione retroarch nella cartella di configurazione retroarch.cfg (retroarch.cfg,retroarch_hdmi.cfg e retroarch_v3.cfg)
-* Il sistema configurerà automaticamente la versione necessaria e faraà il boot nella modalità video più consona 
+* Il sistema configurerà automaticamente la versione necessaria e farà il boot nella modalità video più consona 
 * Connettere e disconnettere il cavo HDMI non è possibile. Per avere l'HDMI funzionante bisogna connetterlo prima di accedere il device
 * Gli schermi IPS non sono ufficialmente supportati
 ## Files Retroarch.cfg

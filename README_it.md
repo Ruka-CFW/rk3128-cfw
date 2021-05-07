@@ -11,7 +11,7 @@ Rockchip RK3128 Custom Firmware per Powkiddy A12/A13
 **ATTENZIONE:**
 l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO per A12 e A13 (ad eccezione delle versioni con schermo IPS che non sono supportati)**, se si prova ad installarlo su altri device si andrà incontro ad un soft brick, e sarete costretti ad usare strumenti e software non forniti qui.
 * Caricate il device in modo da avere la batteria all' 80%, o tenetelo in carica per 7 ore
-* Scaricate i drivers da qui ???
+* Scaricate i drivers da qui [RockChip repository](https://github.com/rockchip-linux/tools/blob/master/windows/DriverAssitant_v5.0.zip?raw=true)
 * Scaricate l'ultimo RKDevTool da [RockChip repository](https://github.com/rockchip-linux/tools/tree/master/windows)
 * Scaricate l'ultimo custom firmware per il vostro Powkiddy A12 / A13 da questa repository
   * Se non sapete che versione installare, considerate ceh se è un A12 sarà probabilmente una rev3, e se è un A13 sarà una rev2. **Installare una versione errata per il vostro device non rovinerà il vostro A12/A13 !!!**       

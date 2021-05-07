@@ -17,8 +17,8 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
 
 ## Document TOC
 
-* [Installazione windows](#windows-installation)
-* [Installazione Linux](#linux-installation)
+* [Installazione windows](#installazione-windows)
+* [Installazione Linux](#installazione-linux)
 * [Modificare le configurazioni esistenti per abilitare la modalità HDMI](#editing-existing-images-to-enable-hdmi-compatibility)
   - [Configurazione Retroarch.cfg](#configurazione-retroarch)
 * [Changelog](#changelog)

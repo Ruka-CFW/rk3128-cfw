@@ -1,5 +1,5 @@
 
-**This document is available in [ en ]**
+**This document is available in [ [en](install.md) | [es](install_es.md) ]**
 
 ------
 
@@ -41,7 +41,7 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 * Download latest custom firmware for your Powkiddy A12 / A13 from this repository
   * If you don´t know which version to install, if is an A12 is likely to rev3 and if is an A13 a rev2. **Install an incorrect version will not harm your A12/A13 system!!!**       
  * Extract the firmware: ```$ unzip RUKA_a12_v1_v2_3.0_alpha_20210504.img.zip```
- * Set your Powkiddy A12/12 in flash mode (LOADER):
+ * Set your Powkiddy A12/13 in flash mode (LOADER):
   * Press and hold SELECT + HOME + VOL+ while you power up your device
  * Connect a USB-A to USB-A cable to your computer
  * Flash the firmware with: ```sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img```

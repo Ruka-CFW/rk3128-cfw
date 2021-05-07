@@ -14,6 +14,17 @@ Rockchip RK3128 Custom Firmware per Powkiddy A12/A13
 
 **ATTENZIONE:**
 l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO per A12 e A13 (ad eccezione delle versioni con schermo IPS che non sono supportati)**, se si prova ad installarlo su altri device si andrà incontro ad un soft brick, e sarete costretti ad usare strumenti e software non forniti qui.
+
+## Document TOC
+
+* [Installazione windows](#Installazione windows)
+* [Installazione Linux](#Installazione linux)
+* [Editing existing images to enable hdmi compatibility](#editing-existing-images-to-enable-hdmi-compatibility)
+  - [Retroarch.cfg files](#retroarchcfg-files)
+* [Changelog](#changelog)
+
+## Installazione windows
+
 * Caricate il device in modo da avere la batteria all' 80%, o tenetelo in carica per 7 ore
 * Scaricate i drivers da qui [RockChip repository](https://github.com/rockchip-linux/tools/blob/master/windows/DriverAssitant_v5.0.zip?raw=true)
 * Scaricate l'ultimo RKDevTool da [RockChip repository](https://github.com/rockchip-linux/tools/tree/master/windows)
@@ -31,6 +42,30 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
 * Click on upgrade, the device will restart automatically and you will see this in the right of the software
 * Cliccate sul tasto upgrade, il device farà un restart automatico e apparirà sul lato destro del software una serie di messaggi di sistema
  ![image](https://user-images.githubusercontent.com/67930710/117166887-135ea900-adc7-11eb-9b39-0c9b830b5968.png)
+ 
+ ## Installazione linux
+
+* Scaricate Linux_Upgrade_Tool da [Rockchip repository](https://github.com/rockchip-linux/tools/blob/master/linux/Linux_Upgrade_Tool/Linux_Upgrade_Tool_v1.57.zip?raw=true)
+* Estrarre il tool: ```$ unzip Linux_Upgrade_Tool_v1.57.zip```
+* Scaricate il custom firmware per il Powkiddy A12 / A13 da questa repository
+  * Se non sapete che versione installare, considerate ceh se è un A12 sarà probabilmente una rev3, e se è un A13 sarà una rev2. **Installare una versione errata per il vostro device non rovinerà il vostro A12/A13 !!!**           
+ * Estrarre il firmware: ```$ unzip RUKA_a12_v1_v2_3.0_alpha_20210504.img.zip```
+ * Settate il Powkiddy A12/13 in flash mode (LOADER):
+  * Premete e tenete premuto i tasti Vol+,Home e Select mentre accendete il device
+ * Connettere il cavo USB-A to USB-A al vostro computer
+ * Flashate il firmware con: ```sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img```
+ * Dovreste avere un output simile a questo:
+ ```
+ $ sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img
+Not found config.ini
+Program Data in Linux_Upgrade_Tool_v1.57
+Loading firmware...
+Support Type:RK312A	FW Ver:8.1.00	FW Time:2021-05-04 13:50:23
+Loader ver:2.52	Loader Time:2020-05-26 18:26:07
+Upgrade firmware ok.
+```
+* Dopo il messaggio```Upgrade firmware ok.```, la console ripartirà con il nuovo firmware installato.
+ 
 
 # Modificare le configurazioni esistenti per abilitare la modalità HDMI **
 * Tutte le immagini dovrebbero avere 3 file di configurazione retroarch nella cartella di configurazione retroarch.cfg (retroarch.cfg,retroarch_hdmi.cfg e retroarch_v3.cfg)

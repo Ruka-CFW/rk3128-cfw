@@ -20,7 +20,7 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
 * [Installazione windows](#windows-installation)
 * [Installazione Linux](#linux-installation)
 * [Modificare le configurazioni esistenti per abilitare la modalità HDMI](#editing-existing-images-to-enable-hdmi-compatibility)
-  - [Retroarch.cfg files](#retroarchcfg-files)
+  - [Configurazione Retroarch.cfg](#retroarchcfg-files)
 * [Changelog](#changelog)
 
 ## Installazione windows
@@ -73,7 +73,7 @@ Upgrade firmware ok.
 * Connettere e disconnettere il cavo HDMI non è possibile. Per avere l'HDMI funzionante bisogna connetterlo prima di accedere il device
 * Gli schermi IPS non sono ufficialmente supportati
 
-## Files Retroarch.cfg
+### Configurazione Retroarch.cfg
 * retroarch.cfg
   * video_fullscreen_x = "1024"
   * video_fullscreen_y = "600"

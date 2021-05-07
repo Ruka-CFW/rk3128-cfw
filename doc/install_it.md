@@ -67,13 +67,13 @@ Upgrade firmware ok.
 * Dopo il messaggio```Upgrade firmware ok.```, la console ripartirà con il nuovo firmware installato.
  
 
-## Modificare le configurazioni esistenti per abilitare la modalità HDMI **
+## Modificare le configurazioni esistenti per abilitare la modalità HDMI
 * Tutte le immagini dovrebbero avere 3 file di configurazione retroarch nella cartella di configurazione retroarch.cfg (retroarch.cfg,retroarch_hdmi.cfg e retroarch_v3.cfg)
 * Il sistema configurerà automaticamente la versione necessaria e farà il boot nella modalità video più consona 
 * Connettere e disconnettere il cavo HDMI non è possibile. Per avere l'HDMI funzionante bisogna connetterlo prima di accedere il device
 * Gli schermi IPS non sono ufficialmente supportati
 
-### Configurazione Retroarch.cfg
+## Configurazione Retroarch.cfg
 * retroarch.cfg
   * video_fullscreen_x = "1024"
   * video_fullscreen_y = "600"

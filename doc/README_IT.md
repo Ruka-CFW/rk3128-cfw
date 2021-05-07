@@ -13,5 +13,5 @@
 
 ## Documentatione
 
-* [Ruka Custom Firmware Installation Guide](doc/install.md)
+* [Installazione Ruka Custom Firmware](doc/install_it.md)
 * [How to Contribute](CONTRIBUTING.md)

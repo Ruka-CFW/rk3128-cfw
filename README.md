@@ -2,14 +2,16 @@
 
 **This document is available in [ [en](readme.md) | [es](doc/readme_es.md) ]**
 
-Rockchip RK3128 Custom Firmware for Powkiddy A12/A13
+---
 
-# Supported Consoles:
+# Rockchip RK3128 Custom Firmware for Powkiddy A12/A13
+
+## Supported Consoles:
 
 * Powkiddy A12 (rev1, rev2, & rev3)
 * Powkiddy A13 (rev1, & rev2)
 
-# Documentation
+## Documentation
 
 * [Ruka Custom Firmware Installation Guide](doc/install.md)
 * [How to Contribute](CONTRIBUTING.md)

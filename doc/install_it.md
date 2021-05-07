@@ -20,7 +20,7 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
 * [Installazione windows](#installazione-windows)
 * [Installazione Linux](#installazione-linux)
 * [Modificare le configurazioni esistenti per abilitare la modalità HDMI](#Modificare-le-configurazioni-esistenti-per-abilitare-la-modalità-HDMI)
-  - [Configurazione Retroarch.cfg](#configurazione-retroarch.cfg)
+  - [Configurazione Retroarch.cfg](#configurazione-Retroarch.cfg)
 * [Changelog](#changelog)
 
 ## Installazione windows
@@ -67,7 +67,7 @@ Upgrade firmware ok.
 * Dopo il messaggio```Upgrade firmware ok.```, la console ripartirà con il nuovo firmware installato.
  
 
-# Modificare le configurazioni esistenti per abilitare la modalità HDMI **
+## Modificare le configurazioni esistenti per abilitare la modalità HDMI **
 * Tutte le immagini dovrebbero avere 3 file di configurazione retroarch nella cartella di configurazione retroarch.cfg (retroarch.cfg,retroarch_hdmi.cfg e retroarch_v3.cfg)
 * Il sistema configurerà automaticamente la versione necessaria e farà il boot nella modalità video più consona 
 * Connettere e disconnettere il cavo HDMI non è possibile. Per avere l'HDMI funzionante bisogna connetterlo prima di accedere il device

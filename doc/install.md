@@ -1,5 +1,5 @@
 
-**This document is available in [ [en](install.md) | [es](install_es.md) ]**
+**This document is available in [ [en](install.md) | [es](install_es.md) | [it](install_it.md) ]**
 
 ------
 

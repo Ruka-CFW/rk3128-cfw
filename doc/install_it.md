@@ -1,9 +1,6 @@
-
-![image](https://user-images.githubusercontent.com/67930710/117461690-22bc2e80-af4e-11eb-8ac5-240f600ebe39.png)
-
 Rockchip RK3128 Custom Firmware per Powkiddy A12/A13
 
-**Questo documento è disponibile in [ [en](install.md) | [es](install_es.md) ]**
+**Questo documento è disponibile in [ [en](install.md) | [es](install_es.md) | [it](install_it.md) ]**
 
 # Consoles supportate:
 

@@ -1,6 +1,6 @@
 ![image](https://user-images.githubusercontent.com/67930710/117461690-22bc2e80-af4e-11eb-8ac5-240f600ebe39.png)
 
-**This document is available in [ [en](readme.md) | [es](doc/readme_es.md) | [it](doc/readme_it.md) ]**
+**This document is available in [ [en](README.md) | [es](doc/readme_es.md) | [it](doc/readme_it.md) ]**
 
 ---
 

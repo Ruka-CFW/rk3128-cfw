@@ -48,3 +48,12 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
   * video_fullscreen_x = "1280"
   * video_fullscreen_y = "720"
   * video_fullscreen = "true"
+  * audio_device = "hw:0,1"
+
+## Changelog
+
+| Modificado el | Comentarios | Colaborador |
+| ------------- | ----------- | ----------- |
+| 2012-05-08  | Add changelog section. | alpgarcia |
+| 2021-05-08  | Add audio device configuration for HDMI. | snam11 |
+| 2021-05-07  | Initial version. | snam11 |

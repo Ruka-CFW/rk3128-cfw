@@ -82,12 +82,14 @@ Upgrade firmware ok.
   * video_fullscreen_x = "1280"
   * video_fullscreen_y = "720"
   * video_fullscreen = "true"
+  * audio_device = "hw:0,1"
 
 ## Changelog
 
 | Modificado el | Comentarios | Colaborador |
 | ------------- | ----------- | ----------- |
-| 2021-05-07  | ESP translation | fakemaria |
+| 2021-05-08  | Add audio device configuration for HDMI. | alpgarcia |
+| 2021-05-07  | ESP translation. | fakemaria |
 | 2021-05-07  | Move document into `doc` folder and format contents according to the template. | alpgarcia |
 | 2021-05-06  | Add Linux installation steps, fix typos. | acmeplus |
 | 2021-05-06  | Initial version. | fakemaria |

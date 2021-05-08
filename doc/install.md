@@ -87,6 +87,7 @@ Upgrade firmware ok.
 
 | Modified at | Comments |Contributor |
 | ----------- | -------- | ---------- |
+| 2021-05-08  | Add audio device configuration for HDMI. | snam11 |
 | 2021-05-07  | Move document into `doc` folder and format contents according to the template. | alpgarcia |
 | 2021-05-06  | Add Linux installation steps, fix typos. | acmeplus |
 | 2021-05-06  | Initial version. | fakemaria |

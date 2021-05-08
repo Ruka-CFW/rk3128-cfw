@@ -22,6 +22,9 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 * Charge the device, it needs to be at least at 80% battery or 7 hours charged
 * Download drivers here [Rockchip repository](https://github.com/rockchip-linux/tools/blob/master/windows/DriverAssitant_v5.0.zip?raw=true)
 * Download latest RKDevTool from [RockChip repository](https://github.com/rockchip-linux/tools/blob/master/windows/RKDevTool_Release_v2.79.zip?raw=true)
+  * To change the language to English, edit the config.ini file and change the value Selected=1 to Selected=2  
+   ![image](https://user-images.githubusercontent.com/67930710/117533430-1509b600-afed-11eb-8424-5f40b15c60bd.png)
+
 * Download latest custom firmware for your Powkiddy A12 / A13 from this repository
   * If you don´t know which version to install, if is an A12 is likely to rev3 and if is an A13 a rev2. **Install an incorrect version will not harm your A12/A13 system!!!**       
 * Unzip RKDevTool and click on AndroidTool.exe

@@ -48,3 +48,4 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
   * video_fullscreen_x = "1280"
   * video_fullscreen_y = "720"
   * video_fullscreen = "true"
+  * audio_device = "hw:0,1"

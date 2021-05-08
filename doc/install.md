@@ -81,6 +81,7 @@ Upgrade firmware ok.
   * video_fullscreen_x = "1280"
   * video_fullscreen_y = "720"
   * video_fullscreen = "true"
+  * audio_device = "hw:0,1"
 
 ## Changelog
 

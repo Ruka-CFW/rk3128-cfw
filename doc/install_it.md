@@ -22,7 +22,7 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
  ![image](https://user-images.githubusercontent.com/67930710/117165619-f07fc500-adc5-11eb-9441-e06df588ec70.png)
  ![image](https://user-images.githubusercontent.com/67930710/117165910-32107000-adc6-11eb-865f-fc88471f2cfb.png)
 * Once selected, please connect the usb male A to the top port of the system and plug the usb male to the pc
-* Press and hold Vol+,Home and Select. Push power button and keep holding the buttons until the software displays that the device is connected
+* Press and hold Vol+,Vol-,Home and Select. Push power button and keep holding the buttons until the software displays that the device is connected
 * Una volta selezionata, connettete il cavo usb nella porta superiore del device e connettete l'altro capo al pc
 * Premete e tenete premuto i tasti Vol+,Home e Select. Premete il tasto power e continuate a tenere premuto fino a che sul programma non appare il messaggio di device connesso in loader mode
 ![image](https://user-images.githubusercontent.com/67930710/117166647-da263900-adc6-11eb-9d1c-29bd802a3d48.png)
@@ -49,11 +49,16 @@ l'installazione è sotto la vostra responsabilità. **Questo firmware è SOLO pe
   * video_fullscreen_y = "720"
   * video_fullscreen = "true"
   * audio_device = "hw:0,1"
+  * custom_viewport_height = "600"
+  * custom_viewport_width = "1024"
+  * aspect_ratio_index = "22"
 
 ## Changelog
 
 | Modificado el | Comentarios | Colaborador |
 | ------------- | ----------- | ----------- |
+| 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |
+| 2021-05-10  | Modified button sequence to flash the device. | fakemaria |
 | 2012-05-08  | Add changelog section. | alpgarcia |
 | 2021-05-08  | Add audio device configuration for HDMI. | snam11 |
 | 2021-05-07  | Initial version. | snam11 |

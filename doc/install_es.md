@@ -33,7 +33,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
  ![image](https://user-images.githubusercontent.com/67930710/117165619-f07fc500-adc5-11eb-9441-e06df588ec70.png)
  ![image](https://user-images.githubusercontent.com/67930710/117165910-32107000-adc6-11eb-865f-fc88471f2cfb.png)
 * Una vez seleccionado y aceptado, por favor conecta el cable USB macho macho de puntas tipo A al puerto de tu ordenador y la otra punta al usb superior de tu Powkiddy
-* Pulsa y deja presionado los botonbes  Vol+,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. El software te avisará de que está conectado, tal y como aparece en las imágenes.
+* Pulsa y deja presionado los botonbes  Vol+,Vol-,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. El software te avisará de que está conectado, tal y como aparece en las imágenes.
 ![image](https://user-images.githubusercontent.com/67930710/117166647-da263900-adc6-11eb-9d1c-29bd802a3d48.png)
 * Haz click en upgrade, el dispositivo se reiniciará automáticamente cuando haya terminado
  ![image](https://user-images.githubusercontent.com/67930710/117166887-135ea900-adc7-11eb-9b39-0c9b830b5968.png)
@@ -47,7 +47,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
   
 * Extrae el firmware: ```$ unzip RUKA_a12_v1_v2_3.0_alpha_20210504.img.zip```
 * Conecta el cable USB macho macho de puntas tipo A al puerto de tu ordenador y la otra punta al usb superior de tu Powkiddy
-* Pulsa y deja presionado los botonbes  Vol+,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. 
+* Pulsa y deja presionado los botonbes  Vol+,Vol-,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. 
 * Flashea el firmware de esta manera: ```sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img```
  * El mensaje de salida será como este:
  ```
@@ -83,11 +83,16 @@ Upgrade firmware ok.
   * video_fullscreen_y = "720"
   * video_fullscreen = "true"
   * audio_device = "hw:0,1"
+  * custom_viewport_height = "600"
+  * custom_viewport_width = "1024"
+  * aspect_ratio_index = "22"
 
 ## Changelog
 
 | Modificado el | Comentarios | Colaborador |
 | ------------- | ----------- | ----------- |
+| 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |
+| 2021-05-10  | Modified button sequence to flash the device. | fakemaria |
 | 2021-05-08  | Add audio device configuration for HDMI. | alpgarcia |
 | 2021-05-07  | ESP translation. | fakemaria |
 | 2021-05-07  | Move document into `doc` folder and format contents according to the template. | alpgarcia |

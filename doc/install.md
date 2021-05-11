@@ -82,11 +82,15 @@ Upgrade firmware ok.
   * video_fullscreen_y = "720"
   * video_fullscreen = "true"
   * audio_device = "hw:0,1"
+  * custom_viewport_height = "600"
+  * custom_viewport_width = "1024"
+  * aspect_ratio_index = "22"
 
 ## Changelog
 
 | Modified at | Comments |Contributor |
 | ----------- | -------- | ---------- |
+| 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |
 | 2021-05-10  | Modified button sequence to flash the device. | fakemaria |
 | 2021-05-08  | Add audio device configuration for HDMI. | snam11 |
 | 2021-05-07  | Move document into `doc` folder and format contents according to the template. | alpgarcia |

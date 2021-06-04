@@ -19,8 +19,8 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 ## Instalación en Windows
 
 * El dispositivo debe de estar al 80% de carga o llevar al menos 7 horas cargando
-* Descarga los drivers de aquí [Rockchip repository](https://github.com/rockchip-linux/tools/blob/master/windows/DriverAssitant_v5.0.zip?raw=true)
-* Descarga la última versión de la RKDevTool desde aquí [RockChip repository](https://github.com/rockchip-linux/tools/blob/master/windows/RKDevTool_Release_v2.79.zip?raw=true)
+* Descarga los [drivers del repositorio de Rockchip](https://github.com/rockchip-linux/tools/raw/master/windows/DriverAssitant_v5.11.zip)
+* Descarga la última versión de la [RKDevTool desde el repositorio de RockChip](https://github.com/rockchip-linux/tools/raw/master/windows/RKDevTool_Release_v2.84.zip)
   * Para cambiar el idioma a inglés edita el fichero config.ini y cambia el valor Selected=1 a Selected=2 tal y como muestra la imagen
   * ![image](https://user-images.githubusercontent.com/67930710/117533473-4bdfcc00-afed-11eb-8f3f-42ff76de7f36.png)
  
@@ -40,7 +40,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 
 ## Instalación en Linux
 
-* Desgarga la utilidad Linux_Upgrade_Tool desde [Rockchip repository](https://github.com/rockchip-linux/tools/blob/master/linux/Linux_Upgrade_Tool/Linux_Upgrade_Tool_v1.57.zip?raw=true)
+* Desgarga la utilidad [Linux_Upgrade_Tool desde Rockchip repository](https://github.com/rockchip-linux/tools/raw/master/linux/Linux_Upgrade_Tool/Linux_Upgrade_Tool_v1.65.zip)
 * Extrae la utilidad: ```$ unzip Linux_Upgrade_Tool_v1.57.zip```
 * Descarga el último custom firmware para tu Powkiddy A12/A13 desde este repositorio.
   * Si no sabes que versión instalar: si es una A12 es muy probable que sea la revisión 3 y si es una A12 la revisión 2. La revisión 1 solo se vendió en los primeros meses de lanzamiento. **Instalar una versión incorrecta no dañará tu A12/A13 (por ejemplo instalar la revisión 2 en vez de la revisión 3 en una Powkiddy A12**   
@@ -91,6 +91,7 @@ Upgrade firmware ok.
 
 | Modificado el | Comentarios | Colaborador |
 | ------------- | ----------- | ----------- |
+| 2021-06-05  | Update links to rockchip tools | alpgarcia |
 | 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |
 | 2021-05-10  | Modified button sequence to flash the device. | fakemaria |
 | 2021-05-08  | Add audio device configuration for HDMI. | alpgarcia |

@@ -20,8 +20,8 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 ## Windows Installation
 
 * Charge the device, it needs to be at least at 80% battery or 7 hours charged
-* Download drivers here [Rockchip repository](https://github.com/rockchip-linux/tools/blob/master/windows/DriverAssitant_v5.0.zip?raw=true)
-* Download latest RKDevTool from [RockChip repository](https://github.com/rockchip-linux/tools/blob/master/windows/RKDevTool_Release_v2.79.zip?raw=true)
+* Download [drivers from Rockchip repository](https://github.com/rockchip-linux/tools/raw/master/windows/DriverAssitant_v5.11.zip)
+* Download latest [RKDevTool from RockChip repository](https://github.com/rockchip-linux/tools/raw/master/windows/RKDevTool_Release_v2.84.zip)
   * To change the language to English, edit the config.ini file and change the value Selected=1 to Selected=2  
    ![image](https://user-images.githubusercontent.com/67930710/117533430-1509b600-afed-11eb-8424-5f40b15c60bd.png)
 
@@ -39,7 +39,7 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 
 ## Linux Installation
 
-* Download the Linux_Upgrade_Tool from [Rockchip repository](https://github.com/rockchip-linux/tools/blob/master/linux/Linux_Upgrade_Tool/Linux_Upgrade_Tool_v1.57.zip?raw=true)
+* Download the [Linux_Upgrade_Tool from Rockchip repository](https://github.com/rockchip-linux/tools/raw/master/linux/Linux_Upgrade_Tool/Linux_Upgrade_Tool_v1.65.zip)
 * Extract the tool: ```$ unzip Linux_Upgrade_Tool_v1.57.zip```
 * Download latest custom firmware for your Powkiddy A12 / A13 from this repository
   * If you don´t know which version to install, if is an A12 is likely to rev3 and if is an A13 a rev2. **Install an incorrect version will not harm your A12/A13 system!!!**       
@@ -90,6 +90,7 @@ Upgrade firmware ok.
 
 | Modified at | Comments |Contributor |
 | ----------- | -------- | ---------- |
+| 2021-06-05  | Update links to Rockchip tools | alpgarcia |
 | 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |
 | 2021-05-10  | Modified button sequence to flash the device. | fakemaria |
 | 2021-05-08  | Add audio device configuration for HDMI. | snam11 |

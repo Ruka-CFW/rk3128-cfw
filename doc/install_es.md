@@ -3,6 +3,7 @@
 ------
 
 # Guía de instalación del Custom Firmware del Team Ruka 
+
 **DESCARGA DE RESPONSABILIDAD:**
 
 Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para las powkiddys A12 Y A13, todas las revisiones (la rev1, rev2 y rev3) a excepción de las pantallas IPS**. Instalando el firmware en otros dispositivos distinto a los mencionados causará un brick permanente que necesitará de herramientas y ficheros que no están aquí y tampoco tiene el equipo ni da soporte. 
@@ -23,7 +24,6 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 * Descarga la última versión de la [RKDevTool desde el repositorio de RockChip](https://github.com/rockchip-linux/tools/raw/master/windows/RKDevTool_Release_v2.84.zip)
   * Para cambiar el idioma a inglés edita el fichero config.ini y cambia el valor Selected=1 a Selected=2 tal y como muestra la imagen
   * ![image](https://user-images.githubusercontent.com/67930710/117533473-4bdfcc00-afed-11eb-8f3f-42ff76de7f36.png)
- 
 * Descarga el último custom firmware para tu Powkiddy A12/A13 desde este repositorio.
 * Descomprime el firmware con 7zip
   * Si no sabes que versión instalar: si es una A12 es muy probable que sea la revisión 3 y si es una A12 la revisión 2. La revisión 1 solo se vendió en los primeros meses de lanzamiento. **Instalar una versión incorrecta no dañará tu A12/A13 (por ejemplo instalar la revisión 2 en vez de la revisión 3 en una Powkiddy A12)**   
@@ -33,7 +33,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
  ![image](https://user-images.githubusercontent.com/67930710/117165619-f07fc500-adc5-11eb-9441-e06df588ec70.png)
  ![image](https://user-images.githubusercontent.com/67930710/117165910-32107000-adc6-11eb-865f-fc88471f2cfb.png)
 * Una vez seleccionado y aceptado, por favor conecta el cable USB macho macho de puntas tipo A al puerto de tu ordenador y la otra punta al usb superior de tu Powkiddy
-* Pulsa y deja presionado los botonbes  Vol+,Vol-,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. El software te avisará de que está conectado, tal y como aparece en las imágenes.
+* Pulsa y deja presionado los botonbes  Vol+,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. El software te avisará de que está conectado, tal y como aparece en las imágenes.
 ![image](https://user-images.githubusercontent.com/67930710/117166647-da263900-adc6-11eb-9d1c-29bd802a3d48.png)
 * Haz click en upgrade, el dispositivo se reiniciará automáticamente cuando haya terminado
  ![image](https://user-images.githubusercontent.com/67930710/117166887-135ea900-adc7-11eb-9b39-0c9b830b5968.png)
@@ -41,13 +41,13 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 ## Instalación en Linux
 
 * Desgarga la utilidad [Linux_Upgrade_Tool desde Rockchip repository](https://github.com/rockchip-linux/tools/raw/master/linux/Linux_Upgrade_Tool/Linux_Upgrade_Tool_v1.65.zip)
-* Extrae la utilidad: ```$ unzip Linux_Upgrade_Tool_v1.57.zip```
+* Extrae la utilidad: ```$ unzip Linux_Upgrade_Tool_v1.65.zip```
 * Descarga el último custom firmware para tu Powkiddy A12/A13 desde este repositorio.
   * Si no sabes que versión instalar: si es una A12 es muy probable que sea la revisión 3 y si es una A12 la revisión 2. La revisión 1 solo se vendió en los primeros meses de lanzamiento. **Instalar una versión incorrecta no dañará tu A12/A13 (por ejemplo instalar la revisión 2 en vez de la revisión 3 en una Powkiddy A12**   
   
 * Extrae el firmware: ```$ unzip RUKA_a12_v1_v2_3.0_alpha_20210504.img.zip```
 * Conecta el cable USB macho macho de puntas tipo A al puerto de tu ordenador y la otra punta al usb superior de tu Powkiddy
-* Pulsa y deja presionado los botonbes  Vol+,Vol-,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. 
+* Pulsa y deja presionado los botonbes  Vol+,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. 
 * Flashea el firmware de esta manera: ```sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img```
  * El mensaje de salida será como este:
  ```

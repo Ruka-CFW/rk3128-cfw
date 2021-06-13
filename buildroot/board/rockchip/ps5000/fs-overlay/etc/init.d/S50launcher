@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# Start linux launcher...
+#
+
+case "$1" in
+  start)
+    printf "Starting launcher: "
+    export LC_ALL='en_US.utf8'
+
+    export WESTON_DRM_MIRROR=0
+    export WESTON_DRM_PREFER_EXTERNAL=1
+
+    # for QLauncher wayland
+    mkdir -p /tmp/.xdg &&  chmod 0700 /tmp/.xdg
+    export XDG_RUNTIME_DIR=/tmp/.xdg
+    weston --tty=2 --idle-time=0 &
+
+    # select display, appropriate resolution
+    if [ `cat /sys/class/drm/card0-HDMI-A-1/status` == "connected" ]; then
+      ra_config="/sdcard/settings/retroarch/retroarch_hdmi.cfg"
+
+    else
+      ra_config="/sdcard/settings/retroarch/retroarch_ps5000.cfg"
+
+    fi
+
+    ( retroarch -c ${ra_config}; poweroff; ) &
+    ;;
+  stop)
+    killall weston
+    printf "stop finished"
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+esac
+exit 0

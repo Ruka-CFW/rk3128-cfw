@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+
+case "$1" in
+  start)
+    alsactl restore -f /userdata/asound.state
+
+    amixer cset name='Master Playback Volume' `cat /sys/devices/platform/adc-pot/scaled`
+    amixer cset name='HDMI Playback Volume' `cat /sys/devices/platform/adc-pot/scaled`
+
+    # select display, appropriate resolution and sound path
+    if [ `cat /sys/class/drm/card0-HDMI-A-1/status` == "connected" ]; then
+      amixer cset name='Playback Path' 'OFF'
+    else
+      amixer cset name='Playback Path' 'SPK'
+    fi
+
+    ;;
+  stop)
+    #alsactl store -f /userdata/asound.state
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+esac

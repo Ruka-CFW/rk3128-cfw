@@ -3,3 +3,5 @@ external/
 kernel/
 buildroot/dl/
 buildroot/output/
+.config*
+..config.tmp

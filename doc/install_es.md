@@ -35,11 +35,11 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 * Pulsa y deja presionado los botonbes  Vol+,Vol-,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones.
 * Abre Android_Console_Tool.exe como admin
 * Presiona 1 tal y como aparece en la imagen 
- ![image](https://user-images.githubusercontent.com/67930710/122982066-b92b9e80-d39a-11eb-954d-5a37ca561dd7.png)
+ * ![image](https://user-images.githubusercontent.com/67930710/122982066-b92b9e80-d39a-11eb-954d-5a37ca561dd7.png)
 * Escribe el siguiente comando RL 0x0 0xffffffff backup.img 
- ![image](https://user-images.githubusercontent.com/67930710/122982706-7ae2af00-d39b-11eb-9898-4276a9ad0fd9.png)
+ * ![image](https://user-images.githubusercontent.com/67930710/122982706-7ae2af00-d39b-11eb-9898-4276a9ad0fd9.png)
 * Mostrará un mensaje de error, es normal y esperado. Comprueba que tienes un fichero llamado backup.img con un tamaño aproximado de 100Mb 
- ![image](https://user-images.githubusercontent.com/67930710/122982826-a1084f00-d39b-11eb-829e-717bf4b5fb02.png)
+ * ![image](https://user-images.githubusercontent.com/67930710/122982826-a1084f00-d39b-11eb-829e-717bf4b5fb02.png)
 * Ya puedes continuar con los siguientes pasos
     
 * Descomprime el fichero RKDevTool y haz click en AndroidTool.exe

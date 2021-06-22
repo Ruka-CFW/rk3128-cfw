@@ -7,6 +7,7 @@
 **DESCARGA DE RESPONSABILIDAD:**
 
 Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para las powkiddys A12 Y A13, todas las revisiones (la rev1, rev2 y rev3) a excepción de las pantallas IPS**. Instalando el firmware en otros dispositivos distinto a los mencionados causará un brick permanente que necesitará de herramientas y ficheros que no están aquí y tampoco tiene el equipo ni da soporte. 
+**ANTES de realizar ninguna modificación haz un backup de tu CFW**
 
 
 ## Índice
@@ -27,13 +28,26 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 * Descarga el último custom firmware para tu Powkiddy A12/A13 desde este repositorio.
 * Descomprime el firmware con 7zip
   * Si no sabes que versión instalar: si es una A12 es muy probable que sea la revisión 3 y si es una A12 la revisión 2. La revisión 1 solo se vendió en los primeros meses de lanzamiento. **Instalar una versión incorrecta no dañará tu A12/A13 (por ejemplo instalar la revisión 2 en vez de la revisión 3 en una Powkiddy A12)**   
+
+**PROCESO DE BACKUP**
+* Descarga y descomprime Android Tools Console [AndroidTool_Console_v2.4.zip](https://github.com/rockchip-linux/tools/raw/master/windows/AndroidTool_Console_v2.4.zip)
+* Una vez seleccionado y aceptado, por favor conecta el cable USB macho macho de puntas tipo A al puerto de tu ordenador y la otra punta al usb superior de tu Powkiddy
+* Pulsa y deja presionado los botonbes  Vol+,Vol-,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones.
+* Abre Android_Console_Tool.exe como admin
+* Presiona 1 tal y como aparece en la imagen 
+ * ![image](https://user-images.githubusercontent.com/67930710/122982066-b92b9e80-d39a-11eb-954d-5a37ca561dd7.png)
+* Escribe el siguiente comando RL 0x0 0xffffffff backup.img 
+ * ![image](https://user-images.githubusercontent.com/67930710/122982706-7ae2af00-d39b-11eb-9898-4276a9ad0fd9.png)
+* Mostrará un mensaje de error, es normal y esperado. Comprueba que tienes un fichero llamado backup.img con un tamaño aproximado de 100Mb 
+ * ![image](https://user-images.githubusercontent.com/67930710/122982826-a1084f00-d39b-11eb-829e-717bf4b5fb02.png)
+* Ya puedes continuar con los siguientes pasos
     
 * Descomprime el fichero RKDevTool y haz click en AndroidTool.exe
 * Haz click en la pestaña Upgrade Firmware y luego en Firmware. Una ventana modal se abrirá para que selecciones el firmware del team ruka (es un fichero .img)
  ![image](https://user-images.githubusercontent.com/67930710/117165619-f07fc500-adc5-11eb-9441-e06df588ec70.png)
  ![image](https://user-images.githubusercontent.com/67930710/117165910-32107000-adc6-11eb-865f-fc88471f2cfb.png)
 * Una vez seleccionado y aceptado, por favor conecta el cable USB macho macho de puntas tipo A al puerto de tu ordenador y la otra punta al usb superior de tu Powkiddy
-* Pulsa y deja presionado los botonbes  Vol+,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. El software te avisará de que está conectado, tal y como aparece en las imágenes.
+* Pulsa y deja presionado los botonbes  Vol+,Vol-,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. El software te avisará de que está conectado, tal y como aparece en las imágenes.
 ![image](https://user-images.githubusercontent.com/67930710/117166647-da263900-adc6-11eb-9d1c-29bd802a3d48.png)
 * Haz click en upgrade, el dispositivo se reiniciará automáticamente cuando haya terminado
  ![image](https://user-images.githubusercontent.com/67930710/117166887-135ea900-adc7-11eb-9b39-0c9b830b5968.png)
@@ -91,6 +105,7 @@ Upgrade firmware ok.
 
 | Modificado el | Comentarios | Colaborador |
 | ------------- | ----------- | ----------- |
+| 2021-06-23  | Added information regarding backup | fakemaria |
 | 2021-06-05  | Update links to rockchip tools | alpgarcia |
 | 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |
 | 2021-05-10  | Modified button sequence to flash the device. | fakemaria |

@@ -6,7 +6,7 @@
 
 **DISCLAIMER:**
 Install it at your own responsibility. **This firmware is ONLY for A12 and A13 all versions (except IPS which is not supported)**, installing in other devices will cause a half brick and you will need to use tools that are not available here.
-
+**Please do a backup before installing the cfw!!!**
 
 ## Document TOC
 
@@ -24,7 +24,20 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
   * To change the language to English, edit the config.ini file and change the value Selected=1 to Selected=2  
    ![image](https://user-images.githubusercontent.com/67930710/117533430-1509b600-afed-11eb-8424-5f40b15c60bd.png)
 * Download latest custom firmware for your Powkiddy A12 / A13 from this repository
-  * If you don´t know which version to install, if is an A12 is likely to rev3 and if is an A13 a rev2. **Install an incorrect version will not harm your A12/A13 system!!!**       
+  * If you don´t know which version to install, if is an A12 is likely to rev3 and if is an A13 a rev2. **Install an incorrect version will not harm your A12/A13 system!!!**     
+
+* Backup process
+* Download and unzip Android Tools Console [AndroidTool_Console_v2.4.zip](https://github.com/fakemaria/rk3128-cfw/files/6696697/AndroidTool_Console_v2.4.zip)
+* Once selected, please connect the usb male A to the top port of the system and plug the usb male to the pc
+* Press and hold Vol+,Vol-,Home and Select. Push power button and keep holding until windows recognize it or a couple of seconds
+* Open Android_Console_Tool.exe as admin
+* If its connected as the image, press 1 ![image](https://user-images.githubusercontent.com/67930710/122982066-b92b9e80-d39a-11eb-954d-5a37ca561dd7.png)
+* Write the following sentence RL 0x0 0xffffffff backup.img ![image](https://user-images.githubusercontent.com/67930710/122982706-7ae2af00-d39b-11eb-9898-4276a9ad0fd9.png)
+* It will display an error message, is totally normal. Check that you have a backup.img with a filesize aprox of 100Mb ![image](https://user-images.githubusercontent.com/67930710/122982826-a1084f00-d39b-11eb-829e-717bf4b5fb02.png)
+* Now, you can proceed with the next steps. 
+
+**CFW INSTALL**
+
 * Unzip RKDevTool and click on AndroidTool.exe
 * Click on Upgrade Firmware tab and then on firmware. A modal window will open and you will need to select the image
  ![image](https://user-images.githubusercontent.com/67930710/117165619-f07fc500-adc5-11eb-9441-e06df588ec70.png)
@@ -89,6 +102,7 @@ Upgrade firmware ok.
 
 | Modified at | Comments |Contributor |
 | ----------- | -------- | ---------- |
+| 2021-06-23  | Added information regarding backup | fakemaria |
 | 2021-06-05  | Update links to Rockchip tools | alpgarcia |
 | 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |
 | 2021-05-10  | Modified button sequence to flash the device. | fakemaria |

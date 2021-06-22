@@ -31,9 +31,12 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 * Once selected, please connect the usb male A to the top port of the system and plug the usb male to the pc
 * Press and hold Vol+,Vol-,Home and Select. Push power button and keep holding until windows recognize it or a couple of seconds
 * Open Android_Console_Tool.exe as admin
-* If its connected as the image, press 1 ![image](https://user-images.githubusercontent.com/67930710/122982066-b92b9e80-d39a-11eb-954d-5a37ca561dd7.png)
-* Write the following sentence RL 0x0 0xffffffff backup.img ![image](https://user-images.githubusercontent.com/67930710/122982706-7ae2af00-d39b-11eb-9898-4276a9ad0fd9.png)
-* It will display an error message, is totally normal. Check that you have a backup.img with a filesize aprox of 100Mb ![image](https://user-images.githubusercontent.com/67930710/122982826-a1084f00-d39b-11eb-829e-717bf4b5fb02.png)
+* If its connected as the image, press 1 
+* ![image](https://user-images.githubusercontent.com/67930710/122982066-b92b9e80-d39a-11eb-954d-5a37ca561dd7.png)
+* Write the following sentence RL 0x0 0xffffffff backup.img 
+* ![image](https://user-images.githubusercontent.com/67930710/122982706-7ae2af00-d39b-11eb-9898-4276a9ad0fd9.png)
+* It will display an error message, is totally normal. Check that you have a backup.img with a filesize aprox of 100Mb 
+* ![image](https://user-images.githubusercontent.com/67930710/122982826-a1084f00-d39b-11eb-829e-717bf4b5fb02.png)
 * Now, you can proceed with the next steps. 
 
 **CFW INSTALL**

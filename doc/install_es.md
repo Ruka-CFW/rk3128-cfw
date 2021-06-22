@@ -30,7 +30,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
   * Si no sabes que versión instalar: si es una A12 es muy probable que sea la revisión 3 y si es una A12 la revisión 2. La revisión 1 solo se vendió en los primeros meses de lanzamiento. **Instalar una versión incorrecta no dañará tu A12/A13 (por ejemplo instalar la revisión 2 en vez de la revisión 3 en una Powkiddy A12)**   
 
 **PROCESO DE BACKUP**
-* Descarga y descomprime Android Tools Console [AndroidTool_Console_v2.4.zip](https://github.com/fakemaria/rk3128-cfw/files/6696697/AndroidTool_Console_v2.4.zip)
+* Descarga y descomprime Android Tools Console [AndroidTool_Console_v2.4.zip](https://github.com/rockchip-linux/tools/raw/master/windows/AndroidTool_Console_v2.4.zip)
 * Una vez seleccionado y aceptado, por favor conecta el cable USB macho macho de puntas tipo A al puerto de tu ordenador y la otra punta al usb superior de tu Powkiddy
 * Pulsa y deja presionado los botonbes  Vol+,Vol-,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones.
 * Abre Android_Console_Tool.exe como admin

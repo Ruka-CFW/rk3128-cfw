@@ -26,7 +26,7 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 * Download latest custom firmware for your Powkiddy A12 / A13 from this repository
   * If you don´t know which version to install, if is an A12 is likely to rev3 and if is an A13 a rev2. **Install an incorrect version will not harm your A12/A13 system!!!**     
 
-* Backup process
+**BACKUP PROCESS**
 * Download and unzip Android Tools Console [AndroidTool_Console_v2.4.zip](https://github.com/fakemaria/rk3128-cfw/files/6696697/AndroidTool_Console_v2.4.zip)
 * Once selected, please connect the usb male A to the top port of the system and plug the usb male to the pc
 * Press and hold Vol+,Vol-,Home and Select. Push power button and keep holding until windows recognize it or a couple of seconds

@@ -1,7 +1,9 @@
 **This document is available in [ [en](install.md) | [es](install_es.md) | [it](install_it.md) ]**
 
 ------
-
+**DO NOT FLASH UNTIL FURTHER NEWS**
+* There is a new version of the board that is not compatible and we are WOI*
+* We will update here *
 # Ruka Custom Firmware Installation Guide
 
 **DISCLAIMER:**

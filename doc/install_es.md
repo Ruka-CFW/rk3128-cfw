@@ -64,7 +64,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
   
 * Extrae el firmware: ```$ unzip RUKA_a12_v1_v2_3.0_alpha_20210504.img.zip```
 * Conecta el cable USB macho macho de puntas tipo A al puerto de tu ordenador y la otra punta al usb superior de tu Powkiddy
-* Pulsa y deja presionado los botonbes  Vol+,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. 
+* Pulsa y deja presionado los botonbes  Vol+,Vol-,Home y Select. Pulsa el botón de encendido mientras dejas presionado el resto de botones. 
 * Flashea el firmware de esta manera: ```sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img```
  * El mensaje de salida será como este:
  ```

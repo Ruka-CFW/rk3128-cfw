@@ -1,6 +1,5 @@
 #
-# Automatically generated file; DO NOT EDIT.
-# Buildroot 2018.02-rc3-g78763579b7-dirty Configuration
+# PS5000
 #
 
 BR2_HAVE_DOT_CONFIG=y
@@ -422,11 +421,12 @@ BR2_TARGET_TZ_INFO=y
 BR2_TARGET_TZ_ZONELIST="default"
 BR2_TARGET_LOCALTIME="Etc/UTC"
 BR2_ROOTFS_USERS_TABLES=""
-BR2_ROOTFS_OVERLAY="board/rockchip/common/base board/rockchip/ruka-base/fs-overlay/ board/rockchip/powkiddy_a12/fs-overlay/"
+BR2_ROOTFS_OVERLAY="board/rockchip/common/base board/rockchip/ruka-base/fs-overlay/ board/rockchip/ps5000/fs-overlay/ board/rockchip/ruka-base/fs-overlay-ext/"
 BR2_ROOTFS_POST_BUILD_SCRIPT="build/post.sh"
 BR2_ROOTFS_POST_FAKEROOT_SCRIPT=""
 BR2_ROOTFS_POST_IMAGE_SCRIPT="board/rockchip/ruka-base/ruka_post_image.sh"
-BR2_ROOTFS_POST_SCRIPT_ARGS="powkiddy_a12"
+BR2_ROOTFS_POST_SCRIPT_ARGS="ps5000"
+
 
 #
 # Kernel

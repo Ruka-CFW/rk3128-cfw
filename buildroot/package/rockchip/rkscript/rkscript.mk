@@ -33,7 +33,7 @@ define RKSCRIPT_INSTALL_TARGET_CMDS
 	$(INSTALL) -m 0755 -D $(@D)/resize-helper $(TARGET_DIR)/usr/bin/
 	$(INSTALL) -m 0755 -D $(@D)/S21mountall.sh $(TARGET_DIR)/etc/init.d/
 #	$(INSTALL) -m 0755 -D $(@D)/S22resize-disk $(TARGET_DIR)/etc/init.d/
-	$(INSTALL) -m 0755 -D $(@D)/S50usbdevice $(TARGET_DIR)/etc/init.d/
+	$(INSTALL) -m 0755 -D $(@D)/S49usbdevice $(TARGET_DIR)/etc/init.d/
 	$(INSTALL) -m 0755 -D $(@D)/S51n4 $(TARGET_DIR)/etc/init.d/
 	$(INSTALL) -m 0755 -D $(@D)/usbdevice $(TARGET_DIR)/usr/bin/
 	$(INSTALL) -m 0755 -D $(@D)/waylandtest.sh $(TARGET_DIR)/usr/bin/

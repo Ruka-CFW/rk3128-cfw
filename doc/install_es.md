@@ -2,8 +2,10 @@
 
 ------
 
-**NO FLASHEES HASTA TENER NUEVAS NOTICIAS**
-* HAY UNA NUEVA REVISIÓN DE LA PLACA Y ESTAMOS TRABAJANDO EN ELLA
+
+**TODAS LAS PLACAS COMPATIBLES, INCLUIDA LA RECIENTE REV D**
+* Para todos, instalad primero el firmware Rev D. Si eso no funciona, entonced instalad Rev A o B. 
+* El Team Ruka quiere dar las gracias a @albertolega, @TheDreamer000 and todos los chicos que han testeado y cepillado sus sistemas para hacer esta placa rev d compatible con el Ruka CFW
 
 # Guía de instalación del Custom Firmware del Team Ruka 
 
@@ -23,6 +25,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 
 ## Instalación en Windows
 
+* Para todos, instalad primero el firmware Rev D. Si eso no funciona, entonced instalad Rev A o B. 
 * El dispositivo debe de estar al 80% de carga o llevar al menos 7 horas cargando
 * Descarga los [drivers del repositorio de Rockchip](https://github.com/rockchip-linux/tools/raw/master/windows/DriverAssitant_v5.11.zip)
 * Descarga la última versión de la [RKDevTool desde el repositorio de RockChip](https://github.com/rockchip-linux/tools/raw/master/windows/RKDevTool_Release_v2.84.zip)
@@ -44,7 +47,9 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 * Mostrará un mensaje de error, es normal y esperado. Comprueba que tienes un fichero llamado backup.img con un tamaño aproximado de 100Mb 
  * ![image](https://user-images.githubusercontent.com/67930710/122982826-a1084f00-d39b-11eb-829e-717bf4b5fb02.png)
 * Ya puedes continuar con los siguientes pasos
-    
+
+**INSTALACIÓN CFW**
+* Para todos, instalad primero el firmware Rev D. Si eso no funciona, entonced instalad Rev A o B.     
 * Descomprime el fichero RKDevTool y haz click en AndroidTool.exe
 * Haz click en la pestaña Upgrade Firmware y luego en Firmware. Una ventana modal se abrirá para que selecciones el firmware del team ruka (es un fichero .img)
  ![image](https://user-images.githubusercontent.com/67930710/117165619-f07fc500-adc5-11eb-9441-e06df588ec70.png)
@@ -108,6 +113,7 @@ Upgrade firmware ok.
 
 | Modificado el | Comentarios | Colaborador |
 | ------------- | ----------- | ----------- |
+| 2021-07-26  | Added Rev D compatibility | fakemaria |
 | 2021-06-23  | Added information regarding backup | fakemaria |
 | 2021-06-05  | Update links to rockchip tools | alpgarcia |
 | 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |

@@ -1,9 +1,9 @@
 **This document is available in [ [en](install.md) | [es](install_es.md) | [it](install_it.md) ]**
 
 ------
-**DO NOT FLASH UNTIL FURTHER NEWS**
-* There is a new version of the board that is not compatible and we are WOI*
-* We will update here *
+**ALL BOARDS ARE NOW COMPATIBLE, INCLUDING LATEST REV D**
+* Please install first Rev D firmware. If that didn´t work, install Rev A or B. 
+* Team Ruka want to give thanks to @albertolega, @TheDreamer000 and all the guys who tested and half-bricked their systems to make this new rev d compatible with Ruka CFW
 # Ruka Custom Firmware Installation Guide
 
 **DISCLAIMER:**

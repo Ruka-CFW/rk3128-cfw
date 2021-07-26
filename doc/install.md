@@ -27,7 +27,7 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
    ![image](https://user-images.githubusercontent.com/67930710/117533430-1509b600-afed-11eb-8424-5f40b15c60bd.png)
 * Download latest custom firmware for your Powkiddy A12 / A13 from this repository
   * If you don´t know which version to install, if is an A12 is likely to rev3 and if is an A13 a rev2. **Install an incorrect version will not harm your A12/A13 system!!!**     
-
+* Please install first Rev D firmware. If that didn´t work, install Rev A or B. 
 **BACKUP PROCESS**
 * Download and unzip Android Tools Console [AndroidTool_Console_v2.4.zip](https://github.com/rockchip-linux/tools/raw/master/windows/AndroidTool_Console_v2.4.zip)
 * Once selected, please connect the usb male A to the top port of the system and plug the usb male to the pc
@@ -42,7 +42,7 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 * Now, you can proceed with the next steps. 
 
 **CFW INSTALL**
-
+* Please install first Rev D firmware. If that didn´t work, install Rev A or B. 
 * Unzip RKDevTool and click on AndroidTool.exe
 * Click on Upgrade Firmware tab and then on firmware. A modal window will open and you will need to select the image
  ![image](https://user-images.githubusercontent.com/67930710/117165619-f07fc500-adc5-11eb-9441-e06df588ec70.png)
@@ -107,6 +107,7 @@ Upgrade firmware ok.
 
 | Modified at | Comments |Contributor |
 | ----------- | -------- | ---------- |
+| 2021-07-26  | Added Rev D compatibility | fakemaria |
 | 2021-06-23  | Added information regarding backup | fakemaria |
 | 2021-06-05  | Update links to Rockchip tools | alpgarcia |
 | 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |

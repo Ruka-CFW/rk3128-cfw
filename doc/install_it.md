@@ -5,7 +5,7 @@ Rockchip RK3128 Custom Firmware per Powkiddy A12/A13
 
 # Consoles supportate:
 
-* Powkiddy A12 rev1 rev2 rev3
+* Powkiddy A12 reva revb revc rev d
 * Powkiddy A13 rev1 rev2
 
 # Come installare
@@ -96,6 +96,7 @@ Upgrade firmware ok.
 
 | Modificado el | Comentarios | Colaborador |
 | ------------- | ----------- | ----------- |
+| 2021-07-26  | Added Rev D compatibility | fakemaria |
 | 2012-06-05  | Update links to rockchip repository | alpgarcia | 
 | 2021-05-11  | Added viewport and aspect ratio to core provided in hdmi config | fakemaria |
 | 2021-05-10  | Modified button sequence to flash the device. | fakemaria |

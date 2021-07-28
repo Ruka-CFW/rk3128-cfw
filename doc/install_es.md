@@ -27,7 +27,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 
 * Para todos, instalad primero el firmware Rev D. Si eso no funciona, entonced instalad Rev A o B. 
 * El dispositivo debe de estar al 80% de carga o llevar al menos 7 horas cargando
-* Descarga los [drivers del repositorio de Rockchip](https://github.com/rockchip-linux/tools/raw/master/windows/DriverAssitant_v5.11.zip)
+* Descarga los [drivers del repositorio de Rockchip e instalalos](https://github.com/rockchip-linux/tools/raw/master/windows/DriverAssitant_v5.11.zip)
 * Descarga la última versión de la [RKDevTool desde el repositorio de RockChip](https://github.com/rockchip-linux/tools/raw/master/windows/RKDevTool_Release_v2.84.zip)
   * Para cambiar el idioma a inglés edita el fichero config.ini y cambia el valor Selected=1 a Selected=2 tal y como muestra la imagen
   * ![image](https://user-images.githubusercontent.com/67930710/117533473-4bdfcc00-afed-11eb-8f3f-42ff76de7f36.png)

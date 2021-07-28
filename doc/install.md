@@ -21,7 +21,7 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 ## Windows Installation
 
 * Charge the device, it needs to be at least at 80% battery or 7 hours charged
-* Download [drivers from Rockchip repository](https://github.com/rockchip-linux/tools/raw/master/windows/DriverAssitant_v5.11.zip)
+* Download [drivers from Rockchip repository and install it](https://github.com/rockchip-linux/tools/raw/master/windows/DriverAssitant_v5.11.zip)
 * Download latest [RKDevTool from RockChip repository](https://github.com/rockchip-linux/tools/raw/master/windows/RKDevTool_Release_v2.84.zip)
   * To change the language to English, edit the config.ini file and change the value Selected=1 to Selected=2  
    ![image](https://user-images.githubusercontent.com/67930710/117533430-1509b600-afed-11eb-8424-5f40b15c60bd.png)

@@ -1,0 +1,96 @@
+#!/bin/sh
+#
+# Start system from SD card
+#
+
+#
+# Display error and power off
+# Initialize the framebuffer, display an image, wait for 5 seconds,
+# and power off the system.
+#
+# The image path is automatically completed with a proper suffix
+# according to the screen resolution. Valid suffixes are:
+#   - _ps5k.png (for 960x544p).
+#   - _revAB.png (for 1024x600p).
+#   - _revCD.png (for 800x480xp).
+#   - _720p.png (for 1280x720p).
+#
+# Parameters:
+#   - image path: only the common part, suffix is added automatically
+#                 as explained above.
+the_end() {
+
+    # TODO we need splash for each console and for no rootfs
+    # TODO review execution order of S50usbdevices
+
+    image=$1
+
+    modes_files=`find /sys/ -name "modes" 2>/dev/null`
+    fb_params=`for f in $modes_files; do cat $f | grep "U:" && echo $f; done`
+    mode=`echo $fb_params | cut -d' ' -f1`
+    fb_path=`echo $fb_params | cut -d' ' -f2 | sed 's/.$//'`
+
+    case "$mode" in
+      U:960x544p-0)
+        image="${image}_ps5k.png" ;;
+      U:1024x600p-0)
+        image="${image}_revAB.png" ;;
+      U:800x480p-0)
+        image="${image}_revCD.png" ;;
+      U:1280x720p-0)
+        image="${image}_720p.png" ;;
+    esac
+
+    # First initialize the framebuffer
+    echo $mode > $fb_path
+    # Display error message
+    fbv -i $image &
+    # Wait 5 seconds before power off the system
+    sleep 5
+    poweroff
+    exit 1
+}
+
+case "$1" in
+  start)
+
+    # Check SD card availability
+    mountpoint -q /mnt/sdcard || the_end "/usr/local/share/ruka/img/no_sdcard"
+
+    # Check external rootfs availability
+    if [ ! -f /mnt/sdcard/rootfs.img ]; then
+      the_end "/usr/local/share/ruka/img/no_rootfs"
+    fi
+
+    # install loop kernel module
+    insmod /lib/modules/loop.ko
+
+    # Create external rootfs and tmp mountpoints
+    mkdir /tmp/rootfs
+    mkdir /tmp/tmp
+
+    # Mount rootfs into /tmp/rootfs
+    mount /mnt/sdcard/rootfs.img /tmp/rootfs &>/mnt/sdcard/mount-rootfs.log
+
+    # Bind / system mountpoints to the chroot
+    # mount -t proc /proc /tmp/rootfs/proc
+    # mount -o bind /dev /tmp/rootfs/dev
+    # mount -o bind /dev/pts /tmp/rootfs/dev/pts
+    # mount -o bind /dev/input /tmp/rootfs/dev/input
+    # mount -o bind /sys /tmp/rootfs/sys
+    # mount -o bind /tmp/tmp /tmp/rootfs/tmp
+    # mount -o bind /mnt/sdcard /tmp/rootfs/mnt/sdcard
+    # mount -o bind /userdata /tmp/rootfs/userdata
+
+    # launch external system
+    /tmp/rootfs/usr/local/share/ruka/scripts/usb.sh &> /mnt/sdcard/logs/usb.sh
+    ;;
+  stop)
+    printf "stop finished"
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+esac
+exit 0

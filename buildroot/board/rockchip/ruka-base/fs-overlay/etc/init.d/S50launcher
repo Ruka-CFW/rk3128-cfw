@@ -88,9 +88,7 @@ case "$1" in
     if [ -f /mnt/sdcard/usb.sh ]; then
       /mnt/sdcard/usb.sh 
     else 
-      chroot /tmp/rootfs /etc/init.d/S10udev stop
-      chroot /tmp/rootfs /etc/init.d/S10udev start
-      chroot /tmp/rootfs /usr/local/share/ruka/scripts/usb.sh 
+      /usr/local/share/ruka/scripts/usb.sh 
     fi
     ;;
   stop)

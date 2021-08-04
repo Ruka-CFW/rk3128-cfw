@@ -1,5 +1,10 @@
 #!/bin/sh
 
+ROOTPATH=/tmp/rootfs
+
+export LD_LIBRARY_PATH=$ROOTPATH/lib:$ROOTPATH/usr/lib:$LD_LIBRARY_PATH
+export PATH=$ROOTPATH/bin:$ROOTPATH/usr/bin:$ROOTPATH/sbin:$ROOTPATH/usr/sbin:$PATH
+
 export LC_ALL='en_US.utf8'
 export WESTON_DRM_MIRROR=0
 export WESTON_DRM_PREFER_EXTERNAL=1

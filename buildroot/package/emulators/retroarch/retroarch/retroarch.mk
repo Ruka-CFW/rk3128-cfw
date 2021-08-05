@@ -3,16 +3,16 @@
 # retroarch
 #
 ################################################################################
-# Version.: Release on Jul 26, 2021
+# Version.: Commits on Aug 09, 2020
 RETROARCH_VERSION = v1.9.7
 RETROARCH_SITE = $(call github,libretro,RetroArch,$(RETROARCH_VERSION))
 RETROARCH_LICENSE = GPLv3+
-RETROARCH_DEPENDENCIES = host-pkgconf dejavu flac
+RETROARCH_DEPENDENCIES = host-pkgconf dejavu flac 
 # install in staging for debugging (gdb)
 RETROARCH_INSTALL_STAGING = YES
 
 RETROARCH_CONF_OPTS = --disable-oss --enable-zlib --disable-qt --enable-threads --enable-ozone --enable-xmb --disable-discord
-RETROARCH_CONF_OPTS += --enable-flac --enable-lua --enable-networking --enable-translate --enable-rgui --disable-cdrom --disable-wayland
+RETROARCH_CONF_OPTS += --enable-flac --enable-lua --enable-networking --enable-translate --enable-rgui --disable-cdrom --enable-wayland
 
 RETROARCH_TARGET_CFLAGS += -DMESA_EGL_NO_X11_HEADERS -DEGL_NO_X11
 
@@ -50,12 +50,12 @@ endif
 
 # x86 : no option
 
-ifeq ($(BR2_PACKAGE_XORG7),y)
-	RETROARCH_CONF_OPTS += --enable-x11
-	RETROARCH_DEPENDENCIES += xserver_xorg-server
-else
+#ifeq ($(BR2_PACKAGE_XORG7),y)
+#	RETROARCH_CONF_OPTS += --enable-x11
+#	RETROARCH_DEPENDENCIES += xserver_xorg-server
+#else
 	RETROARCH_CONF_OPTS += --disable-x11
-endif
+#endif
 
 ifeq ($(BR2_PACKAGE_ALSA_LIB),y)
 	RETROARCH_CONF_OPTS += --enable-alsa
@@ -107,7 +107,7 @@ else
 	RETROARCH_CONF_OPTS += --disable-freetype
 endif
 
-ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_RK3326_ANY),y)
+ifeq ($(BR2_PACKAGE_BATOCERA_TARGET_ODROIDGOA),y)
 	RETROARCH_CONF_OPTS += --enable-odroidgo2
 	RETROARCH_DEPENDENCIES += librga
 endif
@@ -133,7 +133,7 @@ define RETROARCH_CONFIGURE_CMDS
 		$(TARGET_CONFIGURE_ARGS) \
 		$(TARGET_CONFIGURE_OPTS) \
 		CFLAGS="$(TARGET_CFLAGS) $(RETROARCH_TARGET_CFLAGS)" \
-		LDFLAGS="$(TARGET_LDFLAGS) -lc" \
+		LDFLAGS="$(TARGET_LDFLAGS) -lc -lwayland-client" \
 		CROSS_COMPILE="$(HOST_DIR)/usr/bin/" \
 		./configure \
 		--prefix=/usr \

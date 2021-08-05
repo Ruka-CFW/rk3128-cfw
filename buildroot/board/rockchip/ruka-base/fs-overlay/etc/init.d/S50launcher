@@ -69,6 +69,9 @@ case "$1" in
     mkdir /tmp/rootfs
     mkdir /tmp/tmp
     mkdir /tmp/run
+    if [ ! -d /userdata/run ]; then
+      mkdir /userdata/run
+    fi
 
     # Mount rootfs into /tmp/rootfs
     mount /mnt/sdcard/rootfs.img /tmp/rootfs 
@@ -80,15 +83,19 @@ case "$1" in
     mount -o bind /dev/input /tmp/rootfs/dev/input
     mount -o bind /sys /tmp/rootfs/sys
     mount -o bind /tmp/tmp /tmp/rootfs/tmp
-    mount -o bind /tmp/run /tmp/rootfs/run
+    mount -o bind /userdata/run /tmp/rootfs/run
     mount -o bind /mnt/sdcard /tmp/rootfs/mnt/sdcard
     mount -o bind /userdata /tmp/rootfs/userdata
     
     # launch external system
     if [ -f /mnt/sdcard/usb.sh ]; then
       /mnt/sdcard/usb.sh 
-    else 
-      /usr/local/share/ruka/scripts/usb.sh 
+    else
+      if [ ! -d /userdata/run/udev ]; then
+        chroot /tmp/rootfs /etc/init.d/S10udev stop
+        chroot /tmp/rootfs /etc/init.d/S10udev start
+      fi
+      chroot /tmp/rootfs /usr/local/share/ruka/scripts/usb.sh 
     fi
     ;;
   stop)

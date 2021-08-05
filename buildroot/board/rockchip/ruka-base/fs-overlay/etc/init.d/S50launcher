@@ -65,13 +65,23 @@ case "$1" in
     # install loop kernel module
     insmod /lib/modules/loop.ko
 
-    # Create external rootfs and tmp mountpoints
-    mkdir /tmp/rootfs
-    mkdir /tmp/tmp
-    mkdir /tmp/run
+    # Create /run mount point needed for udev
     if [ ! -d /userdata/run ]; then
       mkdir /userdata/run
     fi
+
+    # Create /tmp folder in userdata partition
+    if [ ! -d /userdata/tmp ]; then
+      mkdir /userdata/tmp
+    fi
+
+    # Make sure userdata/system points to /mnt/sdcard
+    if [ ! -d /userdata/system ];then
+      ln -s /mnt/sdcard /userdata/system
+    fi
+
+    # Create external rootfs and tmp mountpoints
+    mkdir /tmp/rootfs
 
     # Mount rootfs into /tmp/rootfs
     mount /mnt/sdcard/rootfs.img /tmp/rootfs 
@@ -82,7 +92,7 @@ case "$1" in
     mount -o bind /dev/pts /tmp/rootfs/dev/pts
     mount -o bind /dev/input /tmp/rootfs/dev/input
     mount -o bind /sys /tmp/rootfs/sys
-    mount -o bind /tmp/tmp /tmp/rootfs/tmp
+    mount -o bind /userdata/tmp /tmp/rootfs/tmp
     mount -o bind /userdata/run /tmp/rootfs/run
     mount -o bind /mnt/sdcard /tmp/rootfs/mnt/sdcard
     mount -o bind /userdata /tmp/rootfs/userdata
@@ -92,6 +102,8 @@ case "$1" in
       /mnt/sdcard/usb.sh 
     else
       if [ ! -d /userdata/run/udev ]; then
+	# We need to re-initialize udev after switching to chroot
+	# TODO need to confirm that doing it once is ok
         chroot /tmp/rootfs /etc/init.d/S10udev stop
         chroot /tmp/rootfs /etc/init.d/S10udev start
       fi

@@ -15,6 +15,9 @@ weston --tty=2 --idle-time=0 &
 
 sleep 2
 
+# Reload input event daemon (needed after chroot)
+/etc/init.d/S99input-event-daemon reload
+
 export RA_CONFIG_FOLDER=/mnt/sdcard/configs/ruka
 
 if [ `cat /sys/class/drm/card0-HDMI-A-1/status` == "connected" ]; then

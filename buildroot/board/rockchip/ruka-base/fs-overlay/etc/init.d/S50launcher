@@ -58,7 +58,7 @@ case "$1" in
     mountpoint -q /mnt/sdcard || the_end "/usr/local/share/ruka/img/no_sdcard"
 
     # Check external rootfs availability
-    if [ ! -f /mnt/sdcard/rootfs.img ]; then
+    if [ ! -f /mnt/sdcard/rukafs ]; then
       the_end "/usr/local/share/ruka/img/no_rootfs"
     fi
 
@@ -84,7 +84,7 @@ case "$1" in
     mkdir /tmp/rootfs
 
     # Mount rootfs into /tmp/rootfs
-    mount /mnt/sdcard/rootfs.img /tmp/rootfs 
+    mount /mnt/sdcard/rukafs /tmp/rootfs 
 
     # Bind / system mountpoints to the chroot
     mount -t proc /proc /tmp/rootfs/proc

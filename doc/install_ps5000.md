@@ -1,4 +1,4 @@
-**This document is available in [ [en](install_ps5000.md) | [es](install_es_ps5000.md) | [it](install_it_ps5000.md) ]**
+**This document is available in [ [en](install_ps5000.md) ]**
 
 # Ruka Custom Firmware Installation Guide for PS5000
 
@@ -39,7 +39,7 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 * Copy the content of the folder ```ruka_cfw_3.0_beta_1_20210806\firmware``` inside Android Tools Console
 * ![image](https://user-images.githubusercontent.com/67930710/126566257-a81893eb-aa70-45fe-9bb7-ecc26473f2ed.png)
 * Set your PS5000 in flash mode (LOADER)
- * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
+  * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
 * Double click on the file ```ruka_install_ps5000.bat```  
 * Allow admin privileges when windows ask for it, it will happen twice.
 * Once finished, you can switch off the system and enjoy it!

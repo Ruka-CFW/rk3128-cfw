@@ -36,8 +36,8 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 
 **CFW INSTALL**
 
-* Copy the content of the folder ```ruka_cfw_3.0_beta_1_20210806\firmware``` inside Android Tools Console
-* ![image](https://user-images.githubusercontent.com/67930710/126566257-a81893eb-aa70-45fe-9bb7-ecc26473f2ed.png)
+* Copy the folder ```ruka_cfw_3.0_beta_1_20210806\firmware``` inside Android Tools Console
+* ![image](https://user-images.githubusercontent.com/67930710/128572776-2a181080-9357-461c-8af0-91febb589360.png)
 * Set your PS5000 in flash mode (LOADER)
   * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
 * Double click on the file ```ruka_install_ps5000.bat```  

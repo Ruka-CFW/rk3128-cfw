@@ -4,14 +4,14 @@
 #
 ################################################################################
 # Version.: Commits on Aug 09, 2020
-RETROARCH_VERSION = v1.9.1
+RETROARCH_VERSION = v1.9.7
 RETROARCH_SITE = $(call github,libretro,RetroArch,$(RETROARCH_VERSION))
 RETROARCH_LICENSE = GPLv3+
 RETROARCH_DEPENDENCIES = host-pkgconf dejavu flac 
 # install in staging for debugging (gdb)
 RETROARCH_INSTALL_STAGING = YES
 
-RETROARCH_CONF_OPTS = --disable-oss --enable-zlib --disable-qt --enable-threads --enable-ozone --enable-xmb --disable-discord --disable-git_version
+RETROARCH_CONF_OPTS = --disable-oss --enable-zlib --disable-qt --enable-threads --enable-ozone --enable-xmb --disable-discord
 RETROARCH_CONF_OPTS += --enable-flac --enable-lua --enable-networking --enable-translate --enable-rgui --disable-cdrom --enable-wayland
 
 RETROARCH_TARGET_CFLAGS += -DMESA_EGL_NO_X11_HEADERS -DEGL_NO_X11

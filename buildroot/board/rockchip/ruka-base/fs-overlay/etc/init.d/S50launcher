@@ -58,32 +58,57 @@ case "$1" in
     mountpoint -q /mnt/sdcard || the_end "/usr/local/share/ruka/img/no_sdcard"
 
     # Check external rootfs availability
-    if [ ! -f /mnt/sdcard/rootfs.img ]; then
+    if [ ! -f /mnt/sdcard/rukafs ]; then
       the_end "/usr/local/share/ruka/img/no_rootfs"
     fi
 
     # install loop kernel module
     insmod /lib/modules/loop.ko
 
+    # Create /run mount point needed for udev
+    if [ ! -d /userdata/run ]; then
+      mkdir /userdata/run
+    fi
+
+    # Create /tmp folder in userdata partition
+    if [ ! -d /userdata/tmp ]; then
+      mkdir /userdata/tmp
+    fi
+
+    # Make sure userdata/system points to /mnt/sdcard
+    if [ ! -d /userdata/system ];then
+      ln -s /mnt/sdcard /userdata/system
+    fi
+
     # Create external rootfs and tmp mountpoints
     mkdir /tmp/rootfs
-    mkdir /tmp/tmp
 
     # Mount rootfs into /tmp/rootfs
-    mount /mnt/sdcard/rootfs.img /tmp/rootfs &>/mnt/sdcard/mount-rootfs.log
+    mount /mnt/sdcard/rukafs /tmp/rootfs 
 
     # Bind / system mountpoints to the chroot
-    # mount -t proc /proc /tmp/rootfs/proc
-    # mount -o bind /dev /tmp/rootfs/dev
-    # mount -o bind /dev/pts /tmp/rootfs/dev/pts
-    # mount -o bind /dev/input /tmp/rootfs/dev/input
-    # mount -o bind /sys /tmp/rootfs/sys
-    # mount -o bind /tmp/tmp /tmp/rootfs/tmp
-    # mount -o bind /mnt/sdcard /tmp/rootfs/mnt/sdcard
-    # mount -o bind /userdata /tmp/rootfs/userdata
-
+    mount -t proc /proc /tmp/rootfs/proc
+    mount -o bind /dev /tmp/rootfs/dev
+    mount -o bind /dev/pts /tmp/rootfs/dev/pts
+    mount -o bind /dev/input /tmp/rootfs/dev/input
+    mount -o bind /sys /tmp/rootfs/sys
+    mount -o bind /userdata/tmp /tmp/rootfs/tmp
+    mount -o bind /userdata/run /tmp/rootfs/run
+    mount -o bind /mnt/sdcard /tmp/rootfs/mnt/sdcard
+    mount -o bind /userdata /tmp/rootfs/userdata
+    
     # launch external system
-    /tmp/rootfs/usr/local/share/ruka/scripts/usb.sh &> /mnt/sdcard/logs/usb.sh
+    if [ -f /mnt/sdcard/usb.sh ]; then
+      /mnt/sdcard/usb.sh 
+    else
+      if [ ! -d /userdata/run/udev ]; then
+	# We need to re-initialize udev after switching to chroot
+	# TODO need to confirm that doing it once is ok
+        chroot /tmp/rootfs /etc/init.d/S10udev stop
+        chroot /tmp/rootfs /etc/init.d/S10udev start
+      fi
+      chroot /tmp/rootfs /usr/local/share/ruka/scripts/usb.sh 
+    fi
     ;;
   stop)
     printf "stop finished"

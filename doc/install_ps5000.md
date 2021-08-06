@@ -22,9 +22,9 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 * Download latest custom firmware for your PS5000 from this repository
   
 **BACKUP PROCESS**
-* Unzip Android Tools Console 
+* Unzip Android Tools Console into the firmware folder (e.g. ruka_cfw_3.0_beta_1_20210806)
 * Once selected, please connect the usb to the left usb port of the system and plug the usb male to the pc
-* Press and hold Select, Start and Vol+. Turn on the system and keep holding until windows recognize it or a couple of seconds
+* Press and hold SELECT key. Turn on the system and keep holding until windows recognize it or a couple of seconds
 * Open Android_Console_Tool.exe as admin
 * If its connected as the image, press 1 
 * ![image](https://user-images.githubusercontent.com/67930710/122982066-b92b9e80-d39a-11eb-954d-5a37ca561dd7.png)
@@ -36,38 +36,55 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 
 **CFW INSTALL**
 
-* Copy the content of the folder ```Ruka 3.0 RC1 for PS5000``` inside Android Tools Console
+* Copy the content of the folder ```ruka_cfw_3.0_beta_1_20210806\firmware``` inside Android Tools Console
 * ![image](https://user-images.githubusercontent.com/67930710/126566257-a81893eb-aa70-45fe-9bb7-ecc26473f2ed.png)
 * Set your PS5000 in flash mode (LOADER)
- * Press and hold Select, Start and Vol+. Turn on the system and keep holding until windows recognize it or a couple of seconds
-* Double click on the file ```ps5000 ruka flash.bat```  
+ * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
+* Double click on the file ```ruka_install_ps5000.bat```  
 * Allow admin privileges when windows ask for it, it will happen twice.
 * Once finished, you can switch off the system and enjoy it!
 
 ## Linux Installation
 
 * Download the [Linux_Upgrade_Tool from Rockchip repository](https://github.com/rockchip-linux/tools/raw/master/linux/Linux_Upgrade_Tool/Linux_Upgrade_Tool_v1.65.zip)
-* Extract the tool: ```$ unzip Linux_Upgrade_Tool_v1.65.zip```
-* Download latest custom firmware for your PS5000 from this repository
+* Extract the tool: 
+```$ unzip Linux_Upgrade_Tool_v1.65.zip
+  Archive:  Linux_Upgrade_Tool_v1.65.zip
+   creating: Linux_Upgrade_Tool_v1.65/
+  inflating: Linux_Upgrade_Tool_v1.65/config.ini  
+  inflating: Linux_Upgrade_Tool_v1.65/Linux┐к╖в╣д╛▀╩╣╙├╩╓▓с_v1.32.pdf  
+  inflating: Linux_Upgrade_Tool_v1.65/revision.txt  
+  inflating: Linux_Upgrade_Tool_v1.65/upgrade_tool 
+```
+* Make sure the upgrade tool is an executable: ```chmod +x Linux_Upgrade_Tool_v1.65\upgrade_tool```
+* Download latest custom firmware for your PS5000 from this repository ()
     
- * Extract the firmware: ```$ unzip RUKA_a12_v1_v2_3.0_alpha_20210504.img.zip```
+ * Extract the firmware: ```$ tar xzf ruka_cfw_3.0_beta_1_20210806.tgz```
 
 * Set your PS5000 in flash mode (LOADER)
- * Press and hold Select, Start and Vol+. Turn on the system and keep holding until windows recognize it or a couple of seconds
+ * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
  * Connect a USB-B to the top left port and the USB-A cable to your computer
- * Flash the firmware with: ```sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img```
- * Flash each file with: 
-  * ```sudo Linux_Upgrade_Tool_v1.57/upgrade_tool WL 0x00003800 boot.img```
-  * ```sudo Linux_Upgrade_Tool_v1.57/upgrade_tool WL 0x00008000 rootfs.img``` 
+ * Open a terminal and run the ```ruka_install_ps5000.sh``` script (you will need to be sudo or root to run it) 
  * You should observe a console output similar to this:
  ```
- $ sudo Linux_Upgrade_Tool_v1.57/upgrade_tool uf RUKA_a12_v1_v2_3.0_alpha_20210504.img
-Not found config.ini
-Program Data in Linux_Upgrade_Tool_v1.57
-Loading firmware...
-Support Type:RK312A	FW Ver:8.1.00	FW Time:2021-05-04 13:50:23
-Loader ver:2.52	Loader Time:2020-05-26 18:26:07
-Upgrade firmware ok.
+ $ sudo ./ruka_install_ps5000.sh
+To flash the firmware you need to put the PS5000 into recovery mode
+Connect your PS5000 console USB port 1 to your computer
+Press and keep pressed the SELECT key and power the console on
+Wait for 5 seconds and then release the SELECT key
+The screen wil be black but the blue power led will be on
+
+Press enter to continue
+Flashing bootloader...
+Program Data in ../Linux_Upgrade_Tool_v1.65
+Write LBA from file (100%)
+Flashing rootfs...
+Program Data in ../Linux_Upgrade_Tool_v1.65
+Write LBA from file (100%)
+Flashing userdata partition...
+Program Data in ../Linux_Upgrade_Tool_v1.65
+Write LBA from file (100%)
+DONE!
 ```
 
 ## Editing existing images to enable hdmi compatibility
@@ -91,3 +108,5 @@ Upgrade firmware ok.
 | Modified at | Comments |Contributor |
 | ----------- | -------- | ---------- |
 | 2021-07-21  | Initial version. | fakemaria |
+| 2021-08-06  | Updated installation steps to match release | acmeplus |
+

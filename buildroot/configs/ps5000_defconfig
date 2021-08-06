@@ -425,7 +425,7 @@ BR2_ROOTFS_OVERLAY="board/rockchip/common/base board/rockchip/ruka-base/fs-overl
 BR2_ROOTFS_POST_BUILD_SCRIPT="build/post.sh"
 BR2_ROOTFS_POST_FAKEROOT_SCRIPT=""
 BR2_ROOTFS_POST_IMAGE_SCRIPT="board/rockchip/ruka-base/ruka_post_image.sh"
-BR2_ROOTFS_POST_SCRIPT_ARGS="ps5000"
+BR2_ROOTFS_POST_SCRIPT_ARGS="ps5000_internal"
 
 #
 # Kernel

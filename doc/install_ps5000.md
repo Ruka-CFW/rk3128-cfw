@@ -20,7 +20,7 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 * Charge the device, it needs to be at least at 80% battery or 7 hours charged
 * Download [drivers from Rockchip repository](https://github.com/rockchip-linux/tools/raw/master/windows/DriverAssitant_v5.11.zip)
 * Download latest [Android Tool Console from RockChip repository](https://github.com/rockchip-linux/tools/blob/master/windows/AndroidTool_Console_v2.4.zip)
-* Download latest custom firmware for your PS5000 from this repository
+* Download [latest custom firmware](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_beta_1) for your PS5000 from this repository 
   
 **BACKUP PROCESS**
 * Unzip Android Tools Console into the firmware folder (e.g. ruka_cfw_3.0_beta_1_20210806)
@@ -58,7 +58,7 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
   inflating: Linux_Upgrade_Tool_v1.65/upgrade_tool 
 ```
 * Make sure the upgrade tool is an executable: ```chmod +x Linux_Upgrade_Tool_v1.65\upgrade_tool```
-* Download latest custom firmware for your PS5000 from this repository ()
+* Download [latest custom firmware](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_beta_1) for your PS5000 from this repository
     
  * Extract the firmware: ```$ tar xzf ruka_cfw_3.0_beta_1_20210806.tgz```
 

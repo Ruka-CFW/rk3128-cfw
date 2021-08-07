@@ -127,6 +127,15 @@ The following files need to be copied into your SDcard
   * custom_viewport_width = "1024"
   * aspect_ratio_index = "22"
 
+## Acknowledgements
+
+* All the folks that have been enjoying our releases
+* Rutjoni, for initial testing and for being right about this console
+* The folks at A12/13 telegram group
+* [Bruma](https://www.youtube.com/channel/UCrdNisYjDd7qI1Zv2ZLwBrQ), [Retrolocatis](https://www.youtube.com/watch?v=a9pKh0gti3s&t=3597s), and other youtubers that have reviewed our CFWs
+* Everyone at the #ps5000 RG Handhelds discord channel
+* And of course, all the rest of the ruka team, you know who you are
+
 ## Changelog
 
 | Modified at | Comments |Contributor |

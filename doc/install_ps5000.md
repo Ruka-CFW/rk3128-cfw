@@ -10,7 +10,8 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 
 * [Windows Installation](#windows-installation)
 * [Linux Installation](#linux-installation)
-* [Editing existing images to enable hdmi compatibility](#editing-existing-images-to-enable-hdmi-compatibility)
+* [SD Card Installation](#sd-card-installation)
+* [General Notes](#general-notes)
   - [Retroarch.cfg files](#retroarchcfg-files)
 * [Changelog](#changelog)
 
@@ -87,14 +88,37 @@ Write LBA from file (100%)
 DONE!
 ```
 
-## Editing existing images to enable hdmi compatibility
+## SD card installation
 
-* TBF
+The sdcard folder contains the folders and files that need to go into the SDCARD.
+
+The following files need to be copied into your SDcard
+
+| File | Description |
+| ---- | ----------- |
+| .config | Retroarch configuration and asset files |
+| rukafs | SDCard Firmware File  |
+| configs | General system and emulators configuration folder |
+| logs | log folder |
+| roms | Roms folder, copy your roms to the specific folder here (e.g. roms/mame) |
+| roms/bios | Bios folder, copy your system bios here |
+
+* Copy the contents of those folders/file into your SD.
+* You will need to add your roms to roms folder (follow the [batocera systems](https://wiki.batocera.org/systems) structure), e.g. roms/mame)
+* Add your bios into the roms/bios folder
+* Insert the SDcard back into the PS5000, reboot, and enjoy
+
+## General notes
+
+* The CFW has been designed to be easily upgradeable. Future upgrades will be via SDCard only, so if you have flashed the internal memory, you won't require to flash it again and instead you will just need to drop an update on your SDCard. 
+* The system may report a couple of BSOD depending on errors:
+  * If your SD card is missing or corrupted the system will report error A
+  * If the rukafs firmware is missing from the SDCard it will report error B
+* You can use your existing SD images from different systems, but the CFW always looks for a configs/ruka/retroarch_ps5000.cfg for its retroarch configuration
 
 ### Retroarch.cfg files
 
-
-* retroarch_hdmi.cfg
+* HDMI compatibility requires at least the following sets to be added to the retroarch.cfg:
   * video_fullscreen_x = "1280"
   * video_fullscreen_y = "720"
   * video_fullscreen = "true"

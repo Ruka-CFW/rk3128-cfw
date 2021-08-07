@@ -15,7 +15,7 @@
 ## Documentación
 
 * [Guía de instalación del CFW del Team Ruka para Powkiddy A12/A13](install_es.md)
-* [Guía de instalación del CFW del Team Ruka para PS5000)(install_ps5000.md)
+* [Guía de instalación del CFW del Team Ruka para PS5000](install_ps5000.md)
 * [How to Contribute](../CONTRIBUTING.md)
 
 ## Ultima versión

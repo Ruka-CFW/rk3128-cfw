@@ -14,7 +14,7 @@
 
 ## Documentation
 
-* [Ruka Custom Firmware Installation Guide](doc/install.md)
+* [Ruka CFW Installation Guide for A12/A13](doc/install.md)
 * [Ruka CFW Installation Guide for PS5000](doc/install_ps5000.md)
 * [How to Contribute](CONTRIBUTING.md)
 

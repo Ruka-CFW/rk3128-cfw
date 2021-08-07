@@ -4,18 +4,21 @@
 
 ---
 
-# Rockchip RK3128 Custom Firmware para Powkiddy A12/A13
+# Rockchip RK3128 Custom Firmware
 
 ## Consolas con soporte:
 
 * Powkiddy A12 (rev1, rev2, & rev3)
 * Powkiddy A13 (rev1, & rev2)
+* PS5000
 
 ## Documentación
 
-* [Guía de instalación del Custom Firmware del Team Ruka](install_es.md)
+* [Guía de instalación del CFW del Team Ruka para Powkiddy A12/A13](install_es.md)
+* [Guía de instalación del CFW del Team Ruka para PS5000)(install_ps5000.md)
 * [How to Contribute](../CONTRIBUTING.md)
 
 ## Ultima versión
 
 * [RUKA CFW v3.0 alpha](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_alpha_1)
+* [RUKA CFW v3.0 beta 1](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_beta_1)

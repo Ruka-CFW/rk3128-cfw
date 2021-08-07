@@ -4,7 +4,7 @@
 
 ---
 
-# Rockchip RK3128 Custom Firmware for Powkiddy A12/A13
+# Rockchip RK3128 Custom Firmware
 
 ## Supported Consoles:
 

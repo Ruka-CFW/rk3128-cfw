@@ -20,5 +20,5 @@
 
 ## Ultima versión
 
-* [RUKA CFW v3.0 alpha](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_alpha_1)
-* [RUKA CFW v3.0 beta 1](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_beta_1)
+* [RUKA CFW v3.0 alpha 1 for Powkiddy A12/A13](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_alpha_1)
+* [RUKA CFW v3.0 beta 1 for PS5000](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_beta_1)

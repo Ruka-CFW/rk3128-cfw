@@ -57,7 +57,7 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 
 * Download [latest custom firmware](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_beta_1) for your PS5000 from this repository
     
-* Extract the firmware: ```$ tar xzf ruka_cfw_3.0_beta_1_20210806.tgz```
+* Extract the firmware: ```$ tar xzf ruka_ps5000_cfw_universal_3.0_beta_2_20210831.tgz```
 
 * Set your PS5000 in flash mode (LOADER)
   * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
@@ -138,4 +138,6 @@ The following files need to be copied into your SDcard
 | 2021-07-21  | Modified version for all revs | fakemaria |
 | 2021-07-21  | Initial version. | fakemaria |
 | 2021-08-06  | Updated installation steps to match release | acmeplus |
+| 2021-08-31  | Updated installation to match beta 2 | fakemaria |
+| 2021-08-31  | Updated Linux installation and added Mac installation | acmeplus |
 

@@ -60,7 +60,7 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 * Extract the firmware: ```$ tar xzf ruka_ps5000_cfw_universal_3.0_beta_2_20210831.tgz```
 
 * Set your PS5000 in flash mode (LOADER)
-  * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
+  * Press and hold SELECT. Turn on the system and keep holding SELECT for 5 seconds
 * Connect a USB-B to the top left port and the USB-A cable to your computer
 * Open a terminal and run the ```ruka_install_ps5000.sh``` script (you will need to be sudo or root to run it) 
 * You should observe a console output similar to this:

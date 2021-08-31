@@ -9,7 +9,7 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 ## Document TOC
 
 * [Windows Installation](#windows-installation)
-* [Linux Installation](#linux-installation)
+* [Linux & Mac Installation](#linux-and-mac-installation)
 * [SD Card Installation](#sd-card-installation)
 * [General Notes](#general-notes)
   - [Retroarch.cfg files](#retroarchcfg-files)
@@ -23,7 +23,7 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 * Download [latest custom firmware](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_beta_1) for your PS5000 from this repository 
   
 **BACKUP PROCESS**
-* Unzip Android Tools Console into the firmware folder (e.g. ruka_cfw_3.0_beta_1_20210806)
+* Unzip Android Tools Console into the firmware folder (e.g. ruka_ps5000_cfw_universal_3.0_beta_2_20210831)
 * Once selected, please connect the usb to the left usb port of the system and plug the usb male to the pc
 * Press and hold SELECT key. Turn on the system and keep holding until windows recognize it or a couple of seconds
 * Open Android_Console_Tool.exe as admin
@@ -37,7 +37,7 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 
 **CFW INSTALL**
 
-* Copy the file ```ruka_ps5000_universal_v3.0_beta_2_20210827``` and ```ruka_install_ps5000 ``` inside Android Tools Console
+* Copy the file ```ruka_ps5000_universal_v3.0_beta_2_20210827.img``` and ```ruka_install_ps5000 ``` inside Android Tools Console
 * ![image](https://user-images.githubusercontent.com/67930710/131519478-583b6e5f-650d-473a-844c-374d4b075a0e.png)
 * Set your PS5000 in flash mode (LOADER)
   * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
@@ -45,22 +45,19 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 * Allow admin privileges when windows ask for it, it will happen twice.
 * Once finished, you can switch off the system and enjoy it!
 
-## Linux Installation
+## Linux and Mac Installation
 
-* Download the [Linux_Upgrade_Tool from Rockchip repository](https://github.com/rockchip-linux/tools/raw/master/linux/Linux_Upgrade_Tool/Linux_Upgrade_Tool_v1.65.zip)
-* Extract the tool: 
-```$ unzip Linux_Upgrade_Tool_v1.65.zip
-  Archive:  Linux_Upgrade_Tool_v1.65.zip
-   creating: Linux_Upgrade_Tool_v1.65/
-  inflating: Linux_Upgrade_Tool_v1.65/config.ini  
-  inflating: Linux_Upgrade_Tool_v1.65/Linux┐к╖в╣д╛▀╩╣╙├╩╓▓с_v1.32.pdf  
-  inflating: Linux_Upgrade_Tool_v1.65/revision.txt  
-  inflating: Linux_Upgrade_Tool_v1.65/upgrade_tool 
-```
-* Make sure the upgrade tool is an executable: ```chmod +x Linux_Upgrade_Tool_v1.65\upgrade_tool```
+* Linux pre-requirements:
+  * You need to install rkflashtool on your linux machine. If you are running ubuntu or debian you can run ```sudo apt install rkflashtool```
+* Mac pre-requirements:
+  * You need to have brew system installed ([brew](https://brew.sh)):
+    ```$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"``` 
+  * Once you have brew installed, install rkflashtool with brew:
+    ```$ brew install rkflashtool```
+
 * Download [latest custom firmware](https://github.com/Ruka-CFW/rk3128-cfw/releases/tag/v3.0_beta_1) for your PS5000 from this repository
     
- * Extract the firmware: ```$ tar xzf ruka_cfw_3.0_beta_1_20210806.tgz```
+* Extract the firmware: ```$ tar xzf ruka_cfw_3.0_beta_1_20210806.tgz```
 
 * Set your PS5000 in flash mode (LOADER)
   * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
@@ -68,7 +65,7 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 * Open a terminal and run the ```ruka_install_ps5000.sh``` script (you will need to be sudo or root to run it) 
 * You should observe a console output similar to this:
  ```
- $ sudo ./ruka_install_ps5000.sh
+ $ sudo ./rkflashtool w 0x0 0x00030000 < ruka_ps5000_v3.0_beta_all_revs_20210827.img
 To flash the firmware you need to put the PS5000 into recovery mode
 Connect your PS5000 console USB port 1 to your computer
 Press and keep pressed the SELECT key and power the console on
@@ -76,15 +73,13 @@ Wait for 5 seconds and then release the SELECT key
 The screen wil be black but the blue power led will be on
 
 Press enter to continue
-Flashing bootloader...
-Program Data in ../Linux_Upgrade_Tool_v1.65
-Write LBA from file (100%)
-Flashing rootfs...
-Program Data in ../Linux_Upgrade_Tool_v1.65
-Write LBA from file (100%)
-Flashing userdata partition...
-Program Data in ../Linux_Upgrade_Tool_v1.65
-Write LBA from file (100%)
+Flashing firmware...
+rkflashtool: info: rkflashtool v5.2
+rkflashtool: info: Detected RK312X...
+rkflashtool: info: interface claimed
+rkflashtool: info: writing flash memory at offset 0x0001ea00
+[...]
+rkflashtool: info: writing flash memory at offset 0x0002ffe0... Done!
 DONE!
 ```
 

@@ -37,8 +37,8 @@ Install it at your own responsibility. **This firmware is ONLY for PS5000**, ins
 
 **CFW INSTALL**
 
-* Copy the folder ```ruka_cfw_3.0_beta_1_20210806\firmware``` inside Android Tools Console
-* ![image](https://user-images.githubusercontent.com/67930710/128572776-2a181080-9357-461c-8af0-91febb589360.png)
+* Copy the file ```ruka_ps5000_universal_v3.0_beta_2_20210827``` and ```ruka_install_ps5000 ``` inside Android Tools Console
+* ![image](https://user-images.githubusercontent.com/67930710/131519478-583b6e5f-650d-473a-844c-374d4b075a0e.png)
 * Set your PS5000 in flash mode (LOADER)
   * Press and hold SELECT. Turn on the system and keep holding until windows recognize it or a couple of seconds
 * Double click on the file ```ruka_install_ps5000.bat```  
@@ -140,6 +140,7 @@ The following files need to be copied into your SDcard
 
 | Modified at | Comments |Contributor |
 | ----------- | -------- | ---------- |
+| 2021-07-21  | Modified version for all revs | fakemaria |
 | 2021-07-21  | Initial version. | fakemaria |
 | 2021-08-06  | Updated installation steps to match release | acmeplus |
 

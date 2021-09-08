@@ -11,7 +11,7 @@
 
 **DESCARGA DE RESPONSABILIDAD:**
 
-Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para las powkiddys A12 Y A13, todas las revisiones (la rev1, rev2 y rev3) a excepción de las pantallas IPS**. Instalando el firmware en otros dispositivos distinto a los mencionados causará un brick permanente que necesitará de herramientas y ficheros que no están aquí y tampoco tiene el equipo ni da soporte. 
+Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para las powkiddys A12 Y A13, todas las revisiones (la reva, revb, revc y revd) a excepción de las pantallas IPS**. Instalando el firmware en otros dispositivos distinto a los mencionados causará un brick permanente que necesitará de herramientas y ficheros que no están aquí y tampoco tiene el equipo ni da soporte. 
 **ANTES de realizar ninguna modificación haz un backup de tu CFW**
 
 
@@ -33,7 +33,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
   * ![image](https://user-images.githubusercontent.com/67930710/117533473-4bdfcc00-afed-11eb-8f3f-42ff76de7f36.png)
 * Descarga el último custom firmware para tu Powkiddy A12/A13 desde este repositorio.
 * Descomprime el firmware con 7zip
-  * Si no sabes que versión instalar: si es una A12 es muy probable que sea la revisión 3 y si es una A12 la revisión 2. La revisión 1 solo se vendió en los primeros meses de lanzamiento. **Instalar una versión incorrecta no dañará tu A12/A13 (por ejemplo instalar la revisión 2 en vez de la revisión 3 en una Powkiddy A12)**   
+  * Si no sabes que versión instalar: si es una A12 es muy probable que sea la revisión d y si es una A13 la revisión a/b. La revisión a solo se vendió en los primeros meses de lanzamiento. **Instalar una versión incorrecta no dañará tu A12/A13 (por ejemplo instalar la revisión b en vez de la revisión c en una Powkiddy A12)**   
 
 **PROCESO DE BACKUP**
 * Descarga y descomprime Android Tools Console [AndroidTool_Console_v2.4.zip](https://github.com/rockchip-linux/tools/raw/master/windows/AndroidTool_Console_v2.4.zip)

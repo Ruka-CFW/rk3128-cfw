@@ -43,7 +43,7 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 
 **CFW INSTALL**
 * Please install first Rev D firmware. If that didn´t work, install Rev A or B. 
-* Unzip RKDevTool and click on AndroidTool.exe
+* Unzip RKDevTool and click on the exe file
 * Click on Upgrade Firmware tab and then on firmware. A modal window will open and you will need to select the image
  ![image](https://user-images.githubusercontent.com/67930710/117165619-f07fc500-adc5-11eb-9441-e06df588ec70.png)
  ![image](https://user-images.githubusercontent.com/67930710/117165910-32107000-adc6-11eb-865f-fc88471f2cfb.png)

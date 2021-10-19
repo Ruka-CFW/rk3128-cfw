@@ -50,7 +50,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 
 **INSTALACIÓN CFW**
 * Para todos, instalad primero el firmware Rev D. Si eso no funciona, entonced instalad Rev A o B.     
-* Descomprime el fichero RKDevTool y haz click en AndroidTool.exe
+* Descomprime el fichero RKDevTool y haz click en el ejecutable
 * Haz click en la pestaña Upgrade Firmware y luego en Firmware. Una ventana modal se abrirá para que selecciones el firmware del team ruka (es un fichero .img)
  ![image](https://user-images.githubusercontent.com/67930710/117165619-f07fc500-adc5-11eb-9441-e06df588ec70.png)
  ![image](https://user-images.githubusercontent.com/67930710/117165910-32107000-adc6-11eb-865f-fc88471f2cfb.png)

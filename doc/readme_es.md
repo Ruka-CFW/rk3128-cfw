@@ -8,8 +8,8 @@
 
 ## Consolas con soporte:
 
-* Powkiddy A12 (rev1, rev2, & rev3)
-* Powkiddy A13 (rev1, & rev2)
+* Powkiddy A12 (reva, revb, revc & revd)
+* Powkiddy A13 (reva, & revb)
 * PS5000
 
 ## Documentación

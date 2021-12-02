@@ -4,7 +4,7 @@
 
 
 **TODAS LAS PLACAS COMPATIBLES, INCLUIDA LA RECIENTE REV D**
-* Para todos, instalad primero el firmware Rev D. Si eso no funciona, entonced instalad Rev A o B. 
+* Para todos, instalad primero el firmware Rev D. Si eso no funciona, entonced instalad Rev A o B. La probabilidad ahora mismo es obtener una placa Rev D en A12 y rev B en A13, pero el Team Ruka no tiene control de estos sucesos. Si te equivocas flasheando y te da el fallo "IDB Fail" es porque has flasheado una Rev A/B en una placa 1.2 Rev D, por lo que tendrás que reflashear la Rev D pero en vez de la combinación de botones tendrás que abrir la consola y ponerla en modo loader dejando pulsado el botón interno de la placa. 
 * El Team Ruka quiere dar las gracias a @albertolega, @TheDreamer000 and todos los chicos que han testeado y cepillado sus sistemas para hacer esta placa rev d compatible con el Ruka CFW
 
 # Guía de instalación del Custom Firmware del Team Ruka 

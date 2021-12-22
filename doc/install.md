@@ -1,7 +1,7 @@
 **This document is available in [ [en](install.md) | [es](install_es.md) | [it](install_it.md) ]**
 
 ------
-**ALL BOARDS ARE NOW COMPATIBLE, INCLUDING LATEST REV D**
+**PLEASE READ: New A13 with board labelled as 1.2 can't be flashed. This revision will be included in next iteration. If you flash it,do it at your own risk**
 * Please install first Rev D firmware if you have an A12. If its an A13 install reva/b. The likelihood is right now to have a revd on A12 and rev b on A13, but this can change and the Team Ruka is not responsible of it. Please note that if you install a RevA/B in a board 1.2 and get the error "IDB Fail" you need to open the Powkiddy and put into loader mode holding the internal button on the board and pressing power (instead of the button combination).  
 * Team Ruka want to give thanks to @albertolega, @TheDreamer000 and all the guys who tested and half-bricked their systems to make this new rev d compatible with Ruka CFW
 # Ruka Custom Firmware Installation Guide

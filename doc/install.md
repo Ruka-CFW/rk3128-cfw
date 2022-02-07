@@ -42,6 +42,7 @@ Install it at your own responsibility. **This firmware is ONLY for A12 and A13 a
 * Now, you can proceed with the next steps. 
 
 **CFW INSTALL**
+* If you didn´t create the backup, do it, IT´S MANDATORY
 * Please install first Rev D firmware. If that didn´t work, install Rev A or B. 
 * Unzip RKDevTool and click on the exe file
 * Click on Upgrade Firmware tab and then on firmware. A modal window will open and you will need to select the image

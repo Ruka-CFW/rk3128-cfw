@@ -49,6 +49,7 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 * Ya puedes continuar con los siguientes pasos
 
 **INSTALACIÓN CFW**
+* HAZ EL BACKUP, ES OBLIGATORIO
 * Para todos, instalad primero el firmware Rev D. Si eso no funciona, entonced instalad Rev A o B.     
 * Descomprime el fichero RKDevTool y haz click en el ejecutable
 * Haz click en la pestaña Upgrade Firmware y luego en Firmware. Una ventana modal se abrirá para que selecciones el firmware del team ruka (es un fichero .img)

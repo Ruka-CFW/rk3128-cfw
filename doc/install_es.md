@@ -25,7 +25,6 @@ Instálalo bajo tu completa responsabilidad. **Este firmware es SÓLAMENTE para 
 
 ## Instalación en Windows
 
-* Para todos, instalad primero el firmware Rev D. Si eso no funciona, entonced instalad Rev A o B. 
 * El dispositivo debe de estar al 80% de carga o llevar al menos 7 horas cargando
 * Descarga los [drivers del repositorio de Rockchip e instalalos](https://github.com/rockchip-linux/tools/raw/master/windows/DriverAssitant_v5.11.zip)
 * Descarga la última versión de la [RKDevTool desde el repositorio de RockChip](https://github.com/rockchip-linux/tools/raw/master/windows/RKDevTool_Release_v2.84.zip)

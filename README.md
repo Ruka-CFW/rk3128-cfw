@@ -2,7 +2,7 @@
 
 ## This repository is now obsolete and won't work with newer models of Powkiddy A12/A13
 ## This cfw is known to work only with models sold up to December 2021, newer models may or may not work and updating may result on a console brick.
-## Use the batocera SDcard firmware found on the [official batocera repository](https://batocera.org/downloads)
+## Use the batocera SDcard firmware found on the [official batocera repository](https://batocera.org/downloads). That image works directly from the SDCARD and does not modify the contents of the internal firmware.
 ## For additional information go to [this wiki page](https://rk3128-cfw.github.io)
 
 ![image](https://user-images.githubusercontent.com/67930710/117461690-22bc2e80-af4e-11eb-8ac5-240f600ebe39.png)
